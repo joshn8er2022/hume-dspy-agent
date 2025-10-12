@@ -34,7 +34,7 @@ def extract_answer_value(answer: TypeformAnswer) -> Any:
     elif answer_type in ["boolean", "yes_no", "legal"]:
         return answer.boolean
 
-    # Single choice
+    # Single choice - FIXED: Added "choice" type
     elif answer_type in ["choice", "dropdown", "multiple_choice", "picture_choice"]:
         if answer.choice:
             return answer.choice.label or answer.choice.id
@@ -133,17 +133,19 @@ def transform_typeform_to_lead(payload: TypeformWebhookPayload) -> Lead:
     """
     form_response = payload.form_response
 
-    # Build field reference map
+    # Build field map using FIELD_MAPPING to translate Typeform IDs to standardized names
     field_map: Dict[str, Any] = {}
 
     for answer in form_response.answers:
-        # Use ref if available, otherwise use field ID
-        key = answer.field.ref or answer.field.id
+        # Get the Typeform field ID
+        typeform_field_id = answer.field.id
         value = extract_answer_value(answer)
 
         if value is not None:
-            field_map[key] = value
-            logger.debug(f"Mapped field {key} = {value}")
+            # Translate Typeform field ID to our standardized field name using FIELD_MAPPING
+            standardized_name = FIELD_MAPPING.get(typeform_field_id, typeform_field_id)
+            field_map[standardized_name] = value
+            logger.debug(f"Mapped Typeform field {typeform_field_id} -> {standardized_name} = {value}")
 
     # Extract required fields
     email = field_map.get("email") or field_map.get("email_address")
