@@ -35,7 +35,7 @@ def extract_answer_value(answer: TypeformAnswer) -> Any:
         return answer.boolean
 
     # Single choice
-    elif answer_type in ["dropdown", "multiple_choice", "picture_choice"]:
+    elif answer_type in ["choice", "dropdown", "multiple_choice", "picture_choice"]:
         if answer.choice:
             return answer.choice.label or answer.choice.id
 
