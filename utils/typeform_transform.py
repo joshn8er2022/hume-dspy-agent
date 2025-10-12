@@ -1,7 +1,7 @@
 """Utilities for transforming Typeform webhook data to Lead models."""
 from typing import Dict, Any, Optional
 from models.typeform import TypeformWebhookPayload, TypeformAnswer
-from models.lead import Lead, BusinessSize, PatientVolume, PartnershipType
+from models.lead import Lead, BusinessSize, PatientVolume, PartnershipType, FIELD_MAPPING
 import logging
 
 logger = logging.getLogger(__name__)
