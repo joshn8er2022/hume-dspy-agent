@@ -159,6 +159,18 @@ async def typeform_webhook(
         logger.info(f"Answers Count: {len(payload.form_response.answers)}")
         logger.info('='*80)
 
+        # DEBUG: Show actual field IDs from Typeform
+        logger.info('\n' + '='*80)
+        logger.info('🔍 TYPEFORM FIELD MAPPING DEBUG')
+        for answer in payload.form_response.answers:
+            field_id = answer.field.id
+            field_ref = answer.field.ref if hasattr(answer.field, 'ref') else 'N/A'
+            field_type = answer.field.type
+            answer_type = answer.type
+            logger.info(f'  Field ID: {field_id} | Ref: {field_ref} | Type: {field_type}/{answer_type}')
+        logger.info('='*80 + '\n')
+
+
         # Transform Typeform payload to Lead model
         try:
             lead = transform_typeform_to_lead(payload)
