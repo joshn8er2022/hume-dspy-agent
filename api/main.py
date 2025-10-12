@@ -192,7 +192,8 @@ async def typeform_webhook(
         logger.info(f"🤖 Qualifying lead with DSPy agent...")
 
         try:
-            result = inbound_agent.qualify_lead(lead)
+            agent = InboundAgent()
+            result = agent.forward(lead)
 
             processing_time = time.time() - start_time
 
