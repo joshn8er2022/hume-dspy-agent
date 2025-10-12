@@ -1,7 +1,8 @@
 """Utilities for transforming Typeform webhook data to Lead models."""
 from typing import Dict, Any, Optional
 from models.typeform import TypeformWebhookPayload, TypeformAnswer
-from models.lead import Lead, BusinessSize, PatientVolume, PartnershipType, FIELD_MAPPING
+from models.lead import Lead, BusinessSize, PatientVolume, PartnershipType, ResponseType, FIELD_MAPPING
+import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -152,9 +153,17 @@ def transform_typeform_to_lead(payload: TypeformWebhookPayload) -> Lead:
     if not email:
         raise ValueError("Email is required but not found in Typeform response")
 
+    # Determine response type (COMPLETED if has email, PARTIAL otherwise)
+    response_type = ResponseType.COMPLETED if email else ResponseType.PARTIAL
+
     # Build Lead object
     try:
         lead = Lead(
+            # Required fields
+            id=str(uuid.uuid4()),
+            typeform_id=form_response.form_id,
+            response_type=response_type,
+
             # Contact info
             first_name=field_map.get("first_name", ""),
             last_name=field_map.get("last_name", ""),
