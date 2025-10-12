@@ -87,8 +87,8 @@ class InboundAgent(dspy.Module):
             email_result = self.generate_email(
                 lead_name=lead.get_full_name(),
                 company=lead.company or "your practice",
-                business_size=lead.business_size.value if lead.business_size else "small business",
-                patient_volume=lead.patient_volume.value if lead.patient_volume else "1-50 patients",
+                business_size=lead.business_size if lead.business_size else "small business",
+                patient_volume=lead.patient_volume if lead.patient_volume else "1-50 patients",
                 needs_summary=lead.ai_summary or "body composition tracking",
                 tier=tier.value,
             )
@@ -138,8 +138,8 @@ class InboundAgent(dspy.Module):
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:
         """Analyze business fit using DSPy."""
         result = self.analyze_business(
-            business_size=lead.business_size.value if lead.business_size else "Unknown",
-            patient_volume=lead.patient_volume.value if lead.patient_volume else "Unknown",
+            business_size=lead.business_size if lead.business_size else "Unknown",
+            patient_volume=lead.patient_volume if lead.patient_volume else "Unknown",
             company=lead.company or "Unknown",
             industry="Healthcare",  # Enrichment removed in form-agnostic refactor
         )
@@ -151,7 +151,7 @@ class InboundAgent(dspy.Module):
     def _analyze_engagement(self, lead: Lead) -> Dict[str, Any]:
         """Analyze engagement using DSPy."""
         result = self.analyze_engagement(
-            response_type=lead.response_type.value,
+            response_type=lead.response_type,
             has_calendly_booking=lead.has_booking(),
             body_comp_response=lead.body_comp_tracking or "No response provided",
             ai_summary=lead.ai_summary or "No summary available",
@@ -167,21 +167,21 @@ class InboundAgent(dspy.Module):
         # Business size scoring (0-20)
         business_size_score = 0
         if lead.business_size:
-            if "Large" in lead.business_size.value:
+            if "Large" in lead.business_size:
                 business_size_score = 20
-            elif "Medium" in lead.business_size.value:
+            elif "Medium" in lead.business_size:
                 business_size_score = 15
-            elif "Small" in lead.business_size.value:
+            elif "Small" in lead.business_size:
                 business_size_score = 10
 
         # Patient volume scoring (0-20)
         patient_volume_score = 0
         if lead.patient_volume:
-            if "300+" in lead.patient_volume.value:
+            if "300+" in lead.patient_volume:
                 patient_volume_score = 20
-            elif "51-300" in lead.patient_volume.value:
+            elif "51-300" in lead.patient_volume:
                 patient_volume_score = 15
-            elif "1-50" in lead.patient_volume.value:
+            elif "1-50" in lead.patient_volume:
                 patient_volume_score = 10
 
         # Industry fit (0-15) - from business fit analysis
@@ -253,10 +253,10 @@ class InboundAgent(dspy.Module):
         if lead.is_complete_submission():
             factors.append("Complete Typeform response")
 
-        if lead.business_size and "Large" in lead.business_size.value:
+        if lead.business_size and "Large" in lead.business_size:
             factors.append("Large business (20+ employees)")
 
-        if lead.patient_volume and "300+" in lead.patient_volume.value:
+        if lead.patient_volume and "300+" in lead.patient_volume:
             factors.append("High patient volume (300+)")
 
         if engagement["intent_level"] == "high":
@@ -284,7 +284,7 @@ class InboundAgent(dspy.Module):
         if engagement["intent_level"] == "low":
             concerns.append("Low engagement signals")
 
-        if lead.business_size and "Small" in lead.business_size.value:
+        if lead.business_size and "Small" in lead.business_size:
             concerns.append("Small business (may have budget constraints)")
 
         return concerns
