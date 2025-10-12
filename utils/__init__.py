@@ -1,11 +1,11 @@
 """Utility functions for the Hume DSPy Agent."""
 
 from .typeform_transform import (
-    transform_typeform_to_lead,
+    transform_typeform_webhook,
     extract_answer_value,
-    map_business_size,
-    map_patient_volume,
-    map_partnership_type,
+    extract_field_name,
+    build_raw_answers,
+    extract_common_fields,
 )
 
 from .security import (
@@ -15,12 +15,11 @@ from .security import (
 
 __all__ = [
     # Typeform transformation
-    "transform_typeform_to_lead",
+    "transform_typeform_webhook",
     "extract_answer_value",
-    "map_business_size",
-    "map_patient_volume",
-    "map_partnership_type",
-
+    "extract_field_name",
+    "build_raw_answers",
+    "extract_common_fields",
     # Security
     "verify_typeform_signature",
     "verify_webhook_signature",
