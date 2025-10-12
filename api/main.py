@@ -1,4 +1,6 @@
 """FastAPI application for Hume DSPy Agent."""
+import os
+import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
@@ -20,6 +22,11 @@ from models import (
 from agents import InboundAgent
 from core import settings, dspy_manager
 from utils.typeform_transformer import transform_typeform_to_lead
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+# Initialize logger
 
 # Initialize FastAPI
 app = FastAPI(
