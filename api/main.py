@@ -93,130 +93,172 @@ async def typeform_webhook(
 ):
     """Receive Typeform webhook and process lead.
 
-    This endpoint receives Typeform webhook submissions directly from Typeform,
-    transforms them to Lead objects, and qualifies them using DSPy.
+    This endpoint:
+    1. Verifies webhook signature for security
+    2. Parses Typeform's nested payload structure
+    3. Transforms to Lead model
+    4. Qualifies lead using DSPy agent
+    5. Executes recommended actions
+    6. Sends notifications
 
     Args:
-        request: Raw request to capture payload
+        request: Raw request to capture payload and headers
         background_tasks: FastAPI background tasks
 
     Returns:
         Event confirmation with processing status
     """
+    import time
+    from models.typeform import TypeformWebhookPayload
+    from utils.typeform_transform import transform_typeform_to_lead
+    from utils.security import verify_typeform_signature
+
+    start_time = time.time()
+
     try:
-        # Get raw payload
-        raw_payload = await request.json()
+        # Get raw body for signature verification
+        body = await request.body()
 
-        # Log incoming webhook for debugging
-        print('\n' + '='*80)
-        print("📥 Typeform Webhook Received")
-        print('='*80)
-        print(json.dumps(raw_payload, indent=2)[:500])  # First 500 chars
-        print('='*80 + '\n')
+        # Verify signature if secret is configured
+        signature = request.headers.get("X-Typeform-Signature", "")
+        typeform_secret = os.getenv("TYPEFORM_WEBHOOK_SECRET", "")
 
-        # Parse webhook payload
-        try:
-            webhook = TypeformWebhook(**raw_payload)
-        except Exception as e:
-            print(f"❌ Failed to parse Typeform webhook: {str(e)}")
-            print(f"Raw payload: {json.dumps(raw_payload, indent=2)}")
+        if typeform_secret and not verify_typeform_signature(body, signature, typeform_secret):
+            logger.warning(f"Invalid Typeform signature from {request.client.host}")
             raise HTTPException(
-                status_code=422,
-                detail=f"Invalid Typeform webhook payload: {str(e)}"
+                status_code=401,
+                detail="Invalid webhook signature"
             )
 
-        # Transform to Lead using new transformer
+        # Parse JSON payload
         try:
-            lead = transform_typeform_to_lead(webhook)
-            print(f"✅ Transformed to Lead: {lead.get_full_name()} ({lead.email})")
+            payload_dict = await request.json()
+            payload = TypeformWebhookPayload(**payload_dict)
         except Exception as e:
-            print(f"❌ Failed to transform webhook to lead: {str(e)}")
+            logger.error(f"Failed to parse Typeform payload: {e}")
+            logger.error(f"Payload: {body.decode('utf-8')[:500]}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid Typeform payload: {str(e)}"
+            )
+
+        logger.info('\n' + '='*80)
+        logger.info(f"📥 TYPEFORM WEBHOOK RECEIVED")
+        logger.info(f"Event ID: {payload.event_id}")
+        logger.info(f"Event Type: {payload.event_type}")
+        logger.info(f"Form ID: {payload.form_response.form_id}")
+        logger.info(f"Submission Token: {payload.form_response.token}")
+        logger.info(f"Submitted At: {payload.form_response.submitted_at}")
+        logger.info(f"Answers Count: {len(payload.form_response.answers)}")
+        logger.info('='*80)
+
+        # Transform Typeform payload to Lead model
+        try:
+            lead = transform_typeform_to_lead(payload)
+            logger.info(f"✅ Transformed to Lead: {lead.email}")
+        except ValueError as e:
+            logger.error(f"Failed to transform Typeform payload: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required fields: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error transforming payload: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to transform webhook: {str(e)}"
+                detail="Failed to process lead data"
             )
 
-        # Create event for audit trail
-        event = Event(
-            id=str(uuid.uuid4()),
-            event_type=EventType.TYPEFORM_SUBMISSION,
-            source=EventSource.WEBHOOK,
-            payload=raw_payload,
-        )
+        # Qualify lead using DSPy agent
+        logger.info(f"🤖 Qualifying lead with DSPy agent...")
 
-        # Process in background
-        background_tasks.add_task(process_lead, lead, event.id)
+        try:
+            result = inbound_agent.qualify_lead(lead)
 
-        return BaseResponse(
-            success=True,
-            message="Typeform submission received and queued for processing",
-            data={
-                "event_id": event.id,
-                "lead_id": lead.id,
-                "lead_name": lead.get_full_name(),
+            processing_time = time.time() - start_time
+
+            logger.info('\n' + '='*80)
+            logger.info(f"✅ LEAD QUALIFIED - {result.tier}")
+            logger.info(f"Score: {result.score}/100")
+            logger.info(f"Business Fit: {result.business_fit_score}/50")
+            logger.info(f"Engagement: {result.engagement_score}/50")
+            logger.info(f"Processing Time: {processing_time:.2f}s")
+            logger.info('='*80)
+
+            # Send Slack notification
+            try:
+                slack_message = f"""🎯 *New Lead Qualified: {result.tier}*
+
+*Contact:* {lead.first_name} {lead.last_name}
+*Email:* {lead.email}
+*Business:* {lead.business_name or 'N/A'}
+
+*Score:* {result.score}/100
+• Business Fit: {result.business_fit_score}/50
+• Engagement: {result.engagement_score}/50
+
+*Tier:* {result.tier}
+*Next Actions:*
+{chr(10).join('• ' + action for action in result.recommended_actions)}
+
+*Reasoning:*
+{result.reasoning}
+
+_Processed in {processing_time:.2f}s_"""
+
+                slack_response = requests.post(
+                    "https://slack.com/api/chat.postMessage",
+                    headers={
+                        "Authorization": f"Bearer {os.getenv('SLACK_USER_TOKEN')}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "channel": "ai-test",
+                        "text": slack_message
+                    }
+                )
+
+                if slack_response.json().get("ok"):
+                    logger.info("✅ Slack notification sent")
+                else:
+                    logger.warning(f"Slack notification failed: {slack_response.json()}")
+
+            except Exception as e:
+                logger.error(f"Failed to send Slack notification: {e}")
+
+            # Return success response
+            return {
+                "status": "success",
+                "event_id": payload.event_id,
+                "submission_token": payload.form_response.token,
                 "lead_email": lead.email,
-            },
-        )
+                "qualification": {
+                    "tier": result.tier,
+                    "score": result.score,
+                    "business_fit": result.business_fit_score,
+                    "engagement": result.engagement_score
+                },
+                "processing_time": round(processing_time, 2),
+                "actions_recommended": len(result.recommended_actions)
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to qualify lead: {e}")
+            logger.exception(e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Lead qualification failed: {str(e)}"
+            )
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Unexpected error in webhook handler: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def process_lead(lead: Lead, event_id: str):
-    """Background task to process and qualify lead.
-
-    Args:
-        lead: Lead to process
-        event_id: Associated event ID
-    """
-    try:
-        print(f"🔄 Processing lead: {lead.get_full_name()}")
-
-        # Qualify lead with DSPy agent
-        agent = InboundAgent()
-        result = agent.forward(lead)
-
-        # Update lead with qualification results
-        lead.score = result.score
-        lead.is_qualified = result.is_qualified
-        lead.qualification_reason = result.reasoning
-        lead.status = _determine_lead_status(result)
-
-        print(f"✅ Lead qualified: {result.score}/100 ({result.tier.value})")
-        print(f"   Status: {lead.status}")
-        print(f"   Next actions: {len(result.next_actions)} recommended")
-
-        # TODO: Save to Supabase
-        # TODO: Create Close CRM lead if qualified
-        # TODO: Send email/SMS if needed
-        # TODO: Post to Slack if high-value
-
-    except Exception as e:
-        print(f"❌ Error processing lead {lead.id}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-
-
-def _determine_lead_status(result: QualificationResult) -> str:
-    """Determine lead status from qualification result.
-
-    Args:
-        result: Qualification result
-
-    Returns:
-        Lead status string
-    """
-    if result.tier.value == "hot":
-        return "qualified"
-    elif result.tier.value == "warm":
-        return "qualified"
-    elif result.tier.value == "cold":
-        return "nurture"
-    else:
-        return "unqualified"
-
+        logger.error(f"Unexpected error in webhook handler: {e}")
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
 
 if __name__ == "__main__":
     uvicorn.run(
