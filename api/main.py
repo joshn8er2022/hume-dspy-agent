@@ -1,14 +1,16 @@
 """FastAPI application for Hume DSPy Agent."""
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 import uvicorn
 import uuid
 from datetime import datetime
+import json
 
 from models import (
     Lead,
     TypeformSubmission,
+    TypeformWebhook,
     Event,
     EventType,
     EventSource,
@@ -17,6 +19,7 @@ from models import (
 )
 from agents import InboundAgent
 from core import settings, dspy_manager
+from utils.typeform_transformer import transform_typeform_to_lead
 
 # Initialize FastAPI
 app = FastAPI(
@@ -85,32 +88,63 @@ async def qualify_lead(lead: Lead):
 
 @app.post("/webhooks/typeform")
 async def typeform_webhook(
-    submission: TypeformSubmission,
+    request: Request,
     background_tasks: BackgroundTasks,
 ):
     """Receive Typeform webhook and process lead.
 
-    This endpoint receives Typeform submissions from N8N,
-    converts them to Lead objects, and qualifies them.
+    This endpoint receives Typeform webhook submissions directly from Typeform,
+    transforms them to Lead objects, and qualifies them using DSPy.
 
     Args:
-        submission: Typeform submission data
+        request: Raw request to capture payload
         background_tasks: FastAPI background tasks
 
     Returns:
         Event confirmation with processing status
     """
     try:
+        # Get raw payload
+        raw_payload = await request.json()
+
+        # Log incoming webhook for debugging
+        print(f"
+{'='*80}")
+        print("📥 Typeform Webhook Received")
+        print(f"{'='*80}")
+        print(json.dumps(raw_payload, indent=2)[:500])  # First 500 chars
+        print(f"{'='*80}
+")
+
+        # Parse webhook payload
+        try:
+            webhook = TypeformWebhook(**raw_payload)
+        except Exception as e:
+            print(f"❌ Failed to parse Typeform webhook: {str(e)}")
+            print(f"Raw payload: {json.dumps(raw_payload, indent=2)}")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid Typeform webhook payload: {str(e)}"
+            )
+
+        # Transform to Lead using new transformer
+        try:
+            lead = transform_typeform_to_lead(webhook)
+            print(f"✅ Transformed to Lead: {lead.get_full_name()} ({lead.email})")
+        except Exception as e:
+            print(f"❌ Failed to transform webhook to lead: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to transform webhook: {str(e)}"
+            )
+
         # Create event for audit trail
         event = Event(
             id=str(uuid.uuid4()),
             event_type=EventType.TYPEFORM_SUBMISSION,
             source=EventSource.WEBHOOK,
-            payload=submission.model_dump(),
+            payload=raw_payload,
         )
-
-        # Convert Typeform submission to Lead
-        lead = _typeform_to_lead(submission)
 
         # Process in background
         background_tasks.add_task(process_lead, lead, event.id)
@@ -121,9 +155,14 @@ async def typeform_webhook(
             data={
                 "event_id": event.id,
                 "lead_id": lead.id,
+                "lead_name": lead.get_full_name(),
+                "lead_email": lead.email,
             },
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ Unexpected error in webhook handler: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -135,6 +174,9 @@ async def process_lead(lead: Lead, event_id: str):
         event_id: Associated event ID
     """
     try:
+        print(f"
+🔄 Processing lead: {lead.get_full_name()}")
+
         # Qualify lead with DSPy agent
         agent = InboundAgent()
         result = agent.forward(lead)
@@ -145,66 +187,19 @@ async def process_lead(lead: Lead, event_id: str):
         lead.qualification_reason = result.reasoning
         lead.status = _determine_lead_status(result)
 
+        print(f"✅ Lead qualified: {result.score}/100 ({result.tier.value})")
+        print(f"   Status: {lead.status}")
+        print(f"   Next actions: {len(result.next_actions)} recommended")
+
         # TODO: Save to Supabase
         # TODO: Create Close CRM lead if qualified
         # TODO: Send email/SMS if needed
         # TODO: Post to Slack if high-value
 
-        print(f"✅ Lead {lead.id} qualified: {result.score}/100 ({result.tier.value})")
-
     except Exception as e:
         print(f"❌ Error processing lead {lead.id}: {str(e)}")
-
-
-def _typeform_to_lead(submission: TypeformSubmission) -> Lead:
-    """Convert Typeform submission to Lead object.
-
-    Args:
-        submission: Typeform submission
-
-    Returns:
-        Lead object
-    """
-    # Parse dates
-    typeform_start = None
-    typeform_submit = None
-
-    if submission.start_date:
-        try:
-            typeform_start = datetime.fromisoformat(submission.start_date.replace(" ", "T"))
-        except:
-            pass
-
-    if submission.submit_date:
-        try:
-            typeform_submit = datetime.fromisoformat(submission.submit_date.replace(" ", "T"))
-        except:
-            pass
-
-    # Create lead
-    lead = Lead(
-        id=str(uuid.uuid4()),
-        typeform_id=submission.submission_id,
-        first_name=submission.first_name.strip(),
-        last_name=submission.last_name.strip(),
-        email=submission.email,
-        phone=submission.phone_number,
-        company=submission.company,
-        business_size=submission.business_size,
-        patient_volume=submission.patient_volume,
-        response_type=submission.response_type,
-        partnership_interest=submission.partnership_interest,
-        body_comp_tracking=submission.body_comp_tracking,
-        ai_summary=submission.summary,
-        calendly_link=submission.calendly_link,
-        calendly_booked=bool(submission.calendly_link),
-        typeform_start_date=typeform_start,
-        typeform_submit_date=typeform_submit,
-        network_id=submission.network_id,
-        tags=submission.tags.split(",") if submission.tags else [],
-    )
-
-    return lead
+        import traceback
+        traceback.print_exc()
 
 
 def _determine_lead_status(result: QualificationResult) -> str:

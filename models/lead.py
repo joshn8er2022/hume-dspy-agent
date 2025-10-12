@@ -80,8 +80,87 @@ class EnrichmentData(BaseModel):
     twitter_url: Optional[str] = None
 
 
+# ============================================================================
+# TYPEFORM WEBHOOK MODELS (Actual Typeform API Structure)
+# ============================================================================
+
+class TypeformFieldRef(BaseModel):
+    """Typeform field reference."""
+    id: str
+    type: str
+    ref: str
+
+
+class TypeformChoice(BaseModel):
+    """Typeform multiple choice answer."""
+    id: Optional[str] = None
+    label: Optional[str] = None
+    ref: Optional[str] = None
+
+
+class TypeformAnswer(BaseModel):
+    """Individual answer in Typeform response."""
+    type: str
+    field: TypeformFieldRef
+
+    # Different answer types
+    text: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    url: Optional[str] = None
+    choice: Optional[TypeformChoice] = None
+    number: Optional[float] = None
+    boolean: Optional[bool] = None
+    date: Optional[str] = None
+
+
+class TypeformFormResponse(BaseModel):
+    """Typeform form response data."""
+    form_id: str
+    token: str
+    landed_at: str
+    submitted_at: str
+    answers: List[TypeformAnswer]
+    hidden: Optional[Dict[str, Any]] = None
+    variables: Optional[List[Dict[str, Any]]] = None
+    definition: Optional[Dict[str, Any]] = None
+    ending: Optional[Dict[str, Any]] = None
+
+
+class TypeformWebhook(BaseModel):
+    """Complete Typeform webhook payload."""
+    event_id: str
+    event_type: str
+    form_response: TypeformFormResponse
+
+
+# ============================================================================
+# FIELD MAPPING FOR HUME WHOLESALE PARTNERSHIP FORM
+# ============================================================================
+
+FIELD_MAPPING = {
+    "3KodbBKF4sjs": "first_name",
+    "E5lZOmaIikF3": "last_name",
+    "rOpAikQSG0QU": "company",
+    "YatnhdTnor9d": "email",
+    "pPr9YAraUEmw": "phone",
+    "mHMo6Fy1kvei": "selling_products",
+    "6FtQFaJWOXEj": "current_products",
+    "Za2AoM3CQPlE": "bodypod_familiarity",
+    "Q3WLjtqYcf5T": "business_goals",
+    "YnUfbQ4i3JXX": "locations",
+    "aNbfZ4kgMafJ": "bodypod_quantity",
+    "jl8tMiHkukdJ": "portal_interest",
+    "ocRGUnixrKTF": "calendly_url"
+}
+
+
+# ============================================================================
+# LEGACY MODEL (For CSV imports)
+# ============================================================================
+
 class TypeformSubmission(BaseModel):
-    """Raw Typeform submission data."""
+    """Raw Typeform submission data from CSV export."""
 
     # Unique identifier
     submission_id: str = Field(..., alias="#")
@@ -96,7 +175,7 @@ class TypeformSubmission(BaseModel):
     # Business details
     business_size: Optional[str] = Field(None, alias="Are you a...")
     patient_volume: Optional[str] = Field(
-        None, 
+        None,
         alias="Approximately how many patients are you aiming to monitor body composition data for"
     )
 
