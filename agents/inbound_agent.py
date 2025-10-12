@@ -75,21 +75,21 @@ class InboundAgent(dspy.Module):
         actions_result = self.determine_actions(
             qualification_score=total_score,
             tier=tier.value,
-            has_booking=lead.has_booking(),
-            response_complete=lead.is_complete_submission(),
+            has_booking=lead.has_field('calendly_url'),
+            response_complete=lead.is_complete(),
         )
 
         # Step 6: Generate personalized templates if qualified
         email_template = None
         sms_template = None
 
-        if is_qualified and lead.is_complete_submission():
+        if is_qualified and lead.is_complete():
             email_result = self.generate_email(
-                lead_name=lead.get_full_name(),
-                company=lead.company or "your practice",
-                business_size=lead.business_size if lead.business_size else "small business",
-                patient_volume=lead.patient_volume if lead.patient_volume else "1-50 patients",
-                needs_summary=lead.ai_summary or "body composition tracking",
+                lead_name=(lead.get_field('first_name', '') + ' ' + lead.get_field('last_name', '')).strip() or 'there',
+                company=lead.get_field('company') or "your practice",
+                business_size=lead.get_field('business_size') if lead.get_field('business_size') else "small business",
+                patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "1-50 patients",
+                needs_summary=lead.get_field('ai_summary') or "body composition tracking",
                 tier=tier.value,
             )
             email_template = f"""Subject: {email_result.email_subject}
@@ -97,9 +97,9 @@ class InboundAgent(dspy.Module):
 {email_result.email_body}"""
 
             sms_result = self.generate_sms(
-                lead_name=lead.first_name,
+                lead_name=lead.get_field('first_name'),
                 tier=tier.value,
-                has_booking=lead.has_booking(),
+                has_booking=lead.has_field('calendly_url'),
             )
             sms_template = sms_result.sms_message
 
@@ -138,9 +138,9 @@ class InboundAgent(dspy.Module):
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:
         """Analyze business fit using DSPy."""
         result = self.analyze_business(
-            business_size=lead.business_size if lead.business_size else "Unknown",
-            patient_volume=lead.patient_volume if lead.patient_volume else "Unknown",
-            company=lead.company or "Unknown",
+            business_size=lead.get_field('business_size') if lead.get_field('business_size') else "Unknown",
+            patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "Unknown",
+            company=lead.get_field('company') or "Unknown",
             industry="Healthcare",  # Enrichment removed in form-agnostic refactor
         )
         return {
@@ -152,9 +152,9 @@ class InboundAgent(dspy.Module):
         """Analyze engagement using DSPy."""
         result = self.analyze_engagement(
             response_type=lead.response_type,
-            has_calendly_booking=lead.has_booking(),
-            body_comp_response=lead.body_comp_tracking or "No response provided",
-            ai_summary=lead.ai_summary or "No summary available",
+            has_calendly_booking=lead.has_field('calendly_url'),
+            body_comp_response=lead.get_field('body_comp_tracking') or "No response provided",
+            ai_summary=lead.get_field('ai_summary') or "No summary available",
         )
         return {
             "score": result.engagement_score,
@@ -166,32 +166,32 @@ class InboundAgent(dspy.Module):
         """Calculate detailed qualification criteria."""
         # Business size scoring (0-20)
         business_size_score = 0
-        if lead.business_size:
-            if "Large" in lead.business_size:
+        if lead.get_field('business_size'):
+            if "Large" in lead.get_field('business_size'):
                 business_size_score = 20
-            elif "Medium" in lead.business_size:
+            elif "Medium" in lead.get_field('business_size'):
                 business_size_score = 15
-            elif "Small" in lead.business_size:
+            elif "Small" in lead.get_field('business_size'):
                 business_size_score = 10
 
         # Patient volume scoring (0-20)
         patient_volume_score = 0
-        if lead.patient_volume:
-            if "300+" in lead.patient_volume:
+        if lead.get_field('patient_volume'):
+            if "300+" in lead.get_field('patient_volume'):
                 patient_volume_score = 20
-            elif "51-300" in lead.patient_volume:
+            elif "51-300" in lead.get_field('patient_volume'):
                 patient_volume_score = 15
-            elif "1-50" in lead.patient_volume:
+            elif "1-50" in lead.get_field('patient_volume'):
                 patient_volume_score = 10
 
         # Industry fit (0-15) - from business fit analysis
         industry_fit_score = min(15, int(business_fit["score"] * 0.3))
 
         # Response completeness (0-15)
-        response_completeness_score = 15 if lead.is_complete_submission() else 5
+        response_completeness_score = 15 if lead.is_complete() else 5
 
         # Calendly booking (0-10)
-        calendly_booking_score = 10 if lead.has_booking() else 0
+        calendly_booking_score = 10 if lead.has_field('calendly_url') else 0
 
         # Response quality (0-10) - from engagement analysis
         response_quality_score = min(10, int(engagement["score"] * 0.2))
@@ -233,10 +233,10 @@ class InboundAgent(dspy.Module):
             engagement["reasoning"],
         ]
 
-        if lead.has_booking():
+        if lead.has_field('calendly_url'):
             reasoning_parts.append("\n✅ Lead has scheduled a Calendly call - high intent signal.")
 
-        if lead.is_complete_submission():
+        if lead.is_complete():
             reasoning_parts.append("✅ Complete Typeform submission - strong engagement.")
         else:
             reasoning_parts.append("⚠️ Partial submission - may need nurturing.")
@@ -247,16 +247,16 @@ class InboundAgent(dspy.Module):
         """Extract key positive factors."""
         factors = []
 
-        if lead.has_booking():
+        if lead.has_field('calendly_url'):
             factors.append("Calendly call scheduled")
 
-        if lead.is_complete_submission():
+        if lead.is_complete():
             factors.append("Complete Typeform response")
 
-        if lead.business_size and "Large" in lead.business_size:
+        if lead.get_field('business_size') and "Large" in lead.get_field('business_size'):
             factors.append("Large business (20+ employees)")
 
-        if lead.patient_volume and "300+" in lead.patient_volume:
+        if lead.get_field('patient_volume') and "300+" in lead.get_field('patient_volume'):
             factors.append("High patient volume (300+)")
 
         if engagement["intent_level"] == "high":
@@ -272,10 +272,10 @@ class InboundAgent(dspy.Module):
         """Extract potential concerns."""
         concerns = []
 
-        if not lead.is_complete_submission():
+        if not lead.is_complete():
             concerns.append("Partial Typeform submission")
 
-        if not lead.has_booking():
+        if not lead.has_field('calendly_url'):
             concerns.append("No Calendly booking yet")
 
         if not lead.phone:
@@ -284,7 +284,7 @@ class InboundAgent(dspy.Module):
         if engagement["intent_level"] == "low":
             concerns.append("Low engagement signals")
 
-        if lead.business_size and "Small" in lead.business_size:
+        if lead.get_field('business_size') and "Small" in lead.get_field('business_size'):
             concerns.append("Small business (may have budget constraints)")
 
         return concerns
