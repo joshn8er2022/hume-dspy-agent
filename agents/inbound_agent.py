@@ -141,7 +141,7 @@ class InboundAgent(dspy.Module):
             business_size=lead.business_size.value if lead.business_size else "Unknown",
             patient_volume=lead.patient_volume.value if lead.patient_volume else "Unknown",
             company=lead.company or "Unknown",
-            industry=lead.enrichment.company_primary_industry if lead.enrichment else "Healthcare",
+            industry="Healthcare",  # Enrichment removed in form-agnostic refactor
         )
         return {
             "score": result.fit_score,
@@ -197,12 +197,8 @@ class InboundAgent(dspy.Module):
         response_quality_score = min(10, int(engagement["score"] * 0.2))
 
         # Company data (0-10)
+        # Company data (0-10) - Enrichment removed in form-agnostic refactor
         company_data_score = 0
-        if lead.enrichment:
-            if lead.enrichment.company_revenue_numeric and lead.enrichment.company_revenue_numeric > 0:
-                company_data_score += 5
-            if lead.enrichment.company_employee_count and lead.enrichment.company_employee_count > 0:
-                company_data_score += 5
 
         return QualificationCriteria(
             business_size_score=business_size_score,
@@ -266,8 +262,9 @@ class InboundAgent(dspy.Module):
         if engagement["intent_level"] == "high":
             factors.append("High purchase intent")
 
-        if lead.enrichment and lead.enrichment.company_revenue_numeric and lead.enrichment.company_revenue_numeric > 1000000:
-            factors.append("Revenue > $1M")
+        # Revenue check removed - enrichment not available in form-agnostic model
+        # if lead.enrichment and lead.enrichment.company_revenue_numeric and lead.enrichment.company_revenue_numeric > 1000000:
+        #     factors.append("Revenue > $1M")
 
         return factors
 
