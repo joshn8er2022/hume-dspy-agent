@@ -8,7 +8,7 @@ from models import (
     Lead,
     QualificationResult,
     QualificationCriteria,
-    QualificationTier,
+    LeadTier,
     NextAction,
     LeadStatus,
 )
@@ -214,18 +214,18 @@ class InboundAgent(dspy.Module):
             company_data_score=company_data_score,
         )
 
-    def _determine_tier(self, score: int) -> QualificationTier:
+    def _determine_tier(self, score: int) -> LeadTier:
         """Determine qualification tier from score."""
         if score >= self.HOT_THRESHOLD:
-            return QualificationTier.HOT
+            return LeadTier.HOT
         elif score >= self.WARM_THRESHOLD:
-            return QualificationTier.WARM
+            return LeadTier.WARM
         elif score >= self.COLD_THRESHOLD:
-            return QualificationTier.COLD
+            return LeadTier.COLD
         else:
-            return QualificationTier.UNQUALIFIED
+            return LeadTier.UNQUALIFIED
 
-    def _compile_reasoning(self, lead: Lead, business_fit: Dict, engagement: Dict, score: int, tier: QualificationTier) -> str:
+    def _compile_reasoning(self, lead: Lead, business_fit: Dict, engagement: Dict, score: int, tier: LeadTier) -> str:
         """Compile comprehensive reasoning for qualification."""
         reasoning_parts = [
             f"Lead scored {score}/100, qualifying as {tier.value.upper()}.",
