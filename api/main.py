@@ -108,13 +108,11 @@ async def typeform_webhook(
         raw_payload = await request.json()
 
         # Log incoming webhook for debugging
-        print(f"
-{'='*80}")
+        print(f"\n{"="*80}")
         print("📥 Typeform Webhook Received")
-        print(f"{'='*80}")
+        print(f"{"="*80}")
         print(json.dumps(raw_payload, indent=2)[:500])  # First 500 chars
-        print(f"{'='*80}
-")
+        print(f"{"="*80}\n")
 
         # Parse webhook payload
         try:
