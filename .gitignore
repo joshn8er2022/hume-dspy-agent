@@ -65,3 +65,7 @@ htmlcov/
 *.tmp
 *.bak
 .cache/
+
+# Railway deployment files (exceptions to *.json rule)
+!railway.json
+!railway.toml
