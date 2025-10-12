@@ -172,8 +172,7 @@ async def process_lead(lead: Lead, event_id: str):
         event_id: Associated event ID
     """
     try:
-        print(f"
-🔄 Processing lead: {lead.get_full_name()}")
+        print(f"🔄 Processing lead: {lead.get_full_name()}")
 
         # Qualify lead with DSPy agent
         agent = InboundAgent()
