@@ -145,7 +145,7 @@ async def typeform_webhook(request: Request):
         start_time = time.time()
 
         agent = InboundAgent()
-        result = agent.qualify_lead(lead)
+        result = agent.forward(lead)
 
         qualification_time = time.time() - start_time
         logger.info(f'✅ Qualification complete in {qualification_time:.2f}s')
@@ -219,7 +219,7 @@ async def qualify_lead_endpoint(lead: Lead):
         logger.info(f'📋 Qualifying lead: {lead.id}')
 
         agent = InboundAgent()
-        result = agent.qualify_lead(lead)
+        result = agent.forward(lead)
 
         logger.info('✅ Qualification complete')
         logger.info(f'   Tier: {result.tier}')
