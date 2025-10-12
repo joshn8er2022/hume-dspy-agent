@@ -16,6 +16,7 @@ from models.lead import (
 from models.qualification import (
     QualificationCriteria,
     QualificationResult,
+    NextAction,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     # Qualification models
     "QualificationCriteria",
     "QualificationResult",
+    "NextAction",
 ]
