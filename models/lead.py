@@ -139,19 +139,24 @@ class TypeformWebhook(BaseModel):
 # ============================================================================
 
 FIELD_MAPPING = {
+    # Core contact fields
     "3KodbBKF4sjs": "first_name",
     "E5lZOmaIikF3": "last_name",
     "rOpAikQSG0QU": "company",
-    "YatnhdTnor9d": "email",
     "pPr9YAraUEmw": "phone",
-    "mHMo6Fy1kvei": "selling_products",
-    "6FtQFaJWOXEj": "current_products",
+    "YatnhdTnor9d": "email",
+
+    # Business context fields
+    "mHMo6Fy1kvei": "currently_selling",
+    "6FtQFaJWOXEj": "products_selling",
     "Za2AoM3CQPlE": "bodypod_familiarity",
-    "Q3WLjtqYcf5T": "business_goals",
-    "YnUfbQ4i3JXX": "locations",
+    "Q3WLjtqYcf5T": "business_description",
+    "YnUfbQ4i3JXX": "number_of_locations",
     "aNbfZ4kgMafJ": "bodypod_quantity",
-    "jl8tMiHkukdJ": "portal_interest",
-    "ocRGUnixrKTF": "calendly_url"
+    "jl8tMiHkukdJ": "web_portal_interest",
+
+    # Calendly booking
+    "ocRGUnixrKTF": "calendly_link",
 }
 
 
@@ -234,6 +239,15 @@ class Lead(TimestampedModel):
     # Business Profile
     business_size: Optional[BusinessSize] = None
     patient_volume: Optional[PatientVolume] = None
+
+    # Business Context (from Typeform)
+    currently_selling: Optional[str] = Field(None, description="Currently selling health/fitness products")
+    products_selling: Optional[str] = Field(None, description="Products currently selling")
+    bodypod_familiarity: Optional[str] = Field(None, description="Familiarity with BodyPod system")
+    business_description: Optional[str] = Field(None, description="Practice/business description")
+    number_of_locations: Optional[str] = Field(None, description="Number of business locations")
+    bodypod_quantity: Optional[str] = Field(None, description="Desired BodyPod quantity")
+    web_portal_interest: Optional[str] = Field(None, description="Interest in web portal")
 
     # Lead Source & Status
     source: str = Field(default="typeform", description="Lead source")
