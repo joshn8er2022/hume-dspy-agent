@@ -271,7 +271,7 @@ async def process_event_async(event_id: str, source: str):
         
         # Update status to 'failed'
         if supabase:
-            retry_count = event.get('retry_count', 0) + 1
+            retry_count = event.get('retry_count', 0) + 1 if event else 0
             supabase.table('raw_events').update({
                 'processing_status': 'failed',
                 'processing_error': str(e),
