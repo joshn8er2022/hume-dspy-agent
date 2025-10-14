@@ -24,7 +24,7 @@ SLACK_CHANNEL = "C09FZT6T1A5"  # #ai-test channel
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "simplified-v3-slack"}
+    return {"status": "healthy", "version": "simplified-v4-slack-fixed"}
 
 async def send_slack_notification(data: dict):
     """Send Typeform data to Slack #ai-test channel."""
@@ -38,55 +38,52 @@ async def send_slack_notification(data: dict):
         
         # Extract key info
         event_type = data.get('event_type', 'unknown')
-        form_id = data.get('form_id', 'unknown')
+        form_response = data.get('form_response', {})
+        form_id = form_response.get('form_id', 'unknown')
         
-        # Build Slack message
-        message_blocks = [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "📥 New Typeform Webhook Received",
-                    "emoji": True
-                }
-            },
-            {
-                "type": "section",
-                "fields": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Event Type:*\n{event_type}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Form ID:*\n{form_id}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Timestamp:*\n{timestamp}"
-                    }
-                ]
-            },
-            {
-                "type": "divider"
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Complete Typeform Data:*"
-                }
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"```{json.dumps(data, indent=2)}```"
-                }
-            }
-        ]
+        # Extract answers
+        answers = form_response.get('answers', [])
         
-        # Send to Slack
+        # Build answer summary (first 10 fields)
+        answer_text = ""
+        for i, answer in enumerate(answers[:10]):
+            field = answer.get('field', {})
+            field_ref = field.get('ref', f"field_{i}")
+            
+            # Get answer value based on type
+            if answer.get('type') == 'text':
+                value = answer.get('text', 'N/A')
+            elif answer.get('type') == 'email':
+                value = answer.get('email', 'N/A')
+            elif answer.get('type') == 'phone_number':
+                value = answer.get('phone_number', 'N/A')
+            elif answer.get('type') == 'choice':
+                choice = answer.get('choice', {})
+                value = choice.get('label', 'N/A')
+            elif answer.get('type') == 'number':
+                value = str(answer.get('number', 'N/A'))
+            else:
+                value = str(answer.get(answer.get('type', 'text'), 'N/A'))
+            
+            answer_text += f"*{field_ref}:* {value}\n"
+        
+        if len(answers) > 10:
+            answer_text += f"\n_... and {len(answers) - 10} more fields_"
+        
+        # Build Slack message (simple text, no complex blocks)
+        message_text = f"""📥 *New Typeform Webhook Received*
+
+*Event Type:* {event_type}
+*Form ID:* {form_id}
+*Timestamp:* {timestamp}
+*Total Fields:* {len(answers)}
+
+*Answers (first 10):*
+{answer_text}
+
+_Full data logged to Railway_"""
+        
+        # Send to Slack (simple message, no blocks)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://slack.com/api/chat.postMessage",
@@ -96,8 +93,8 @@ async def send_slack_notification(data: dict):
                 },
                 json={
                     "channel": SLACK_CHANNEL,
-                    "blocks": message_blocks,
-                    "text": f"New Typeform webhook received: {event_type}"
+                    "text": message_text,
+                    "mrkdwn": True
                 },
                 timeout=10.0
             )
@@ -136,6 +133,12 @@ async def typeform_webhook(request: Request):
             data = await request.json()
             logger.info(f"✅ JSON parsed successfully")
             logger.info(f"   Keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
+            
+            # Log full data to Railway logs
+            logger.info("")
+            logger.info("FULL TYPEFORM DATA:")
+            logger.info(json.dumps(data, indent=2))
+            logger.info("")
             
         except Exception as e:
             logger.error(f"❌ JSON parse failed: {str(e)}")
