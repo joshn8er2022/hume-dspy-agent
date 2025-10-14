@@ -143,7 +143,7 @@ async def save_lead_to_database(lead: Any, result: Any):
             'company': lead.company,
             'qualification_score': result.score,
             'qualification_tier': result.tier,
-            'recommended_actions': result.recommended_actions,
+            'recommended_actions': result.next_actions,
             'raw_answers': lead.raw_answers
         }).execute()
         logger.info(f"✅ Lead saved: {lead.id}")
@@ -172,10 +172,10 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any):
 *Qualification:*
 • Score: {result.score}/100
 • Tier: {result.tier.upper()}
-• Actions: {', '.join(result.recommended_actions[:3])}
+• Actions: {', '.join(result.next_actions[:3])}
 
 *Email Preview:*
-{result.email_template[:150]}..."""
+{result.suggested_email_template[:150]}..."""
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
