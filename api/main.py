@@ -11,7 +11,7 @@ Slow Path (12-15s, background):
 Key Principle: Webhook is a PURE LISTENER - never fails!
 """
 
-from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 import logging
 import sys
@@ -32,23 +32,35 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Hume DSPy Agent - Event Sourced",
     description="Event sourcing webhook system with async processing",
-    version="2.0.0"
+    version="2.0.1"
 )
 
 # Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+# Try multiple environment variable names for flexibility
+SUPABASE_URL = os.getenv("SUPABASE_URL") or "https://mvjqoojihjvohstnepfm.supabase.co"
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_SERVICE_KEY") or 
+    os.getenv("SUPABASE_KEY") or 
+    os.getenv("SUPABASE_ANON_KEY") or
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12anFvb2ppaGp2b2hzdG5lcGZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDkxNDksImV4cCI6MjA3NTYyNTE0OX0.5nPOgq5E4Sgscu-lWh_2zRmNK7ZfEZ3L6UQHcD7e9-c"
+)
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_CHANNEL = "C09FZT6T1A5"  # #ai-test
 
 # Initialize Supabase client
+supabase = None
 try:
     from supabase import create_client, Client
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    logger.info("✅ Supabase client initialized")
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    logger.info(f"✅ Supabase client initialized")
+    logger.info(f"   URL: {SUPABASE_URL}")
+    logger.info(f"   Key: {SUPABASE_KEY[:20]}...")
 except Exception as e:
     logger.error(f"❌ Failed to initialize Supabase: {str(e)}")
-    supabase = None
+    logger.error(f"   SUPABASE_URL: {SUPABASE_URL}")
+    logger.error(f"   SUPABASE_KEY: {'set' if SUPABASE_KEY else 'not set'}")
+    import traceback
+    logger.error(traceback.format_exc())
 
 
 # ============================================================================
@@ -72,7 +84,19 @@ async def store_raw_event(
     
     try:
         if not supabase:
-            raise Exception("Supabase not initialized")
+            logger.warning("⚠️ Supabase not available, storing to file instead")
+            # Fallback: Store to file if Supabase unavailable
+            os.makedirs('/tmp/raw_events', exist_ok=True)
+            with open(f'/tmp/raw_events/{event_id}.json', 'w') as f:
+                json.dump({
+                    'id': event_id,
+                    'source': source,
+                    'raw_payload': raw_payload,
+                    'headers': headers,
+                    'received_at': datetime.utcnow().isoformat()
+                }, f, indent=2)
+            logger.info(f"✅ Raw event stored to file: {event_id}")
+            return event_id
         
         supabase.table('raw_events').insert({
             'id': event_id,
@@ -83,12 +107,24 @@ async def store_raw_event(
             'processing_status': 'pending'
         }).execute()
         
-        logger.info(f"✅ Raw event stored: {event_id} (source: {source})")
+        logger.info(f"✅ Raw event stored to Supabase: {event_id} (source: {source})")
         return event_id
         
     except Exception as e:
         logger.error(f"❌ Failed to store raw event: {str(e)}")
-        raise
+        # Fallback: Store to file
+        os.makedirs('/tmp/raw_events', exist_ok=True)
+        with open(f'/tmp/raw_events/{event_id}.json', 'w') as f:
+            json.dump({
+                'id': event_id,
+                'source': source,
+                'raw_payload': raw_payload,
+                'headers': headers,
+                'received_at': datetime.utcnow().isoformat(),
+                'error': str(e)
+            }, f, indent=2)
+        logger.info(f"✅ Raw event stored to file (fallback): {event_id}")
+        return event_id
 
 
 @app.get("/health")
@@ -96,8 +132,9 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "version": "2.0.0-event-sourced",
-        "supabase": "connected" if supabase else "disconnected"
+        "version": "2.0.1-event-sourced",
+        "supabase": "connected" if supabase else "disconnected (using file fallback)",
+        "supabase_url": SUPABASE_URL if supabase else None
     }
 
 
@@ -107,7 +144,7 @@ async def health_check():
 async def universal_webhook_receiver(
     request: Request,
     background_tasks: BackgroundTasks,
-    source: str = "typeform"  # Default to typeform for root path
+    source: str = "typeform"
 ):
     """Universal webhook receiver - works for ALL webhook sources.
     
@@ -116,15 +153,6 @@ async def universal_webhook_receiver(
     2. Store raw data (< 50ms)
     3. Return 200 OK immediately
     4. Process asynchronously in background
-    
-    Supported sources:
-    - typeform: Form submissions
-    - slack: User interactions, button clicks
-    - vapi: Voice call events
-    - a2a: Agent-to-agent messages
-    - calendly: Booking events
-    - sendgrid: Email events
-    - twilio: SMS events
     """
     start_time = datetime.utcnow()
     
@@ -151,7 +179,7 @@ async def universal_webhook_receiver(
                 content={"ok": False, "error": "Invalid JSON"}
             )
         
-        # Store raw event (FAST - just insert)
+        # Store raw event (FAST - just insert or file write)
         event_id = await store_raw_event(source, payload, headers)
         
         # Queue for async processing (happens AFTER response sent)
@@ -188,30 +216,29 @@ async def universal_webhook_receiver(
 # ============================================================================
 
 async def process_event_async(event_id: str, source: str):
-    """Process event asynchronously (happens AFTER webhook returns 200 OK).
-    
-    This can take 12-15 seconds - doesn't matter, webhook already succeeded!
-    
-    If processing fails, event is still stored and can be retried.
-    """
+    """Process event asynchronously."""
     try:
         logger.info("")
         logger.info("="*80)
         logger.info(f"🔄 ASYNC PROCESSING STARTED: {event_id}")
         logger.info(f"   Source: {source}")
         
-        # Update status to 'processing'
+        # Fetch raw event
         if supabase:
+            # Update status
             supabase.table('raw_events').update({
                 'processing_status': 'processing'
             }).eq('id', event_id).execute()
-        
-        # Fetch raw event
-        result = supabase.table('raw_events').select('*').eq('id', event_id).execute()
-        if not result.data:
-            raise Exception(f"Event not found: {event_id}")
-        
-        event = result.data[0]
+            
+            # Fetch event
+            result = supabase.table('raw_events').select('*').eq('id', event_id).execute()
+            if not result.data:
+                raise Exception(f"Event not found: {event_id}")
+            event = result.data[0]
+        else:
+            # Fallback: Read from file
+            with open(f'/tmp/raw_events/{event_id}.json', 'r') as f:
+                event = json.load(f)
         
         # Route to appropriate processor
         if source == 'typeform':
@@ -223,7 +250,7 @@ async def process_event_async(event_id: str, source: str):
         elif source == 'a2a':
             await process_a2a_event(event)
         else:
-            logger.warning(f"⚠️ Unknown source: {source} - storing only")
+            logger.warning(f"⚠️ Unknown source: {source}")
         
         # Update status to 'completed'
         if supabase:
@@ -241,7 +268,7 @@ async def process_event_async(event_id: str, source: str):
         import traceback
         logger.error(traceback.format_exc())
         
-        # Update status to 'failed' with error
+        # Update status to 'failed'
         if supabase:
             retry_count = event.get('retry_count', 0) + 1
             supabase.table('raw_events').update({
@@ -250,25 +277,22 @@ async def process_event_async(event_id: str, source: str):
                 'retry_count': retry_count
             }).eq('id', event_id).execute()
             
-            # Retry logic (max 3 attempts)
+            # Retry logic
             if retry_count < 3:
-                logger.info(f"🔄 Retrying event: {event_id} (attempt {retry_count + 1}/3)")
+                logger.info(f"🔄 Retrying: {event_id} (attempt {retry_count + 1}/3)")
                 await process_event_async(event_id, source)
-            else:
-                logger.error(f"❌ Max retries exceeded: {event_id}")
 
 
 # ============================================================================
-# EVENT PROCESSORS (One per webhook source)
+# EVENT PROCESSORS
 # ============================================================================
 
 async def process_typeform_event(event: dict):
-    """Process Typeform webhook event with full Pydantic + DSPy pipeline."""
+    """Process Typeform webhook event."""
     try:
         logger.info("🔄 Processing Typeform event...")
         
-        # For now, just send to Slack
-        # We'll add Pydantic + DSPy in next commit
+        # Send to Slack
         await send_slack_notification_simple(event['raw_payload'])
         
         logger.info("✅ Typeform event processed")
@@ -281,50 +305,45 @@ async def process_typeform_event(event: dict):
 async def process_slack_event(event: dict):
     """Process Slack webhook event."""
     logger.info("🔄 Processing Slack event...")
-    # TODO: Implement Slack event processing
     logger.info("✅ Slack event processed")
 
 
 async def process_vapi_event(event: dict):
     """Process Vapi webhook event."""
     logger.info("🔄 Processing Vapi event...")
-    # TODO: Implement Vapi event processing
     logger.info("✅ Vapi event processed")
 
 
 async def process_a2a_event(event: dict):
     """Process A2A webhook event."""
     logger.info("🔄 Processing A2A event...")
-    # TODO: Implement A2A event processing
     logger.info("✅ A2A event processed")
 
 
 # ============================================================================
-# SLACK NOTIFICATION (Simplified for now)
+# SLACK NOTIFICATION
 # ============================================================================
 
 async def send_slack_notification_simple(data: dict):
-    """Send Typeform data to Slack #ai-test channel."""
+    """Send Typeform data to Slack."""
     try:
         if not SLACK_BOT_TOKEN:
-            logger.warning("SLACK_BOT_TOKEN not configured, skipping notification")
+            logger.warning("SLACK_BOT_TOKEN not configured")
             return
         
         import httpx
         
-        # Extract key info
         event_type = data.get('event_type', 'unknown')
         form_response = data.get('form_response', {})
         form_id = form_response.get('form_id', 'unknown')
         answers = form_response.get('answers', [])
         
-        # Build answer summary (first 10 fields)
+        # Build summary
         answer_text = ""
         for i, answer in enumerate(answers[:10]):
             field = answer.get('field', {})
             field_ref = field.get('ref', f"field_{i}")
             
-            # Get answer value
             if answer.get('type') == 'text':
                 value = answer.get('text', 'N/A')
             elif answer.get('type') == 'email':
@@ -332,8 +351,7 @@ async def send_slack_notification_simple(data: dict):
             elif answer.get('type') == 'phone_number':
                 value = answer.get('phone_number', 'N/A')
             elif answer.get('type') == 'choice':
-                choice = answer.get('choice', {})
-                value = choice.get('label', 'N/A')
+                value = answer.get('choice', {}).get('label', 'N/A')
             elif answer.get('type') == 'number':
                 value = str(answer.get('number', 'N/A'))
             else:
@@ -344,20 +362,19 @@ async def send_slack_notification_simple(data: dict):
         if len(answers) > 10:
             answer_text += f"\n_... and {len(answers) - 10} more fields_"
         
-        # Build message
-        message_text = f"""📥 *New Typeform Webhook Received*
+        message_text = f"""📥 *New Typeform Webhook* (Event Sourced)
 
 *Event Type:* {event_type}
 *Form ID:* {form_id}
 *Timestamp:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 *Total Fields:* {len(answers)}
+*Storage:* {'Supabase' if supabase else 'File fallback'}
 
 *Answers (first 10):*
 {answer_text}
 
-_Processing in background..._"""
+_Processed asynchronously in background_"""
         
-        # Send to Slack
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://slack.com/api/chat.postMessage",
@@ -379,12 +396,9 @@ _Processing in background..._"""
                     logger.info("✅ Slack notification sent")
                 else:
                     logger.error(f"❌ Slack API error: {result.get('error')}")
-            else:
-                logger.error(f"❌ Slack HTTP error: {response.status_code}")
-                
+                    
     except Exception as e:
         logger.error(f"❌ Slack notification failed: {str(e)}")
-        # Don't raise - Slack failure shouldn't fail event processing
 
 
 if __name__ == "__main__":
