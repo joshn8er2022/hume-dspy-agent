@@ -16,27 +16,40 @@ app = FastAPI(title="Hume DSPy Agent - SIMPLIFIED")
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "version": "simplified-v1"}
+    return {"status": "healthy", "version": "simplified-v2"}
 
+@app.post("/")
 @app.post("/webhooks/typeform")
 async def typeform_webhook(request: Request):
-    """SIMPLEST POSSIBLE webhook - just receive and acknowledge.
+    """SIMPLEST POSSIBLE webhook - accepts at ROOT or /webhooks/typeform.
     
-    No qualification, no Slack, no database - just receive and return OK.
-    This is for TESTING to ensure webhook reception works.
+    Typeform is sending to ROOT path, so we accept both.
     """
     try:
+        # Log request details
+        logger.info("="*80)
+        logger.info(f"📥 WEBHOOK RECEIVED at {request.url.path}")
+        logger.info(f"   Method: {request.method}")
+        logger.info(f"   Headers: {dict(request.headers)}")
+        
         # Get the raw body
         body = await request.body()
-        logger.info(f"📥 Webhook received: {len(body)} bytes")
+        logger.info(f"   Body size: {len(body)} bytes")
         
         # Try to parse as JSON
         try:
             data = await request.json()
             logger.info(f"✅ JSON parsed successfully")
             logger.info(f"   Keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
+            
+            # Log first 500 chars of data for debugging
+            import json
+            data_str = json.dumps(data, indent=2)
+            logger.info(f"   Data preview: {data_str[:500]}...")
+            
         except Exception as e:
             logger.error(f"❌ JSON parse failed: {str(e)}")
+            logger.error(f"   Raw body: {body[:500]}")
             return JSONResponse(
                 status_code=400,
                 content={"ok": False, "error": "Invalid JSON"}
@@ -44,10 +57,13 @@ async def typeform_webhook(request: Request):
         
         # Return success
         logger.info("✅ Webhook processed successfully")
+        logger.info("="*80)
         return {"ok": True, "message": "Webhook received"}
         
     except Exception as e:
         logger.error(f"❌ Webhook error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return JSONResponse(
             status_code=500,
             content={"ok": False, "error": str(e)}
