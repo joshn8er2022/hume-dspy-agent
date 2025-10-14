@@ -218,6 +218,7 @@ async def universal_webhook_receiver(
 async def process_event_async(event_id: str, source: str):
     """Process event asynchronously."""
     try:
+    event = None  # Initialize before try block
         logger.info("")
         logger.info("="*80)
         logger.info(f"🔄 ASYNC PROCESSING STARTED: {event_id}")
