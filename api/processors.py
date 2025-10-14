@@ -23,33 +23,45 @@ def set_supabase_client(client):
 # DSPy configuration (lazy initialization)
 dspy_configured = False
 
+
 def configure_dspy():
     """Configure DSPy with OpenAI LM."""
     global dspy_configured
-    
+
     if dspy_configured:
         return True
-    
+
     try:
         import dspy
-        
-        # Get OpenAI API key from environment
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        
+
+        # Try multiple environment variable names
+        openai_api_key = (
+            os.getenv("OPENAI_API_KEY") or
+            os.getenv("OPENAI_KEY") or
+            os.getenv("OPENAI_API_TOKEN") or
+            os.getenv("openai_api_key") or
+            os.getenv("OPENAI")
+        )
+
         if not openai_api_key:
-            logger.error("❌ OPENAI_API_KEY not configured")
+            logger.error("❌ OpenAI API key not found in environment")
+            logger.error("   Tried: OPENAI_API_KEY, OPENAI_KEY, OPENAI_API_TOKEN, openai_api_key, OPENAI")
+            logger.error("   Available env vars: " + ", ".join([k for k in os.environ.keys() if 'OPENAI' in k.upper()]))
             return False
-        
+
         # Configure DSPy with OpenAI LM
         lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
         dspy.configure(lm=lm)
-        
+
         logger.info("✅ DSPy configured with OpenAI GPT-4o")
+        logger.info(f"   API key: {openai_api_key[:10]}...")
         dspy_configured = True
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ DSPy configuration failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 
