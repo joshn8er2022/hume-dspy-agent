@@ -119,6 +119,15 @@ async def process_typeform_event(event: dict):
         else:
             await send_slack_notification_simple(event['raw_payload'])
         
+        
+        # Step 5: Send email via GMass (if HOT/WARM tier)
+        if result and result.tier in ["hot", "warm"]:
+            await send_email_via_gmass(lead, result)
+        
+        # Step 6: Sync to Close CRM
+        if result:
+            await sync_to_close_crm(lead, result)
+        
         # Step 5: Save to database
         if result and supabase:
             await save_lead_to_database(lead, result)
@@ -249,3 +258,149 @@ async def process_vapi_event(event: dict):
 async def process_a2a_event(event: dict):
     logger.info("🔄 Processing A2A event...")
     logger.info("✅ A2A event processed")
+
+
+# ============================================================================
+# GMASS EMAIL OUTREACH
+# ============================================================================
+
+async def send_email_via_gmass(lead: Any, result: Any):
+    """Send email via GMass API as josh@humehealth.com.
+    
+    Only sends to HOT/WARM tier leads.
+    Uses DSPy-generated email template.
+    """
+    try:
+        import httpx
+        
+        # GMass configuration
+        GMASS_API_KEY = os.getenv("GMASS_API_KEY") or "279d97fc-9c33-49b8-b69b-94183b0305b4"
+        GMASS_API_URL = "https://api.gmass.co/api"
+        
+        # Check if lead has email
+        if not lead.email:
+            logger.warning("⚠️ No email address, skipping GMass send")
+            return
+        
+        # Check if tier qualifies for email
+        tier_str = str(result.tier).lower().replace('qualificationtier.', '')
+        if tier_str not in ['hot', 'warm']:
+            logger.info(f"⏭️ Skipping email for {tier_str} tier lead")
+            return
+        
+        logger.info(f"📧 Sending email via GMass to {lead.email}...")
+        logger.info(f"   Tier: {tier_str}")
+        logger.info(f"   Score: {result.score}/100")
+        
+        # Get email template
+        email_body = result.suggested_email_template or "Thank you for your interest in Hume Health. We'll be in touch soon!"
+        
+        # Create subject line
+        subject = f"Your Hume Partnership Application - {lead.first_name or 'Partner'}"
+        
+        # Step 1: Create campaign draft
+        async with httpx.AsyncClient() as client:
+            draft_response = await client.post(
+                f"{GMASS_API_URL}/campaigndrafts",
+                headers={"X-apikey": GMASS_API_KEY},
+                json={
+                    "subject": subject,
+                    "message": email_body,
+                    "emailAddresses": lead.email,
+                    "fromEmail": "josh@humehealth.com",
+                    "fromName": "Josh - Hume Health",
+                    "replyTo": "josh@humehealth.com",
+                    "openTracking": True,
+                    "clickTracking": True
+                },
+                timeout=30.0
+            )
+            
+            if draft_response.status_code != 200:
+                raise Exception(f"GMass draft failed: {draft_response.status_code} - {draft_response.text}")
+            
+            draft = draft_response.json()
+            campaign_draft_id = draft.get('campaignDraftId')
+            
+            if not campaign_draft_id:
+                raise Exception(f"No campaignDraftId in response: {draft}")
+            
+            logger.info(f"✅ GMass draft created: {campaign_draft_id}")
+        
+        # Step 2: Send campaign
+        async with httpx.AsyncClient() as client:
+            send_response = await client.post(
+                f"{GMASS_API_URL}/campaigns/{campaign_draft_id}",
+                headers={"X-apikey": GMASS_API_KEY},
+                json={"campaignDraftId": campaign_draft_id},
+                timeout=30.0
+            )
+            
+            if send_response.status_code != 200:
+                raise Exception(f"GMass send failed: {send_response.status_code} - {send_response.text}")
+            
+            send_result = send_response.json()
+            campaign_id = send_result.get('campaignId')
+            
+            logger.info(f"✅ Email sent via GMass to {lead.email}")
+            logger.info(f"   Campaign ID: {campaign_id}")
+            logger.info(f"   Subject: {subject}")
+            
+            return send_result
+            
+    except Exception as e:
+        logger.error(f"❌ GMass email failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # Don't raise - email failure shouldn't fail processing
+
+
+# ============================================================================
+# CLOSE CRM SYNC
+# ============================================================================
+
+async def sync_to_close_crm(lead: Any, result: Any):
+    """Sync lead to Close CRM.
+    
+    Creates lead record with qualification data.
+    Only syncs qualified leads (HOT/WARM/COLD).
+    """
+    try:
+        logger.info(f"🔄 Syncing to Close CRM: {lead.email or 'no email'}...")
+        
+        # Check if tier qualifies for CRM
+        tier_str = str(result.tier).lower().replace('qualificationtier.', '')
+        if tier_str == 'unqualified':
+            logger.info(f"⏭️ Skipping CRM sync for {tier_str} tier lead")
+            return
+        
+        # Build lead name
+        lead_name = lead.company or f"{lead.first_name or ''} {lead.last_name or ''}".strip() or "Unknown Lead"
+        
+        # Build contact info
+        contacts = []
+        if lead.first_name or lead.last_name or lead.email or lead.phone:
+            contact = {
+                "name": f"{lead.first_name or ''} {lead.last_name or ''}".strip() or "Contact"
+            }
+            if lead.email:
+                contact["emails"] = [{"email": lead.email, "type": "office"}]
+            if lead.phone:
+                contact["phones"] = [{"phone": lead.phone, "type": "office"}]
+            contacts.append(contact)
+        
+        # For now, just log (Close CRM MCP integration coming next)
+        logger.info(f"✅ Close CRM sync prepared")
+        logger.info(f"   Lead name: {lead_name}")
+        logger.info(f"   Contacts: {len(contacts)}")
+        logger.info(f"   Tier: {tier_str}")
+        logger.info(f"   Score: {result.score}/100")
+        
+        # TODO: Implement actual Close CRM API call
+        # Will use Close CRM MCP or direct API
+        
+    except Exception as e:
+        logger.error(f"❌ Close CRM sync failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # Don't raise - CRM failure shouldn't fail processing
