@@ -155,7 +155,11 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any):
     """Enhanced Slack with qualification."""
     try:
         import httpx
-        SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
+        SLACK_BOT_TOKEN = (
+            os.getenv("SLACK_BOT_TOKEN") or
+            os.getenv("SLACK_MCP_XOXB_TOKEN") or
+            os.getenv("SLACK_MCP_XOXP_TOKEN")
+        )
         SLACK_CHANNEL = "C09FZT6T1A5"
         
         if not SLACK_BOT_TOKEN:
@@ -172,10 +176,10 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any):
 *Qualification:*
 • Score: {result.score}/100
 • Tier: {result.tier.upper()}
-• Actions: {', '.join(result.next_actions[:3])}
+• Actions: {', '.join(result.next_actions[:3]) if result.next_actions else 'None'}
 
 *Email Preview:*
-{result.suggested_email_template[:150]}..."""
+{(result.suggested_email_template or 'No template')[:150]}..."""
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -194,7 +198,11 @@ async def send_slack_notification_simple(data: dict):
     """Simple Slack (fallback)."""
     try:
         import httpx
-        SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
+        SLACK_BOT_TOKEN = (
+            os.getenv("SLACK_BOT_TOKEN") or
+            os.getenv("SLACK_MCP_XOXB_TOKEN") or
+            os.getenv("SLACK_MCP_XOXP_TOKEN")
+        )
         SLACK_CHANNEL = "C09FZT6T1A5"
         
         if not SLACK_BOT_TOKEN:
