@@ -127,22 +127,39 @@ async def process_typeform_event(event: dict):
                         ])
                     break
 
-        # Step 5: Slack notification
+        # Step 5: Slack notification with thread creation
+        slack_channel = None
+        slack_thread_ts = None
         if result:
-            await send_slack_notification_with_qualification(lead, result, transcript_text)
+            slack_channel, slack_thread_ts = await send_slack_notification_with_qualification(lead, result, transcript_text)
         else:
             await send_slack_notification_simple(event['raw_payload'])
-        
-        
-        # Step 5: Send email via GMass (if agent recommends)
-        if result and 'send_email' in [str(action).lower() for action in (result.next_actions or [])]:
-            await send_email_via_gmass(lead, result)
-        
-        # Step 6: Sync to Close CRM
+
+        # Step 6: Start autonomous follow-up agent (LangGraph)
+        if result and slack_thread_ts:
+            try:
+                from agents.follow_up_agent import FollowUpAgent
+                follow_up_agent = FollowUpAgent()
+
+                # Start the autonomous lead journey
+                journey_state = follow_up_agent.start_lead_journey(
+                    lead=lead,
+                    tier=result.tier,
+                    slack_thread_ts=slack_thread_ts,
+                    slack_channel=slack_channel or "inbound-leads"
+                )
+                logger.info(f"✅ Autonomous follow-up agent started for lead {lead.id}")
+                logger.info(f"   Journey state: {journey_state.get('status')}")
+            except Exception as e:
+                logger.error(f"❌ Follow-up agent failed: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
+
+        # Step 7: Sync to Close CRM
         if result:
             await sync_to_close_crm(lead, result)
-        
-        # Step 5: Save to database
+
+        # Step 8: Save to database
         if result and supabase:
             await save_lead_to_database(lead, result)
         
@@ -233,10 +250,17 @@ _Processed via Event Sourcing + DSPy AI_"""
                 json={"channel": SLACK_CHANNEL, "text": message, "mrkdwn": True},
                 timeout=10.0
             )
-            if response.status_code == 200 and response.json().get('ok'):
+            response_data = response.json() if response.status_code == 200 else {}
+            if response_data.get('ok'):
                 logger.info("✅ Enhanced Slack sent")
+                # Return thread info for follow-up agent
+                return response_data.get('channel'), response_data.get('ts')
+            else:
+                logger.error(f"❌ Slack API error: {response_data}")
+                return None, None
     except Exception as e:
         logger.error(f"❌ Enhanced Slack failed: {str(e)}")
+        return None, None
 
 
 async def send_slack_notification_simple(data: dict):

@@ -51,8 +51,12 @@ class LeadStatus(str, Enum):
     """Lead status in the pipeline."""
     NEW = "new"
     CONTACTED = "contacted"
+    AWAITING_RESPONSE = "awaiting_response"
+    FOLLOWING_UP = "following_up"
+    RESPONDED = "responded"
     QUALIFIED = "qualified"
     UNQUALIFIED = "unqualified"
+    COLD = "cold"
     CONVERTED = "converted"
 
 

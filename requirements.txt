@@ -4,9 +4,18 @@ pydantic>=2.5.0
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
+# Agentic Framework
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-anthropic>=0.3.0
+
+# Task Queue for Scheduled Follow-ups
+celery[redis]>=5.4.0
+redis>=5.0.0
+
 # LLM Backends (switchable)
 openai>=1.3.0
-anthropic>=0.7.0
+anthropic>=0.40.0  # Updated for latest Claude API
 
 # Database
 supabase>=2.0.0
