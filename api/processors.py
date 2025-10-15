@@ -236,12 +236,16 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
 
 *Email Template Preview:*
 {(result.suggested_email_template or 'No template generated')[:200]}...
+"""
 
-{f"""
+        # Add transcript if available (avoid nested f-strings)
+        if transcript:
+            message += f"""
+
 *Deep Dive Conversation:*
-{transcript}""" if transcript else ""}
+{transcript}"""
 
-_Processed via Event Sourcing + DSPy AI_"""
+        message += "\n\n_Processed via Event Sourcing + DSPy AI_"
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
