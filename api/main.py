@@ -106,7 +106,7 @@ async def store_raw_event(
             'raw_payload': raw_payload,
             'headers': headers,
             'received_at': datetime.utcnow().isoformat(),
-            'processing_status': 'pending'
+            'status': 'pending'
         }).execute()
         
         logger.info(f"✅ Raw event stored to Supabase: {event_id}")
@@ -217,7 +217,7 @@ async def process_event_async(event_id: str, source: str):
         if supabase:
             # Update status
             supabase.table('raw_events').update({
-                'processing_status': 'processing'
+                'status': 'processing'
             }).eq('id', event_id).execute()
             
             # Fetch event
@@ -245,7 +245,7 @@ async def process_event_async(event_id: str, source: str):
         # Update status to 'completed'
         if supabase:
             supabase.table('raw_events').update({
-                'processing_status': 'completed',
+                'status': 'completed',
                 'processed_at': datetime.utcnow().isoformat()
             }).eq('id', event_id).execute()
         
@@ -262,7 +262,7 @@ async def process_event_async(event_id: str, source: str):
         if supabase and event:
             retry_count = event.get('retry_count', 0) + 1 if event else 0
             supabase.table('raw_events').update({
-                'processing_status': 'failed',
+                'status': 'failed',
                 'processing_error': str(e),
                 'retry_count': retry_count
             }).eq('id', event_id).execute()
