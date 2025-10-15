@@ -113,9 +113,23 @@ async def process_typeform_event(event: dict):
             logger.error(traceback.format_exc())
             # Continue without qualification
         
-        # Step 4: Slack notification
+        # Step 4: Extract transcript (deep_dive conversation)
+        transcript_text = ""
+        if lead.raw_answers:
+            for key, value in lead.raw_answers.items():
+                if isinstance(value, dict) and 'raw' in value:
+                    # This is a transcript field
+                    raw_convo = value.get('raw', [])
+                    if raw_convo:
+                        transcript_text = "\n".join([
+                            f"Q: {item.get('assistant', '')}\nA: {item.get('user', '')}"
+                            for item in raw_convo[:3]  # First 3 Q&A pairs
+                        ])
+                    break
+
+        # Step 5: Slack notification
         if result:
-            await send_slack_notification_with_qualification(lead, result)
+            await send_slack_notification_with_qualification(lead, result, transcript_text)
         else:
             await send_slack_notification_simple(event['raw_payload'])
         
@@ -160,7 +174,7 @@ async def save_lead_to_database(lead: Any, result: Any):
         logger.error(f"❌ Save failed: {str(e)}")
 
 
-async def send_slack_notification_with_qualification(lead: Any, result: Any):
+async def send_slack_notification_with_qualification(lead: Any, result: Any, transcript: str = ""):
     """Enhanced Slack with qualification."""
     try:
         import httpx
@@ -174,21 +188,43 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any):
         if not SLACK_BOT_TOKEN:
             return
         
-        message = f"""📥 *New Lead Qualified*
+        # Build enhanced message with agent reasoning
+        tier_str = str(result.tier).replace('QualificationTier.', '')
+        actions_str = ', '.join([str(a).replace('NextAction.', '').replace('_', ' ').title() for a in (result.next_actions or [])[:3]])
 
-*Contact:*
-• {lead.first_name} {lead.last_name}
-• {lead.company or 'N/A'}
-• {lead.email or 'N/A'}
-• {lead.phone or 'N/A'}
+        message = f"""📥 *New Lead Qualified* (AI-Powered)
 
-*Qualification:*
+*Contact Information:*
+• Name: {lead.first_name or 'N/A'} {lead.last_name or ''}
+• Company: {lead.company or 'N/A'}
+• Email: {lead.email or 'N/A'}
+• Phone: {lead.phone or 'N/A'}
+
+*AI Qualification Results:*
 • Score: {result.score}/100
-• Tier: {result.tier.upper()}
-• Actions: {', '.join(result.next_actions[:3]) if result.next_actions else 'None'}
+• Tier: {tier_str.upper()}
+• Priority: {getattr(result, 'priority', 'N/A')}/5
 
-*Email Preview:*
-{(result.suggested_email_template or 'No template')[:150]}..."""
+*Agent Reasoning:*
+{getattr(result, 'reasoning', 'No reasoning provided')[:300]}
+
+*Key Factors:*
+{chr(10).join([f'• {factor}' for factor in getattr(result, 'key_factors', [])[:3]]) or '• None'}
+
+*Concerns:*
+{chr(10).join([f'• {concern}' for concern in getattr(result, 'concerns', [])[:3]]) or '• None'}
+
+*Recommended Actions:*
+{chr(10).join([f'• {str(a).replace("NextAction.", "").replace("_", " ").title()}' for a in (result.next_actions or [])[:5]]) or '• None'}
+
+*Email Template Preview:*
+{(result.suggested_email_template or 'No template generated')[:200]}...
+
+{f"""
+*Deep Dive Conversation:*
+{transcript}""" if transcript else ""}
+
+_Processed via Event Sourcing + DSPy AI_"""
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
