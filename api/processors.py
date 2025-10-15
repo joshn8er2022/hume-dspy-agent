@@ -336,15 +336,16 @@ async def send_email_via_gmass(lead: Any, result: Any):
     """
     try:
         import httpx
-        
+
         # GMass configuration
         GMASS_API_KEY = os.getenv("GMASS_API_KEY")
 
-    if not GMASS_API_KEY:
-        logger.warning("⚠️  GMASS_API_KEY not configured, skipping email send")
-        return None
+        if not GMASS_API_KEY:
+            logger.warning("⚠️  GMASS_API_KEY not configured, skipping email send")
+            return None
+
         GMASS_API_URL = "https://api.gmass.co/api"
-        
+
         # Check if lead has email
         if not lead.email:
             logger.warning("⚠️ No email address, skipping GMass send")
