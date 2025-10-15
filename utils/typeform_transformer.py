@@ -1,4 +1,10 @@
-"""Transform Typeform webhook payloads to Lead models."""
+"""Transform Typeform webhook payloads to Lead models.
+
+Extraction Strategy:
+- Use field.type to identify email, phone, text fields
+- No hardcoded FIELD_MAPPING required
+- Works with any Typeform structure
+"""
 from typing import Dict, Any, Optional
 from datetime import datetime
 import uuid
@@ -10,8 +16,7 @@ from models.lead import (
     BusinessSize,
     PatientVolume,
     PartnershipType,
-    LeadStatus,
-    FIELD_MAPPING
+    LeadStatus
 )
 
 
@@ -51,56 +56,103 @@ def extract_answer_value(answer: Dict[str, Any]) -> Optional[str]:
 
 
 def transform_typeform_to_lead(webhook: TypeformWebhook) -> Lead:
-    """Transform Typeform webhook payload to Lead model."""
+    """Transform Typeform webhook payload to Lead model.
+
+    Uses field.type for extraction (no FIELD_MAPPING needed).
+    """
 
     form_response = webhook.form_response
 
-    # Extract answers into a dictionary using field IDs
-    answers_dict: Dict[str, str] = {}
+    # Extract by field TYPE (reliable!)
+    email = None
+    phone = None
+    text_fields = []  # For first_name, last_name, company
+    business_size_raw = None
+    patient_volume_raw = None
+    calendly_link = None
+    business_goals = None
+    current_products = None
+    selling_products = None
+    portal_interest = None
+
     for answer in form_response.answers:
-        field_id = answer.field.id
-        field_name = FIELD_MAPPING.get(field_id, field_id)
+        field_type = answer.type
         value = extract_answer_value(answer.model_dump())
-        if value:
-            answers_dict[field_name] = value
 
-    # Determine response type (completed if has all required fields)
-    required_fields = ["first_name", "last_name", "email"]
-    has_all_required = all(field in answers_dict for field in required_fields)
-    response_type = ResponseType.COMPLETED if has_all_required else ResponseType.PARTIAL
+        if not value:
+            continue
 
-    # Map business size if present
+        # Extract by TYPE
+        if field_type == "email":
+            email = value
+
+        elif field_type == "phone_number":
+            phone = value
+
+        elif field_type == "text":
+            text_fields.append(value)
+
+        elif field_type == "url":
+            if "calendly" in value.lower():
+                calendly_link = value
+
+        elif field_type == "choice":
+            # Heuristic: Identify by content
+            if "employee" in value.lower() or "business" in value.lower():
+                business_size_raw = value
+            elif "patient" in value.lower():
+                patient_volume_raw = value
+            elif "yes" in value.lower() or "no" in value.lower():
+                if selling_products is None:
+                    selling_products = value
+                else:
+                    portal_interest = value
+
+    # Heuristic: First 3 text fields = first_name, last_name, company
+    first_name = text_fields[0] if len(text_fields) >= 1 else "Unknown"
+    last_name = text_fields[1] if len(text_fields) >= 2 else "Unknown"
+    company = text_fields[2] if len(text_fields) >= 3 else None
+
+    # Remaining text fields might be business_goals or current_products
+    if len(text_fields) >= 4:
+        business_goals = text_fields[3]
+    if len(text_fields) >= 5:
+        current_products = text_fields[4]
+
+    # Map business size
     business_size = None
-    if "business_size" in answers_dict:
-        size_value = answers_dict["business_size"]
-        if "1-5" in size_value:
+    if business_size_raw:
+        if "1-5" in business_size_raw:
             business_size = BusinessSize.SMALL
-        elif "6-20" in size_value:
+        elif "6-20" in business_size_raw:
             business_size = BusinessSize.MEDIUM
-        elif "20+" in size_value:
+        elif "20+" in business_size_raw:
             business_size = BusinessSize.LARGE
 
-    # Map patient volume if present
+    # Map patient volume
     patient_volume = None
-    if "patient_volume" in answers_dict:
-        volume_value = answers_dict["patient_volume"]
-        if "1-50" in volume_value:
+    if patient_volume_raw:
+        if "1-50" in patient_volume_raw:
             patient_volume = PatientVolume.SMALL
-        elif "51-300" in volume_value:
+        elif "51-300" in patient_volume_raw:
             patient_volume = PatientVolume.MEDIUM
-        elif "300+" in volume_value:
+        elif "300+" in patient_volume_raw:
             patient_volume = PatientVolume.LARGE
 
     # Determine partnership types
     partnership_types = []
-    if answers_dict.get("selling_products") == "Yes":
+    if selling_products and "yes" in selling_products.lower():
         partnership_types.append(PartnershipType.WHOLESALE_RETAIL)
-    if answers_dict.get("portal_interest") == "Yes":
+    if portal_interest and "yes" in portal_interest.lower():
         partnership_types.append(PartnershipType.PROFESSIONAL)
 
     # Check for Calendly booking
-    calendly_link = answers_dict.get("calendly_url")
     calendly_booked = bool(calendly_link)
+
+    # Determine response type
+    has_email = bool(email)
+    has_name = bool(first_name and first_name != "Unknown")
+    response_type = ResponseType.COMPLETED if (has_email and has_name) else ResponseType.PARTIAL
 
     # Parse timestamps
     try:
@@ -125,17 +177,25 @@ def transform_typeform_to_lead(webhook: TypeformWebhook) -> Lead:
     else:
         status = LeadStatus.NEW
 
+    # Build raw_answers dict for storage
+    raw_answers = {}
+    for answer in form_response.answers:
+        field_id = answer.field.id
+        value = extract_answer_value(answer.model_dump())
+        if value:
+            raw_answers[field_id] = value
+
     # Create Lead model
     lead = Lead(
         id=str(uuid.uuid4()),
         typeform_id=form_response.token,
 
         # Contact info
-        first_name=answers_dict.get("first_name", "Unknown"),
-        last_name=answers_dict.get("last_name", "Unknown"),
-        email=answers_dict.get("email", "unknown@example.com"),
-        phone=answers_dict.get("phone"),
-        company=answers_dict.get("company"),
+        first_name=first_name,
+        last_name=last_name,
+        email=email or "unknown@example.com",
+        phone=phone,
+        company=company,
 
         # Business profile
         business_size=business_size,
@@ -148,10 +208,10 @@ def transform_typeform_to_lead(webhook: TypeformWebhook) -> Lead:
 
         # Partnership
         partnership_types=partnership_types,
-        partnership_interest=answers_dict.get("business_goals"),
+        partnership_interest=business_goals,
 
         # Engagement
-        body_comp_tracking=answers_dict.get("current_products"),
+        body_comp_tracking=current_products,
         calendly_link=calendly_link,
         calendly_booked=calendly_booked,
 
@@ -160,11 +220,11 @@ def transform_typeform_to_lead(webhook: TypeformWebhook) -> Lead:
         typeform_submit_date=typeform_submit_date,
 
         # Metadata
+        raw_answers=raw_answers,
         metadata={
             "form_id": form_response.form_id,
             "event_id": webhook.event_id,
             "event_type": webhook.event_type,
-            "raw_answers": answers_dict,
             "hidden_fields": form_response.hidden or {},
             "variables": form_response.variables or []
         }
