@@ -39,8 +39,8 @@ def verify_typeform_signature(
         ```
     """
     if not secret:
-        logger.warning("No Typeform secret configured - skipping signature verification")
-        return True  # Allow if no secret configured (dev mode)
+        logger.error("❌ No Typeform secret configured - rejecting webhook for security")
+        return False  # DENY if no secret configured (fail-closed for security)
 
     try:
         # Typeform uses HMAC-SHA256

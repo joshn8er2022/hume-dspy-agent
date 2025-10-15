@@ -5,6 +5,15 @@ import os
 
 
 class Settings(BaseSettings):
+
+    def __post_init__(self):
+        """Validate required credentials are set."""
+        if not self.supabase_url:
+            raise ValueError("SUPABASE_URL environment variable is required")
+        if not self.supabase_key:
+            raise ValueError("SUPABASE_KEY environment variable is required")
+        if not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
     """Application settings with environment variable support."""
     
     # LLM Configuration (Switchable)
@@ -18,8 +27,8 @@ class Settings(BaseSettings):
     dspy_temperature: float = 0.7
     
     # Supabase (OPTIONAL with defaults)
-    supabase_url: Optional[str] = "https://mvjqoojihjvohstnepfm.supabase.co"
-    supabase_key: Optional[str] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12anFvb2ppaGp2b2hzdG5lcGZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDkxNDksImV4cCI6MjA3NTYyNTE0OX0.5nPOgq5E4Sgscu-lWh_2zRmNK7ZfEZ3L6UQHcD7e9-c"
+    supabase_url: Optional[str] = None
+    supabase_key: Optional[str] = None
     supabase_service_key: Optional[str] = None
     
     # Close CRM
@@ -48,7 +57,7 @@ class Settings(BaseSettings):
     
     # Environment
     environment: Literal["development", "production"] = "development"
-    debug: bool = True
+    debug: bool = False
     
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -54,7 +54,7 @@ def configure_dspy():
         dspy.configure(lm=lm)
 
         logger.info("✅ DSPy configured with OpenAI GPT-4o")
-        logger.info(f"   API key: {openai_api_key[:10]}...")
+        # API key logging removed for security
         dspy_configured = True
         return True
 
@@ -310,7 +310,11 @@ async def send_email_via_gmass(lead: Any, result: Any):
         import httpx
         
         # GMass configuration
-        GMASS_API_KEY = os.getenv("GMASS_API_KEY") or "279d97fc-9c33-49b8-b69b-94183b0305b4"
+        GMASS_API_KEY = os.getenv("GMASS_API_KEY")
+
+    if not GMASS_API_KEY:
+        logger.warning("⚠️  GMASS_API_KEY not configured, skipping email send")
+        return None
         GMASS_API_URL = "https://api.gmass.co/api"
         
         # Check if lead has email
