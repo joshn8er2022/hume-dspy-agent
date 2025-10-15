@@ -120,8 +120,8 @@ async def process_typeform_event(event: dict):
             await send_slack_notification_simple(event['raw_payload'])
         
         
-        # Step 5: Send email via GMass (if HOT/WARM tier)
-        if result and result.tier in ["hot", "warm"]:
+        # Step 5: Send email via GMass (if agent recommends)
+        if result and 'send_email' in [str(action).lower() for action in (result.next_actions or [])]:
             await send_email_via_gmass(lead, result)
         
         # Step 6: Sync to Close CRM
@@ -282,11 +282,8 @@ async def send_email_via_gmass(lead: Any, result: Any):
             logger.warning("⚠️ No email address, skipping GMass send")
             return
         
-        # Check if tier qualifies for email
-        tier_str = str(result.tier).lower().replace('qualificationtier.', '')
-        if tier_str not in ['hot', 'warm']:
-            logger.info(f"⏭️ Skipping email for {tier_str} tier lead")
-            return
+        # Agent decides via next_actions - no hardcoded tier checks
+        # If this function is called, agent already decided to send email
         
         logger.info(f"📧 Sending email via GMass to {lead.email}...")
         logger.info(f"   Tier: {tier_str}")
@@ -368,11 +365,8 @@ async def sync_to_close_crm(lead: Any, result: Any):
     try:
         logger.info(f"🔄 Syncing to Close CRM: {lead.email or 'no email'}...")
         
-        # Check if tier qualifies for CRM
-        tier_str = str(result.tier).lower().replace('qualificationtier.', '')
-        if tier_str == 'unqualified':
-            logger.info(f"⏭️ Skipping CRM sync for {tier_str} tier lead")
-            return
+        # Agent decides via next_actions - no hardcoded tier checks
+        # If this function is called, agent already decided to sync to CRM
         
         # Build lead name
         lead_name = lead.company or f"{lead.first_name or ''} {lead.last_name or ''}".strip() or "Unknown Lead"
