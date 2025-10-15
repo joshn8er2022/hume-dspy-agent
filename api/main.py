@@ -102,6 +102,7 @@ async def store_raw_event(
         
         supabase.table('raw_events').insert({
             'id': event_id,
+            'event_type': raw_payload.get('event_type', 'webhook'),
             'source': source,
             'raw_payload': raw_payload,
             'headers': headers,
