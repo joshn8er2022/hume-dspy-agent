@@ -28,49 +28,73 @@ class QualifyLead(dspy.Signature):
 
 
 class AnalyzeBusinessFit(dspy.Signature):
-    """Analyze how well a lead fits the ideal customer profile.
+    """Analyze how well a B2B lead fits Hume Health's ideal customer profile.
 
-    Consider business size, patient volume, industry, and company data
-    to determine business fit score.
+    CONTEXT: Hume Health sells Body Pod (98% accuracy BIA scale) + Hume Connect
+    (HIPAA-compliant RPM platform) to healthcare practitioners. We're a $72M company
+    with 650K MAU. Target: clinics needing remote patient monitoring.
+
+    KEY DIFFERENTIATORS vs competitors (InBody, Withings, DXA):
+    - Daily-use tracking for TRENDS (not just single-point accuracy)
+    - Practitioner workflow efficiency (saves 15+ hours/week)
+    - Improved patient adherence through daily engagement
+
+    IDEAL B2B CUSTOMER:
+    - Healthcare practitioners (weight loss, diabetes, functional medicine, telehealth)
+    - 50+ patients (100+ is excellent, 300+ is ideal)
+    - Clear pain point: manual data collection, low patient adherence
+    - Budget-conscious but ROI-focused
+
+    TONE: Conversational peer-to-peer consultant, NOT robotic AI or pushy salesperson.
+    Focus on problems solved, not features. Use practitioner language.
     """
 
-    business_size: str = dspy.InputField(desc="Business size category")
-    patient_volume: str = dspy.InputField(desc="Target patient monitoring volume")
-    company: str = dspy.InputField(desc="Company name")
-    industry: str = dspy.InputField(desc="Primary industry")
+    business_size: str = dspy.InputField(desc="Business size (employees)")
+    patient_volume: str = dspy.InputField(desc="Current patient/client volume for remote monitoring")
+    company: str = dspy.InputField(desc="Company/practice name")
+    industry: str = dspy.InputField(desc="Industry (healthcare, wellness, fitness, etc.)")
 
     fit_score: int = dspy.OutputField(
-        desc="Business fit score (0-50)"
+        desc="Business fit score (0-50). Weight: Patient volume > Practice size > Pain points"
     )
     reasoning: str = dspy.OutputField(
-        desc="Explanation of fit score"
+        desc="Conversational explanation of fit (avoid AI-speak, focus on their specific practice)"
     )
 
 
 class AnalyzeEngagement(dspy.Signature):
-    """Analyze lead engagement signals and intent.
+    """Analyze B2B lead engagement signals for Hume Health RPM solution.
 
-    Evaluate response completeness, quality, booking status,
-    and overall engagement to determine engagement score.
+    CONTEXT: We're assessing practitioner interest in Hume Connect (RPM platform)
+    and Body Pod hardware for their practice. High engagement = clear pain point
+    + specific use case + ready to discuss implementation.
+
+    ENGAGEMENT INDICATORS (ranked):
+    1. Calendly booking = HIGH INTENT (ready to discuss seriously)
+    2. Complete submission = MEDIUM INTENT (interested, needs education)
+    3. Specific pain points mentioned = STRONG SIGNAL (knows what they need)
+    4. Generic interest = LOW INTENT (browsing, not urgent)
+
+    TONE: Consultant analyzing a potential partnership, not grading a student.
     """
 
-    response_type: str = dspy.InputField(desc="completed or partial")
-    has_calendly_booking: bool = dspy.InputField(desc="Whether lead booked a call")
+    response_type: str = dspy.InputField(desc="completed or partial Typeform submission")
+    has_calendly_booking: bool = dspy.InputField(desc="Booked discovery call? (highest intent signal)")
     body_comp_response: str = dspy.InputField(
-        desc="Lead's response about body composition tracking needs"
+        desc="Their stated needs for patient body composition tracking"
     )
     ai_summary: str = dspy.InputField(
-        desc="AI-generated summary of lead's needs"
+        desc="Summary of practice needs and pain points"
     )
 
     engagement_score: int = dspy.OutputField(
-        desc="Engagement score (0-50)"
+        desc="Engagement score (0-50). Calendly booking = major boost"
     )
     intent_level: str = dspy.OutputField(
-        desc="high, medium, or low intent"
+        desc="high (ready to buy), medium (educating), or low (browsing)"
     )
     reasoning: str = dspy.OutputField(
-        desc="Explanation of engagement assessment"
+        desc="Conversational assessment of their readiness (avoid robotic analysis)"
     )
 
 
