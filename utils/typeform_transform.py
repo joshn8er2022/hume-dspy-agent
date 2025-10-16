@@ -62,6 +62,20 @@ def transform_typeform_webhook(webhook_data: Dict[str, Any]) -> Lead:
                 choice = answer.get('choice', {})
                 label = choice.get('label')
                 raw_answers[field_ref] = label
+
+                # SEMANTIC MAPPING: Detect business size and patient volume
+                if label:
+                    label_lower = label.lower()
+
+                    # Business size detection
+                    if 'employee' in label_lower or 'business' in label_lower:
+                        raw_answers['business_size'] = label
+                        logger.info(f"📊 Mapped business_size: {label}")
+
+                    # Patient volume detection
+                    elif 'patient' in label_lower or any(num in label for num in ['1-50', '51-300', '300+']):
+                        raw_answers['patient_volume'] = label
+                        logger.info(f"📊 Mapped patient_volume: {label}")
                 
             elif field_type == 'transcript':
                 transcript = answer.get('transcript', {})
