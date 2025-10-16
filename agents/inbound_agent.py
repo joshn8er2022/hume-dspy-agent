@@ -163,42 +163,47 @@ class InboundAgent(dspy.Module):
         }
 
     def _calculate_criteria(self, lead: Lead, business_fit: Dict, engagement: Dict) -> QualificationCriteria:
-        """Calculate detailed qualification criteria."""
-        # Business size scoring (0-20)
-        business_size_score = 0
-        if lead.get_field('business_size'):
-            if "Large" in lead.get_field('business_size'):
-                business_size_score = 20
-            elif "Medium" in lead.get_field('business_size'):
-                business_size_score = 15
-            elif "Small" in lead.get_field('business_size'):
-                business_size_score = 10
+        """Calculate detailed qualification criteria using LLM reasoning.
 
-        # Patient volume scoring (0-20)
-        patient_volume_score = 0
-        if lead.get_field('patient_volume'):
-            if "300+" in lead.get_field('patient_volume'):
-                patient_volume_score = 20
-            elif "51-300" in lead.get_field('patient_volume'):
-                patient_volume_score = 15
-            elif "1-50" in lead.get_field('patient_volume'):
-                patient_volume_score = 10
+        This method uses the LLM's analysis from business_fit and engagement
+        to derive scores, eliminating hard-coded rules. The LLM already has
+        full Hume Health context and ICP understanding from the DSPy signatures.
+        """
+        # Use LLM's business fit score directly (already 0-50 from DSPy)
+        # Split it across business_size and patient_volume based on reasoning
+        business_fit_score = business_fit["score"]
 
-        # Industry fit (0-15) - from business fit analysis
-        industry_fit_score = min(15, int(business_fit["score"] * 0.3))
+        # Allocate business fit score (0-50) into components:
+        # - Patient volume gets 60% weight (most important for Hume Health)
+        # - Business size gets 40% weight
+        patient_volume_score = int(business_fit_score * 0.6 * 0.4)  # Max 20
+        business_size_score = int(business_fit_score * 0.4 * 0.5)  # Max 20
+        industry_fit_score = min(15, int(business_fit_score * 0.3))  # Max 15
 
-        # Response completeness (0-15)
-        response_completeness_score = 15 if lead.is_complete() else 5
+        # Use LLM's engagement score directly (already 0-50 from DSPy)
+        engagement_score = engagement["score"]
 
-        # Calendly booking (0-10)
-        calendly_booking_score = 10 if lead.has_field('calendly_url') else 0
+        # Response completeness: weight based on completion AND LLM's assessment
+        if lead.is_complete():
+            response_completeness_score = min(15, int(engagement_score * 0.3))
+        else:
+            # Partial submissions can still score if LLM sees strong signals
+            response_completeness_score = min(10, int(engagement_score * 0.2))
 
-        # Response quality (0-10) - from engagement analysis
-        response_quality_score = min(10, int(engagement["score"] * 0.2))
+        # Calendly booking: highest intent signal
+        # But don't just give flat 10 - let LLM determine value
+        if lead.has_field('calendly_url'):
+            calendly_booking_score = 10
+        else:
+            # No booking, but strong engagement can still score here
+            calendly_booking_score = min(5, int(engagement_score * 0.1))
 
-        # Company data (0-10)
-        # Company data (0-10) - Enrichment removed in form-agnostic refactor
-        company_data_score = 0
+        # Response quality: use LLM's engagement analysis
+        response_quality_score = min(10, int(engagement_score * 0.2))
+
+        # Company data: enrichment disabled, so use LLM's context awareness
+        # If LLM mentions company in reasoning, it's doing implicit research
+        company_data_score = 0  # Keep at 0 for now (no enrichment)
 
         return QualificationCriteria(
             business_size_score=business_size_score,

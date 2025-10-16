@@ -45,6 +45,16 @@ class AnalyzeBusinessFit(dspy.Signature):
     - Clear pain point: manual data collection, low patient adherence
     - Budget-conscious but ROI-focused
 
+    SCORING GUIDANCE (0-50):
+    - 40-50: EXCELLENT FIT - 100+ patients, healthcare practice, clear RPM use case
+    - 30-39: GOOD FIT - 50-100 patients, relevant industry, identifiable pain points
+    - 20-29: MODERATE FIT - <50 patients OR non-healthcare but wellness-adjacent
+    - 10-19: WEAK FIT - Very small practice, unclear use case, but still B2B
+    - 0-9: POOR FIT - Consumer inquiry, wrong industry, or no clear business need
+
+    IMPORTANT: Patient volume is the PRIMARY signal. A solo practitioner with 200 patients
+    is better than a 50-employee corporate wellness company with 20 clients.
+
     TONE: Conversational peer-to-peer consultant, NOT robotic AI or pushy salesperson.
     Focus on problems solved, not features. Use practitioner language.
     """
@@ -55,7 +65,7 @@ class AnalyzeBusinessFit(dspy.Signature):
     industry: str = dspy.InputField(desc="Industry (healthcare, wellness, fitness, etc.)")
 
     fit_score: int = dspy.OutputField(
-        desc="Business fit score (0-50). Weight: Patient volume > Practice size > Pain points"
+        desc="Business fit score (0-50). CRITICAL: Patient volume > Industry fit > Practice size"
     )
     reasoning: str = dspy.OutputField(
         desc="Conversational explanation of fit (avoid AI-speak, focus on their specific practice)"
@@ -75,6 +85,17 @@ class AnalyzeEngagement(dspy.Signature):
     3. Specific pain points mentioned = STRONG SIGNAL (knows what they need)
     4. Generic interest = LOW INTENT (browsing, not urgent)
 
+    SCORING GUIDANCE (0-50):
+    - 45-50: VERY HIGH INTENT - Calendly booked + detailed pain points + complete submission
+    - 35-44: HIGH INTENT - Calendly booked OR very detailed responses about needs
+    - 25-34: MEDIUM INTENT - Complete submission with specific use case mentioned
+    - 15-24: LOW-MEDIUM INTENT - Partial submission but shows genuine interest
+    - 5-14: LOW INTENT - Generic interest, vague responses, just browsing
+    - 0-4: VERY LOW INTENT - Spam, wrong audience, or no engagement signals
+
+    IMPORTANT: Quality over quantity. A short but specific response ("I need to track
+    50 diabetes patients remotely") scores higher than a long generic one.
+
     TONE: Consultant analyzing a potential partnership, not grading a student.
     """
 
@@ -88,7 +109,7 @@ class AnalyzeEngagement(dspy.Signature):
     )
 
     engagement_score: int = dspy.OutputField(
-        desc="Engagement score (0-50). Calendly booking = major boost"
+        desc="Engagement score (0-50). CRITICAL: Calendly booking + specificity > length of response"
     )
     intent_level: str = dspy.OutputField(
         desc="high (ready to buy), medium (educating), or low (browsing)"
