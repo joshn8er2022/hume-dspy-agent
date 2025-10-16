@@ -11,14 +11,14 @@ Slow Path (12-15s, background):
 Key Principle: Webhook is a PURE LISTENER - never fails!
 """
 
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
 import logging
 import sys
 import os
 import uuid
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import json
 
 # Configure logging
@@ -138,6 +138,78 @@ async def health_check():
         "version": "2.1.0-full-pipeline",
         "supabase": "connected" if supabase else "disconnected"
     }
+
+
+# ============================================================================
+# A2A INTROSPECTION API
+# ============================================================================
+
+async def verify_a2a_token(authorization: Optional[str] = Header(None)) -> bool:
+    """Verify A2A authentication token."""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format. Use: Bearer <token>")
+
+    token = authorization.replace("Bearer ", "")
+    expected_token = os.getenv("A2A_API_KEY")
+
+    if not expected_token:
+        logger.warning("⚠️ A2A_API_KEY not set - allowing all requests (INSECURE!)")
+        return True
+
+    if token != expected_token:
+        raise HTTPException(status_code=403, detail="Invalid A2A API key")
+
+    return True
+
+
+@app.post("/a2a/introspect")
+async def a2a_introspection(
+    request: Request,
+    authorized: bool = Depends(verify_a2a_token)
+):
+    """A2A introspection endpoint for agent-to-agent communication.
+
+    Authentication: Requires Bearer token in Authorization header.
+    Set A2A_API_KEY environment variable to enable authentication.
+
+    This endpoint allows external agents (like Claude Code) to query the
+    autonomous agents about their internal state, reasoning, and decisions.
+
+    Example queries:
+    - Show follow-up state: {"agent_type": "follow_up", "query_type": "show_state", "lead_id": "abc-123"}
+    - Explain qualification: {"agent_type": "qualification", "query_type": "explain_score", "lead_id": "abc-123"}
+    - Test qualification: {"agent_type": "qualification", "query_type": "test_qualification", "test_data": {...}}
+    """
+    try:
+        from agents.introspection import get_introspection_service, IntrospectionRequest
+
+        # Parse request
+        payload = await request.json()
+        introspection_request = IntrospectionRequest(**payload)
+
+        # Get introspection service
+        service = get_introspection_service()
+
+        # Handle query
+        response = service.handle_query(introspection_request)
+
+        return response.model_dump()
+
+    except Exception as e:
+        logger.error(f"❌ A2A introspection failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
 
 
 @app.post("/")
