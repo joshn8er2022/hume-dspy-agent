@@ -76,8 +76,45 @@ class AgentIntrospectionService:
     """Service for A2A introspection of autonomous agents."""
 
     def __init__(self):
+        # Initialize DSPy before creating agents (base_model pattern)
+        self._ensure_dspy_configured()
+
         self.follow_up_agent = FollowUpAgent()
         self.qualification_agent = InboundAgent()
+
+    def _ensure_dspy_configured(self):
+        """Ensure DSPy is configured with an LM (base_model pattern).
+
+        This is the 'lm = base_model' fix your developer mentioned.
+        Instead of relying on global dspy.configure(), we ensure it's
+        configured before agent initialization.
+        """
+        import dspy
+        import os
+
+        # Check if already configured
+        if hasattr(dspy.settings, 'lm') and dspy.settings.lm is not None:
+            logger.info("✅ DSPy already configured with base_model")
+            return
+
+        # Get API key
+        openai_api_key = (
+            os.getenv("OPENAI_API_KEY") or
+            os.getenv("OPENAI_KEY") or
+            os.getenv("ANTHROPIC_API_KEY")  # Fallback to Anthropic
+        )
+
+        if not openai_api_key:
+            raise ValueError("No LM API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY")
+
+        # Configure with base model (DSPy 2.5+ pattern)
+        if os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_KEY"):
+            lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
+        else:
+            lm = dspy.LM('anthropic/claude-3-5-sonnet-20241022', api_key=openai_api_key)
+
+        dspy.configure(lm=lm)
+        logger.info(f"✅ DSPy configured with base_model: {lm.model}")
 
     def handle_query(self, request: IntrospectionRequest) -> IntrospectionResponse:
         """Route introspection query to appropriate handler."""
