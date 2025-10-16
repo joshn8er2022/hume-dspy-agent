@@ -1,27 +1,26 @@
-"""Email client for sending outreach and follow-ups."""
+"""Email client for sending outreach and follow-ups via GMass."""
 
 import os
 import logging
+import requests
 from datetime import datetime
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, CustomArg, TrackingSettings, ClickTracking, OpenTracking
 
 logger = logging.getLogger(__name__)
 
 
 class EmailClient:
-    """Client for sending emails via SendGrid API."""
+    """Client for sending emails via GMass Chrome Extension API.
+
+    GMass uses your personal Gmail account for sending, which is perfect
+    for B2B outreach as emails come from your actual inbox.
+    """
 
     def __init__(self):
-        self.api_key = os.getenv("SENDGRID_API_KEY")
-        self.from_email = os.getenv("FROM_EMAIL", "hello@humehealth.com")
-        self.from_name = os.getenv("FROM_NAME", "Hume Health Team")
+        self.api_key = os.getenv("GMASS_API_KEY")
+        self.from_email = os.getenv("FROM_EMAIL", "your@gmail.com")
 
-        if self.api_key:
-            self.client = SendGridAPIClient(self.api_key)
-        else:
-            self.client = None
-            logger.warning("SENDGRID_API_KEY not configured")
+        if not self.api_key:
+            logger.warning("GMASS_API_KEY not configured")
 
     def send_email(
         self,
@@ -31,58 +30,57 @@ class EmailClient:
         tier: str,
         lead_data: dict = None
     ) -> bool:
-        """Send an email via SendGrid.
+        """Send an email via GMass.
+
+        GMass sends emails through your Gmail account, which improves deliverability
+        and makes the emails appear more personal (not from a corporate domain).
 
         Args:
             to_email: Recipient email
             lead_id: Lead ID for tracking
             template_type: Type of email (initial_outreach, follow_up_1, etc.)
             tier: Lead tier (HOT, WARM, COLD)
-            lead_data: Optional lead data for personalization
+            lead_data: Optional lead data for personalization (first_name, company)
 
         Returns:
             True if sent successfully
         """
-        if not self.client:
-            logger.warning("SendGrid client not configured, skipping email send")
+        if not self.api_key:
+            logger.warning("GMASS_API_KEY not configured, skipping email send")
             return False
 
         # Get template based on type and tier
         subject, body = self._get_template(template_type, tier, lead_data)
 
         try:
-            # Create SendGrid message
-            message = Mail(
-                from_email=(self.from_email, self.from_name),
-                to_emails=to_email,
-                subject=subject,
-                html_content=body
+            # GMass API endpoint for sending emails
+            # Docs: https://www.gmass.co/api
+            payload = {
+                "apiKey": self.api_key,
+                "emailSubject": subject,
+                "emailBody": body,
+                "toAddress": to_email,
+                "fromAddress": self.from_email,
+                "trackOpens": "Y",
+                "trackClicks": "Y",
+                "customTag": f"lead_id:{lead_id},tier:{tier},template:{template_type}"
+            }
+
+            response = requests.post(
+                "https://api.gmass.co/api/drafts",
+                json=payload,
+                timeout=10
             )
 
-            # Add custom tracking args
-            message.custom_arg = [
-                CustomArg("lead_id", lead_id),
-                CustomArg("template_type", template_type),
-                CustomArg("tier", tier)
-            ]
-
-            # Enable tracking
-            message.tracking_settings = TrackingSettings()
-            message.tracking_settings.click_tracking = ClickTracking(True, True)
-            message.tracking_settings.open_tracking = OpenTracking(True)
-
-            # Send email
-            response = self.client.send(message)
-
-            if response.status_code in [200, 201, 202]:
-                logger.info(f"Email sent successfully to {to_email} (template: {template_type}, tier: {tier})")
+            if response.status_code == 200:
+                logger.info(f"✅ Email sent via GMass to {to_email} (template: {template_type}, tier: {tier})")
                 return True
             else:
-                logger.error(f"SendGrid API error: {response.status_code} - {response.body}")
+                logger.error(f"❌ GMass API error: {response.status_code} - {response.text}")
                 return False
 
         except Exception as e:
-            logger.error(f"Email send error: {str(e)}")
+            logger.error(f"❌ Email send error: {str(e)}")
             return False
 
     def _get_template(self, template_type: str, tier: str, lead_data: dict = None) -> tuple[str, str]:
