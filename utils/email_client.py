@@ -1,119 +1,206 @@
 """Email client for sending outreach and follow-ups."""
 
 import os
-import requests
 import logging
 from datetime import datetime
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, CustomArg, TrackingSettings, ClickTracking, OpenTracking
 
 logger = logging.getLogger(__name__)
 
 
 class EmailClient:
-    """Client for sending emails via GMass API."""
+    """Client for sending emails via SendGrid API."""
 
     def __init__(self):
-        self.api_key = os.getenv("GMASS_API_KEY")
-        self.api_base = "https://api.gmass.co/api"
-        self.from_email = os.getenv("FROM_EMAIL", "hello@yourcompany.com")
+        self.api_key = os.getenv("SENDGRID_API_KEY")
+        self.from_email = os.getenv("FROM_EMAIL", "hello@humehealth.com")
+        self.from_name = os.getenv("FROM_NAME", "Hume Health Team")
+
+        if self.api_key:
+            self.client = SendGridAPIClient(self.api_key)
+        else:
+            self.client = None
+            logger.warning("SENDGRID_API_KEY not configured")
 
     def send_email(
         self,
         to_email: str,
         lead_id: str,
         template_type: str,
-        tier: str
+        tier: str,
+        lead_data: dict = None
     ) -> bool:
-        """Send an email via GMass.
+        """Send an email via SendGrid.
 
         Args:
             to_email: Recipient email
             lead_id: Lead ID for tracking
             template_type: Type of email (initial_outreach, follow_up_1, etc.)
-            tier: Lead tier
+            tier: Lead tier (HOT, WARM, COLD)
+            lead_data: Optional lead data for personalization
 
         Returns:
             True if sent successfully
         """
-        if not self.api_key:
-            logger.warning("GMASS_API_KEY not configured, skipping email send")
+        if not self.client:
+            logger.warning("SendGrid client not configured, skipping email send")
             return False
 
-        # Get template based on type
-        subject, body = self._get_template(template_type, tier)
+        # Get template based on type and tier
+        subject, body = self._get_template(template_type, tier, lead_data)
 
         try:
-            # GMass API call (simplified - adjust to actual GMass API)
-            payload = {
-                "apiKey": self.api_key,
-                "from": self.from_email,
-                "to": to_email,
-                "subject": subject,
-                "body": body,
-                "trackOpens": True,
-                "trackClicks": True,
-                "customHeaders": {
-                    "X-Lead-ID": lead_id,
-                    "X-Template-Type": template_type
-                }
-            }
-
-            response = requests.post(
-                f"{self.api_base}/campaigns",
-                json=payload,
-                timeout=10
+            # Create SendGrid message
+            message = Mail(
+                from_email=(self.from_email, self.from_name),
+                to_emails=to_email,
+                subject=subject,
+                html_content=body
             )
 
-            if response.status_code == 200:
-                logger.info(f"Email sent successfully to {to_email} (template: {template_type})")
+            # Add custom tracking args
+            message.custom_arg = [
+                CustomArg("lead_id", lead_id),
+                CustomArg("template_type", template_type),
+                CustomArg("tier", tier)
+            ]
+
+            # Enable tracking
+            message.tracking_settings = TrackingSettings()
+            message.tracking_settings.click_tracking = ClickTracking(True, True)
+            message.tracking_settings.open_tracking = OpenTracking(True)
+
+            # Send email
+            response = self.client.send(message)
+
+            if response.status_code in [200, 201, 202]:
+                logger.info(f"Email sent successfully to {to_email} (template: {template_type}, tier: {tier})")
                 return True
             else:
-                logger.error(f"GMass API error: {response.status_code} - {response.text}")
+                logger.error(f"SendGrid API error: {response.status_code} - {response.body}")
                 return False
 
         except Exception as e:
             logger.error(f"Email send error: {str(e)}")
             return False
 
-    def _get_template(self, template_type: str, tier: str) -> tuple[str, str]:
+    def _get_template(self, template_type: str, tier: str, lead_data: dict = None) -> tuple[str, str]:
         """Get email template based on type and tier.
+
+        Templates follow Hume Health brand voice: conversational consultant,
+        not robotic AI or pushy salesperson. Focus on practitioner pain points.
 
         Returns:
             Tuple of (subject, body)
         """
-        # These should ideally come from a database or DSPy generation
-        # For now, simple templates based on type
+        lead_data = lead_data or {}
+        company = lead_data.get("company", "your practice")
+        first_name = lead_data.get("first_name", "")
+
+        # Personalize greeting
+        greeting = f"Hi {first_name}," if first_name else "Hi there,"
 
         if template_type == "initial_outreach":
-            subject = "Quick question about your body composition tracking"
-            body = f"""Hi there,
+            # Tier-based urgency and approach
+            if tier == "HOT":
+                subject = "Body composition tracking for your practice"
+                body = f"""<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+{greeting}<br><br>
 
-I noticed you're interested in body composition tracking for your practice.
+Thanks for reaching out about remote patient monitoring for {company}. Based on what you shared, it sounds like you're dealing with the classic challenge of manual data collection eating up your time.<br><br>
 
-I'd love to learn more about your current workflow and see if we can help.
+We work with a lot of practices in similar situations, and the common thread is always the same: practitioners want to focus on patients, not spreadsheets.<br><br>
 
-Would you be open to a quick 15-minute chat this week?
+<strong>Here's what we typically see work well:</strong><br>
+• Body Pod for clinical-grade body composition (98% accuracy, but more importantly: daily-use tracking so you can spot trends, not just snapshots)<br>
+• Hume Connect platform to automatically pull everything into one view—saves our practitioners about 15+ hours per week on data analysis<br><br>
 
-Best,
-Your Name
-"""
+Not trying to sell you anything yet—just want to understand your specific workflow and see if this makes sense for {company}.<br><br>
+
+Would you be open to a quick 15-minute conversation this week? I can walk you through how other practices are handling this, and we can figure out if it's a fit.<br><br>
+
+Best,<br>
+Hume Health Team<br>
+<a href="mailto:{self.from_email}">{self.from_email}</a>
+</body></html>"""
+
+            elif tier == "WARM":
+                subject = "Quick question about patient data tracking"
+                body = f"""<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+{greeting}<br><br>
+
+I saw your inquiry about body composition tracking for {company}. Sounds like you might be in the same boat as a lot of practices we talk to—spending too much time manually tracking patient metrics.<br><br>
+
+We've built a remote patient monitoring platform (Hume Connect) that integrates with clinical-grade hardware (Body Pod) to automate a lot of that. The key benefit isn't just accuracy—it's the daily engagement piece that improves patient adherence.<br><br>
+
+<strong>Quick snapshot:</strong><br>
+• Body Pod: 98% accurate BIA scale for daily body comp tracking<br>
+• Hume Connect: HIPAA-compliant dashboard that auto-syncs patient data (saves ~15 hours/week for most practitioners)<br>
+• Focus on trends, not single-point measurements (which is what actually drives patient outcomes)<br><br>
+
+Not sure if this aligns with your needs, but happy to hop on a quick call to discuss your specific workflow.<br><br>
+
+Let me know if you'd be interested in a 15-minute chat?<br><br>
+
+Best,<br>
+Hume Health Team<br>
+<a href="mailto:{self.from_email}">{self.from_email}</a>
+</body></html>"""
+
+            else:  # COLD or UNQUALIFIED
+                subject = "Following up on your Hume Health inquiry"
+                body = f"""<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+{greeting}<br><br>
+
+Thanks for your interest in Hume Health's body composition tracking solutions.<br><br>
+
+We specialize in helping healthcare practitioners with remote patient monitoring—specifically for practices that need daily body composition data (not just one-off measurements).<br><br>
+
+<strong>Our typical fit:</strong><br>
+• Weight loss clinics, diabetes management, functional medicine practices<br>
+• 50+ patients who need regular monitoring<br>
+• Practitioners looking to save time on data collection and improve patient adherence<br><br>
+
+If that sounds like your practice, I'd be happy to set up a brief call to discuss how we can help.<br><br>
+
+Feel free to reply to this email or book time directly: <a href="https://calendly.com/humehealth">calendly.com/humehealth</a><br><br>
+
+Best,<br>
+Hume Health Team<br>
+<a href="mailto:{self.from_email}">{self.from_email}</a>
+</body></html>"""
 
         elif template_type.startswith("follow_up_"):
             follow_up_num = template_type.split("_")[-1]
-            subject = f"Re: Body composition tracking (follow-up #{follow_up_num})"
-            body = f"""Hi again,
+            subject = f"Re: Body composition tracking for {company}"
+            body = f"""<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+{greeting}<br><br>
 
-Just wanted to follow up on my previous email about body composition tracking.
+Just circling back on my previous email about remote patient monitoring for {company}.<br><br>
 
-I'd still love to connect and learn about your needs.
+I know you're busy, so I'll keep this short: we help practices like yours automate body composition tracking and cut down on manual data entry. Most practitioners save 15+ hours per week.<br><br>
 
-Let me know if you have 15 minutes for a quick call?
+Still interested in chatting? Let me know if you have 15 minutes this week.<br><br>
 
-Best,
-Your Name
-"""
+Otherwise, no worries—feel free to reach out whenever the timing is better.<br><br>
+
+Best,<br>
+Hume Health Team<br>
+<a href="mailto:{self.from_email}">{self.from_email}</a>
+</body></html>"""
 
         else:
-            subject = "Following up"
-            body = "Just checking in..."
+            subject = "Following up on Hume Health inquiry"
+            body = f"""<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+{greeting}<br><br>
+
+Just checking in to see if you're still interested in learning more about Hume Health's remote patient monitoring solutions.<br><br>
+
+Let me know if you'd like to connect!<br><br>
+
+Best,<br>
+Hume Health Team
+</body></html>"""
 
         return subject, body

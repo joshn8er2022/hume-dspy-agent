@@ -31,6 +31,7 @@ class LeadJourneyState(TypedDict):
     lead_id: str
     email: str
     first_name: str
+    company: str
     tier: str
     status: str
     slack_thread_ts: str | None
@@ -129,11 +130,18 @@ class FollowUpAgent:
     def send_initial_email(self, state: LeadJourneyState) -> LeadJourneyState:
         """Send the initial engagement email."""
         try:
+            # Prepare lead data for personalization
+            lead_data = {
+                'first_name': state.get('first_name', ''),
+                'company': state.get('company', 'your practice')
+            }
+
             success = self.email_client.send_email(
                 to_email=state['email'],
                 lead_id=state['lead_id'],
                 template_type='initial_outreach',
-                tier=state['tier']
+                tier=state['tier'],
+                lead_data=lead_data
             )
 
             if success:
@@ -155,11 +163,18 @@ class FollowUpAgent:
         try:
             state['follow_up_count'] += 1
 
+            # Prepare lead data for personalization
+            lead_data = {
+                'first_name': state.get('first_name', ''),
+                'company': state.get('company', 'your practice')
+            }
+
             success = self.email_client.send_email(
                 to_email=state['email'],
                 lead_id=state['lead_id'],
                 template_type=f'follow_up_{state["follow_up_count"]}',
-                tier=state['tier']
+                tier=state['tier'],
+                lead_data=lead_data
             )
 
             if success:
