@@ -45,15 +45,22 @@ class AnalyzeBusinessFit(dspy.Signature):
     - Clear pain point: manual data collection, low patient adherence
     - Budget-conscious but ROI-focused
 
-    SCORING GUIDANCE (0-50):
-    - 40-50: EXCELLENT FIT - 100+ patients, healthcare practice, clear RPM use case
-    - 30-39: GOOD FIT - 50-100 patients, relevant industry, identifiable pain points
-    - 20-29: MODERATE FIT - <50 patients OR non-healthcare but wellness-adjacent
-    - 10-19: WEAK FIT - Very small practice, unclear use case, but still B2B
-    - 0-9: POOR FIT - Consumer inquiry, wrong industry, or no clear business need
+    SCORING GUIDANCE (0-50) - Granular assessment for precise tier placement:
+    - 45-50: EXCEPTIONAL FIT - 300+ patients, healthcare specialty practice, urgent RPM need
+    - 38-44: EXCELLENT FIT - 100-300 patients, healthcare practice, clear pain point
+    - 30-37: STRONG FIT - 50-100 patients, relevant specialty, identifiable workflow issues
+    - 23-29: GOOD FIT - 30-50 patients, wellness-adjacent, some pain points mentioned
+    - 15-22: MODERATE FIT - <30 patients OR corporate wellness with unclear volume
+    - 8-14: WEAK FIT - Very small practice, vague use case, but B2B context exists
+    - 0-7: POOR FIT - Consumer inquiry, wrong industry, no business application
 
-    IMPORTANT: Patient volume is the PRIMARY signal. A solo practitioner with 200 patients
-    is better than a 50-employee corporate wellness company with 20 clients.
+    CRITICAL WEIGHTING:
+    1. Patient volume (60%): 300+ = 45-50, 100-300 = 38-44, 50-100 = 30-37, <50 = scale down
+    2. Healthcare specialty (25%): Diabetes/weight loss/functional med = boost, general wellness = neutral
+    3. Pain point clarity (15%): "Manual data killing me" = boost, "Interested in tech" = neutral
+
+    IMPORTANT: A solo diabetes practitioner with 150 patients (score: 40-45) beats a
+    50-employee corporate wellness with 25 clients (score: 15-20).
 
     TONE: Conversational peer-to-peer consultant, NOT robotic AI or pushy salesperson.
     Focus on problems solved, not features. Use practitioner language.
@@ -85,16 +92,25 @@ class AnalyzeEngagement(dspy.Signature):
     3. Specific pain points mentioned = STRONG SIGNAL (knows what they need)
     4. Generic interest = LOW INTENT (browsing, not urgent)
 
-    SCORING GUIDANCE (0-50):
-    - 45-50: VERY HIGH INTENT - Calendly booked + detailed pain points + complete submission
-    - 35-44: HIGH INTENT - Calendly booked OR very detailed responses about needs
-    - 25-34: MEDIUM INTENT - Complete submission with specific use case mentioned
-    - 15-24: LOW-MEDIUM INTENT - Partial submission but shows genuine interest
-    - 5-14: LOW INTENT - Generic interest, vague responses, just browsing
-    - 0-4: VERY LOW INTENT - Spam, wrong audience, or no engagement signals
+    SCORING GUIDANCE (0-50) - Granular intent assessment:
+    - 45-50: EXTREME INTENT - Calendly booked + complete submission + specific pain points + urgency signals
+    - 40-44: VERY HIGH INTENT - Calendly booked + detailed responses OR complete submission with clear timeline
+    - 33-39: HIGH INTENT - Calendly booked OR very detailed specific needs (no generic language)
+    - 25-32: MEDIUM-HIGH INTENT - Complete submission + specific use case + some pain points
+    - 18-24: MEDIUM INTENT - Partial submission but specific about needs OR complete but generic
+    - 10-17: LOW-MEDIUM INTENT - Shows interest but vague/exploratory, no urgency
+    - 3-9: LOW INTENT - Minimal effort, generic responses, browsing behavior
+    - 0-2: NO INTENT - Spam, wrong audience, accidental submission
 
-    IMPORTANT: Quality over quantity. A short but specific response ("I need to track
-    50 diabetes patients remotely") scores higher than a long generic one.
+    CRITICAL SIGNALS (in priority order):
+    1. Calendly booking (40% weight): Booked = 40-50 range possible, Not booked = caps at 39
+    2. Response specificity (35%): "Track 60 weight loss patients daily" > "Interested in tracking"
+    3. Pain point clarity (15%): "Manual entry taking 10hrs/week" > "Looking to improve workflow"
+    4. Completion (10%): Complete submission shows commitment
+
+    IMPORTANT: A partial submission with "I need this for 100 diabetes patients, manual
+    tracking is killing my practice" (score: 35-39) beats a complete generic submission
+    "We're interested in body composition tech for our wellness program" (score: 18-24).
 
     TONE: Consultant analyzing a potential partnership, not grading a student.
     """

@@ -61,9 +61,20 @@ class LeadStatus(str, Enum):
 
 
 class LeadTier(str, Enum):
-    """Lead qualification tier."""
+    """Lead qualification tier with granular segmentation.
+
+    6-tier system for precise lead prioritization and nurture cadence:
+    - SCORCHING: 90-100 - Book meeting immediately, highest priority
+    - HOT: 75-89 - High priority follow-up, same-day outreach
+    - WARM: 60-74 - Standard nurture sequence, 24-48h follow-up
+    - COOL: 45-59 - Long-term nurture, weekly touchpoints
+    - COLD: 30-44 - Low priority drip campaign, monthly check-ins
+    - UNQUALIFIED: <30 - No active outreach, passive content only
+    """
+    SCORCHING = "scorching"
     HOT = "hot"
     WARM = "warm"
+    COOL = "cool"
     COLD = "cold"
     UNQUALIFIED = "unqualified"
 

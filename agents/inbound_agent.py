@@ -41,10 +41,12 @@ class InboundAgent(dspy.Module):
         self.generate_email = dspy.ChainOfThought(GenerateEmailTemplate)
         self.generate_sms = dspy.ChainOfThought(GenerateSMSMessage)
 
-        # Qualification thresholds
-        self.HOT_THRESHOLD = 80
+        # Qualification thresholds (6-tier granular system)
+        self.SCORCHING_THRESHOLD = 90
+        self.HOT_THRESHOLD = 75
         self.WARM_THRESHOLD = 60
-        self.COLD_THRESHOLD = 40
+        self.COOL_THRESHOLD = 45
+        self.COLD_THRESHOLD = 30
 
     def forward(self, lead: Lead) -> QualificationResult:
         """Process and qualify a lead.
@@ -216,11 +218,15 @@ class InboundAgent(dspy.Module):
         )
 
     def _determine_tier(self, score: int) -> LeadTier:
-        """Determine qualification tier from score."""
-        if score >= self.HOT_THRESHOLD:
+        """Determine qualification tier from score using 6-tier granular system."""
+        if score >= self.SCORCHING_THRESHOLD:
+            return LeadTier.SCORCHING
+        elif score >= self.HOT_THRESHOLD:
             return LeadTier.HOT
         elif score >= self.WARM_THRESHOLD:
             return LeadTier.WARM
+        elif score >= self.COOL_THRESHOLD:
+            return LeadTier.COOL
         elif score >= self.COLD_THRESHOLD:
             return LeadTier.COLD
         else:
