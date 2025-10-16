@@ -223,19 +223,19 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
 • Priority: {getattr(result, 'priority', 'N/A')}/5
 
 *Agent Reasoning:*
-{getattr(result, 'reasoning', 'No reasoning provided')[:300]}
+{getattr(result, 'reasoning', 'No reasoning provided')}
 
 *Key Factors:*
-{chr(10).join([f'• {factor}' for factor in getattr(result, 'key_factors', [])[:3]]) or '• None'}
+{chr(10).join([f'• {factor}' for factor in getattr(result, 'key_factors', [])])}
 
 *Concerns:*
-{chr(10).join([f'• {concern}' for concern in getattr(result, 'concerns', [])[:3]]) or '• None'}
+{chr(10).join([f'• {concern}' for concern in getattr(result, 'concerns', [])])}
 
 *Recommended Actions:*
-{chr(10).join([f'• {str(a).replace("NextAction.", "").replace("_", " ").title()}' for a in (result.next_actions or [])[:5]]) or '• None'}
+{chr(10).join([f'• {str(a).replace("NextAction.", "").replace("_", " ").title()}' for a in (result.next_actions or [])])}
 
 *Email Template Preview:*
-{(result.suggested_email_template or 'No template generated')[:200]}...
+{result.suggested_email_template or 'No template generated'}
 """
 
         # Add transcript if available (avoid nested f-strings)
