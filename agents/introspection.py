@@ -86,16 +86,23 @@ class AgentIntrospectionService:
         """Ensure DSPy is configured with an LM (base_model pattern).
 
         This is the 'lm = base_model' fix your developer mentioned.
-        Instead of relying on global dspy.configure(), we ensure it's
-        configured before agent initialization.
+
+        DSPy's modular abstraction allows you to swap LMs by reassigning
+        the base_model via dspy.configure(lm=base_model). This changes
+        the underlying model for all subsequent calls without altering
+        pipeline logic or data structures (Pydantic + LangGraph intact).
+
+        This solves issues related to:
+        - Model-specific bugs or compatibility
+        - Missing LM initialization
+        - Performance issues with specific models
+
+        The key insight: DSPy decouples the LM from infrastructure,
+        so switching models isolates whether issues are model-specific
+        or elsewhere in the stack.
         """
         import dspy
         import os
-
-        # Check if already configured
-        if hasattr(dspy.settings, 'lm') and dspy.settings.lm is not None:
-            logger.info("✅ DSPy already configured with base_model")
-            return
 
         # Get API key
         openai_api_key = (
@@ -107,14 +114,20 @@ class AgentIntrospectionService:
         if not openai_api_key:
             raise ValueError("No LM API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY")
 
-        # Configure with base model (DSPy 2.5+ pattern)
+        # Create base_model instance
+        # The 'base_model' is the LM that serves as the foundation for all DSPy operations
         if os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_KEY"):
-            lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
+            base_model = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
+            logger.info("🔄 Switching to base_model: openai/gpt-4o")
         else:
-            lm = dspy.LM('anthropic/claude-3-5-sonnet-20241022', api_key=openai_api_key)
+            base_model = dspy.LM('anthropic/claude-3-5-sonnet-20241022', api_key=openai_api_key)
+            logger.info("🔄 Switching to base_model: anthropic/claude-3-5-sonnet-20241022")
 
-        dspy.configure(lm=lm)
-        logger.info(f"✅ DSPy configured with base_model: {lm.model}")
+        # Swap the LM by reconfiguring with base_model
+        # This decouples the LM from the rest of the infrastructure
+        dspy.configure(lm=base_model)
+
+        logger.info(f"✅ DSPy configured with base_model (Pydantic + LangGraph infrastructure intact)")
 
     def handle_query(self, request: IntrospectionRequest) -> IntrospectionResponse:
         """Route introspection query to appropriate handler."""
