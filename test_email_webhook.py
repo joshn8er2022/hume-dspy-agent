@@ -164,7 +164,7 @@ def submit_test_webhook(payload: dict, use_webhook_secret: bool = True):
     # Submit webhook
     try:
         response = requests.post(
-            f"{API_ENDPOINT}/typeform",
+            f"{API_ENDPOINT}/webhooks/typeform",
             json=payload,
             headers=headers,
             timeout=30
