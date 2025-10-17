@@ -2,14 +2,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from enum import Enum
-
-
-class QualificationTier(str, Enum):
-    """Lead qualification tiers."""
-    HOT = "hot"  # 80-100 score
-    WARM = "warm"  # 60-79 score
-    COLD = "cold"  # 40-59 score
-    UNQUALIFIED = "unqualified"  # 0-39 score
+from models.lead import LeadTier  # Import 6-tier system
 
 
 class NextAction(str, Enum):
@@ -61,7 +54,7 @@ class QualificationResult(BaseModel):
     # Qualification outcome
     is_qualified: bool
     score: int = Field(..., ge=0, le=100)
-    tier: QualificationTier
+    tier: LeadTier  # Use 6-tier system
 
     # Reasoning
     reasoning: str = Field(..., description="AI reasoning for qualification")
@@ -91,18 +84,24 @@ class QualificationResult(BaseModel):
 
     @classmethod
     def from_score(cls, score: int, **kwargs) -> "QualificationResult":
-        """Create qualification result from score."""
-        if score >= 80:
-            tier = QualificationTier.HOT
+        """Create qualification result from score using 6-tier system."""
+        if score >= 90:
+            tier = LeadTier.SCORCHING
+            is_qualified = True
+        elif score >= 75:
+            tier = LeadTier.HOT
             is_qualified = True
         elif score >= 60:
-            tier = QualificationTier.WARM
+            tier = LeadTier.WARM
             is_qualified = True
-        elif score >= 40:
-            tier = QualificationTier.COLD
+        elif score >= 45:
+            tier = LeadTier.COOL
+            is_qualified = False
+        elif score >= 30:
+            tier = LeadTier.COLD
             is_qualified = False
         else:
-            tier = QualificationTier.UNQUALIFIED
+            tier = LeadTier.UNQUALIFIED
             is_qualified = False
 
         return cls(
