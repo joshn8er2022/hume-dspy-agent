@@ -28,15 +28,21 @@ class IntrospectionRequest(BaseModel):
     """Request format for A2A introspection queries and commands."""
     mode: str = Field("query", description="Mode: 'query' (read-only) or 'command' (action)")
     agent_type: str = Field(..., description="Agent to target: 'inbound', 'follow_up', 'research', 'strategy'")
-    action: str = Field(..., description="Action: 'show_state', 'explain_score', 'research_lead', etc.")
+    
+    # Support both old (query_type) and new (action) field names
+    action: Optional[str] = Field(None, description="Action: 'show_state', 'explain_score', 'research_lead', etc.")
+    query_type: Optional[str] = Field(None, description="[Deprecated] Use 'action' instead")
+    
     lead_id: Optional[str] = Field(None, description="Lead ID for operations")
     parameters: Optional[Dict[str, Any]] = Field(None, description="Additional parameters for the action")
     test_data: Optional[Dict[str, Any]] = Field(None, description="Test lead data for validation")
     
-    # Backwards compatibility
-    @property
-    def query_type(self) -> str:
-        return self.action
+    def model_post_init(self, __context):
+        """Backwards compatibility: query_type → action"""
+        if self.query_type and not self.action:
+            self.action = self.query_type
+        elif not self.action and not self.query_type:
+            raise ValueError("Either 'action' or 'query_type' must be provided")
 
 
 class AgentState(BaseModel):
