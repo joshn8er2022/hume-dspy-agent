@@ -361,97 +361,25 @@ async def process_a2a_event(event: dict):
 async def send_email_via_gmass(lead: Any, result: Any):
     """Send email via GMass API as josh@humehealth.com.
     
+    TEMPORARILY DISABLED: GMass API endpoint returning 404 errors.
+    TODO: Fix GMass API endpoint or migrate to SendGrid.
+    
     Only sends to HOT/WARM tier leads.
     Uses DSPy-generated email template.
     """
-    try:
-        import httpx
-
-        # GMass configuration
-        GMASS_API_KEY = os.getenv("GMASS_API_KEY")
-
-        if not GMASS_API_KEY:
-            logger.warning("⚠️  GMASS_API_KEY not configured, skipping email send")
-            return None
-
-        GMASS_API_URL = "https://api.gmass.co/api"
-
-        # Check if lead has email
-        if not lead.email:
-            logger.warning("⚠️ No email address, skipping GMass send")
-            return
-        
-        # Agent decides via next_actions - no hardcoded tier checks
-        # If this function is called, agent already decided to send email
-        
-        # Format tier for logging
-        tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
-        
-        logger.info(f"📧 Sending email via GMass to {lead.email}...")
-        logger.info(f"   Tier: {tier_str}")
-        logger.info(f"   Score: {result.score}/100")
-        
-        # Get email template
-        email_body = result.suggested_email_template or "Thank you for your interest in Hume Health. We'll be in touch soon!"
-        
-        # Create subject line
-        subject = f"Your Hume Partnership Application - {lead.first_name or 'Partner'}"
-        
-        # Step 1: Create campaign draft
-        async with httpx.AsyncClient() as client:
-            draft_response = await client.post(
-                f"{GMASS_API_URL}/campaigndrafts",
-                headers={"X-apikey": GMASS_API_KEY},
-                json={
-                    "subject": subject,
-                    "message": email_body,
-                    "emailAddresses": lead.email,
-                    "fromEmail": "josh@humehealth.com",
-                    "fromName": "Josh - Hume Health",
-                    "replyTo": "josh@humehealth.com",
-                    "openTracking": True,
-                    "clickTracking": True
-                },
-                timeout=30.0
-            )
-            
-            if draft_response.status_code != 200:
-                raise Exception(f"GMass draft failed: {draft_response.status_code} - {draft_response.text}")
-            
-            draft = draft_response.json()
-            campaign_draft_id = draft.get('campaignDraftId')
-            
-            if not campaign_draft_id:
-                raise Exception(f"No campaignDraftId in response: {draft}")
-            
-            logger.info(f"✅ GMass draft created: {campaign_draft_id}")
-        
-        # Step 2: Send campaign
-        async with httpx.AsyncClient() as client:
-            send_response = await client.post(
-                f"{GMASS_API_URL}/campaigns/{campaign_draft_id}",
-                headers={"X-apikey": GMASS_API_KEY},
-                json={"campaignDraftId": campaign_draft_id},
-                timeout=30.0
-            )
-            
-            if send_response.status_code != 200:
-                raise Exception(f"GMass send failed: {send_response.status_code} - {send_response.text}")
-            
-            send_result = send_response.json()
-            campaign_id = send_result.get('campaignId')
-            
-            logger.info(f"✅ Email sent via GMass to {lead.email}")
-            logger.info(f"   Campaign ID: {campaign_id}")
-            logger.info(f"   Subject: {subject}")
-            
-            return send_result
-            
-    except Exception as e:
-        logger.error(f"❌ GMass email failed: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # Don't raise - email failure shouldn't fail processing
+    # Format tier for logging
+    tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
+    
+    logger.warning("⚠️ GMass integration temporarily disabled (404 errors)")
+    logger.warning(f"   Would have sent email to: {lead.email}")
+    logger.warning(f"   Subject: Your Hume Partnership Application - {lead.first_name or 'Partner'}")
+    logger.warning(f"   Tier: {tier_str}")
+    logger.warning(f"   Score: {result.score}/100")
+    
+    # Email template is still generated and stored in result.suggested_email_template
+    # Can be manually sent or used when GMass is re-enabled
+    
+    return None
 
 
 # ============================================================================
@@ -465,7 +393,12 @@ async def sync_to_close_crm(lead: Any, result: Any):
     Only syncs qualified leads (HOT/WARM/COLD).
     """
     try:
-        logger.info(f"🔄 Syncing to Close CRM: {lead.email or 'no email'}...")
+        # Format tier for logging (define early to avoid NameError)
+        tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
+        
+        logger.info(f"� Syncing to Close CRM: {lead.email or 'no email'}...")
+        logger.info(f"   Tier: {tier_str}")
+        logger.info(f"   Score: {result.score}/100")
         
         # Agent decides via next_actions - no hardcoded tier checks
         # If this function is called, agent already decided to sync to CRM
@@ -485,15 +418,10 @@ async def sync_to_close_crm(lead: Any, result: Any):
                 contact["phones"] = [{"phone": lead.phone, "type": "office"}]
             contacts.append(contact)
         
-        # Format tier for logging
-        tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
-        
         # For now, just log (Close CRM MCP integration coming next)
         logger.info(f"✅ Close CRM sync prepared")
         logger.info(f"   Lead name: {lead_name}")
         logger.info(f"   Contacts: {len(contacts)}")
-        logger.info(f"   Tier: {tier_str}")
-        logger.info(f"   Score: {result.score}/100")
         
         # TODO: Implement actual Close CRM API call
         # Will use Close CRM MCP or direct API

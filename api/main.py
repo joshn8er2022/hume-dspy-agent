@@ -40,9 +40,15 @@ SUPABASE_URL = os.getenv("SUPABASE_URL") or "https://mvjqoojihjvohstnepfm.supaba
 SUPABASE_KEY = (
     os.getenv("SUPABASE_SERVICE_KEY") or 
     os.getenv("SUPABASE_KEY") or 
-    os.getenv("SUPABASE_ANON_KEY") or
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12anFvb2ppaGp2b2hzdG5lcGZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwNDkxNDksImV4cCI6MjA3NTYyNTE0OX0.5nPOgq5E4Sgscu-lWh_2zRmNK7ZfEZ3L6UQHcD7e9-c"
+    os.getenv("SUPABASE_ANON_KEY")
 )
+
+# Validate required configuration
+if not SUPABASE_KEY:
+    logger.error("❌ CRITICAL: SUPABASE_KEY not found in environment")
+    logger.error("   Set one of: SUPABASE_SERVICE_KEY, SUPABASE_KEY, or SUPABASE_ANON_KEY")
+    logger.error("   Application cannot start without Supabase credentials")
+    raise ValueError("Supabase credentials required but not found in environment variables")
 
 # Initialize Supabase client
 supabase = None
