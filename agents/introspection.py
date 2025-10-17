@@ -255,8 +255,11 @@ class AgentIntrospectionService:
             lead = transform_typeform_webhook(test_data)
         else:
             # Load lead from database
-            from core.database import get_supabase
-            supabase = get_supabase()
+            from api.processors import supabase
+
+            if not supabase:
+                return {"error": "Supabase client not initialized"}
+
             lead_data = supabase.table('leads').select('*').eq('id', lead_id).single().execute()
 
             if not lead_data.data:
