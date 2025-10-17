@@ -11,6 +11,9 @@ import os
 from datetime import datetime
 from typing import Any
 
+from config.settings import settings
+from utils.retry import async_retry
+
 logger = logging.getLogger(__name__)
 
 # Supabase client
@@ -129,6 +132,21 @@ async def process_typeform_event(event: dict):
             logger.error(f"❌ DSPy failed: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
+            
+            # Track failure for observability
+            if supabase:
+                try:
+                    supabase.table('processing_failures').insert({
+                        'event_id': event.get('id'),
+                        'stage': 'dspy_qualification',
+                        'error': str(e),
+                        'traceback': traceback.format_exc(),
+                        'lead_email': lead.email if hasattr(lead, 'email') else None,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }).execute()
+                except:
+                    pass  # Don't fail if error tracking fails
+            
             # Continue without qualification
         
         # Step 4: Extract transcript (deep_dive conversation)
@@ -209,16 +227,13 @@ async def save_lead_to_database(lead: Any, result: Any):
         logger.error(f"❌ Save failed: {str(e)}")
 
 
+@async_retry(max_attempts=3)
 async def send_slack_notification_with_qualification(lead: Any, result: Any, transcript: str = ""):
-    """Enhanced Slack with qualification."""
+    """Enhanced Slack with qualification (with retry logic)."""
     try:
         import httpx
-        SLACK_BOT_TOKEN = (
-            os.getenv("SLACK_BOT_TOKEN") or
-            os.getenv("SLACK_MCP_XOXB_TOKEN") or
-            os.getenv("SLACK_MCP_XOXP_TOKEN")
-        )
-        SLACK_CHANNEL = "C09FZT6T1A5"
+        SLACK_BOT_TOKEN = settings.SLACK_BOT_TOKEN
+        SLACK_CHANNEL = settings.SLACK_CHANNEL_INBOUND
         
         if not SLACK_BOT_TOKEN:
             return
@@ -285,16 +300,13 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
         return None, None
 
 
+@async_retry(max_attempts=2)
 async def send_slack_notification_simple(data: dict):
-    """Simple Slack (fallback)."""
+    """Simple Slack (fallback, with retry logic)."""
     try:
         import httpx
-        SLACK_BOT_TOKEN = (
-            os.getenv("SLACK_BOT_TOKEN") or
-            os.getenv("SLACK_MCP_XOXB_TOKEN") or
-            os.getenv("SLACK_MCP_XOXP_TOKEN")
-        )
-        SLACK_CHANNEL = "C09FZT6T1A5"
+        SLACK_BOT_TOKEN = settings.SLACK_BOT_TOKEN
+        SLACK_CHANNEL = settings.SLACK_CHANNEL_INBOUND
         
         if not SLACK_BOT_TOKEN:
             return
@@ -371,6 +383,9 @@ async def send_email_via_gmass(lead: Any, result: Any):
         
         # Agent decides via next_actions - no hardcoded tier checks
         # If this function is called, agent already decided to send email
+        
+        # Format tier for logging
+        tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
         
         logger.info(f"📧 Sending email via GMass to {lead.email}...")
         logger.info(f"   Tier: {tier_str}")
@@ -469,6 +484,9 @@ async def sync_to_close_crm(lead: Any, result: Any):
             if lead.phone:
                 contact["phones"] = [{"phone": lead.phone, "type": "office"}]
             contacts.append(contact)
+        
+        # Format tier for logging
+        tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
         
         # For now, just log (Close CRM MCP integration coming next)
         logger.info(f"✅ Close CRM sync prepared")

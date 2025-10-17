@@ -20,8 +20,9 @@ from dspy_modules import (
     GenerateEmailTemplate,
     GenerateSMSMessage,
 )
-from core import settings
+from core import settings as core_settings
 from core.company_context import get_company_context_for_qualification
+from config.settings import settings
 
 
 class InboundAgent(dspy.Module):
@@ -42,12 +43,12 @@ class InboundAgent(dspy.Module):
         self.generate_email = dspy.ChainOfThought(GenerateEmailTemplate)
         self.generate_sms = dspy.ChainOfThought(GenerateSMSMessage)
 
-        # Qualification thresholds (6-tier granular system)
-        self.SCORCHING_THRESHOLD = 90
-        self.HOT_THRESHOLD = 75
-        self.WARM_THRESHOLD = 60
-        self.COOL_THRESHOLD = 45
-        self.COLD_THRESHOLD = 30
+        # Qualification thresholds (6-tier granular system) - from centralized config
+        self.SCORCHING_THRESHOLD = settings.SCORCHING_THRESHOLD
+        self.HOT_THRESHOLD = settings.HOT_THRESHOLD
+        self.WARM_THRESHOLD = settings.WARM_THRESHOLD
+        self.COOL_THRESHOLD = settings.COOL_THRESHOLD
+        self.COLD_THRESHOLD = settings.COLD_THRESHOLD
 
     def forward(self, lead: Lead) -> QualificationResult:
         """Process and qualify a lead.
@@ -83,6 +84,7 @@ class InboundAgent(dspy.Module):
 
         # Step 5: Determine next actions
         actions_result = self.determine_actions(
+            company_context=get_company_context_for_qualification(),
             qualification_score=total_score,
             tier=tier.value,
             has_booking=lead.has_field('calendly_url'),
@@ -108,6 +110,7 @@ class InboundAgent(dspy.Module):
 {email_result.email_body}"""
 
             sms_result = self.generate_sms(
+                company_context=get_company_context_for_qualification(),
                 lead_name=lead.get_field('first_name'),
                 tier=tier.value,
                 has_booking=lead.has_field('calendly_url'),
@@ -140,7 +143,7 @@ class InboundAgent(dspy.Module):
             suggested_email_template=email_template,
             suggested_sms_message=sms_template,
             agent_version="1.0.0",
-            model_used=settings.dspy_model,
+            model_used=core_settings.dspy_model,
             processing_time_ms=processing_time,
         )
 

@@ -87,10 +87,12 @@ class AnalyzeEngagement(dspy.Signature):
 class DetermineNextActions(dspy.Signature):
     """Determine optimal next actions for a qualified lead.
 
+    Use company_context to understand Hume Health's sales process and priorities.
     Based on qualification score, tier, and lead characteristics,
     recommend specific actions and prioritization.
     """
 
+    company_context: str = dspy.InputField(desc="Hume Health context for action prioritization and sales process")
     qualification_score: int = dspy.InputField(desc="Lead qualification score (0-100)")
     tier: str = dspy.InputField(desc="hot, warm, cold, or unqualified")
     has_booking: bool = dspy.InputField(desc="Whether lead has Calendly booking")
@@ -134,9 +136,11 @@ class GenerateEmailTemplate(dspy.Signature):
 class GenerateSMSMessage(dspy.Signature):
     """Generate concise SMS message for lead follow-up.
 
+    Use company_context for tone guidelines and value proposition.
     Create brief, engaging SMS (160 chars max) for immediate outreach.
     """
 
+    company_context: str = dspy.InputField(desc="Hume Health context for tone and messaging")
     lead_name: str = dspy.InputField(desc="Lead's first name")
     tier: str = dspy.InputField(desc="Qualification tier")
     has_booking: bool = dspy.InputField(desc="Whether lead has booking")

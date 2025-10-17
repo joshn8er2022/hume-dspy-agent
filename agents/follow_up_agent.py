@@ -21,6 +21,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from models import Lead, LeadTier, LeadStatus
 from utils.slack_client import SlackClient
 from utils.email_client import EmailClient
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -134,13 +135,12 @@ class FollowUpAgent:
     def assess_lead(self, state: LeadJourneyState) -> LeadJourneyState:
         """Assess the lead and determine initial strategy."""
 
-        # Set defaults based on tier
-        if state['tier'] == LeadTier.HOT.value:
-            state['next_follow_up_hours'] = 4  # Follow up every 4 hours
-        elif state['tier'] == LeadTier.WARM.value:
-            state['next_follow_up_hours'] = 24  # Follow up daily
-        else:
-            state['next_follow_up_hours'] = 48  # Follow up every 2 days
+        # Get cadence from centralized settings
+        tier_upper = state['tier'].upper()
+        state['next_follow_up_hours'] = settings.FOLLOW_UP_CADENCE_HOURS.get(
+            tier_upper,
+            48  # Default to 48 hours if tier not found
+        )
 
         logger.info(f"Assessed lead {state['lead_id']}: tier={state['tier']}, cadence={state['next_follow_up_hours']}h")
         return state
@@ -322,12 +322,9 @@ Moving to nurture campaign.
         if state['response_received']:
             return "responded"
 
-        # Check if we've hit max follow-ups
-        max_follow_ups = {
-            LeadTier.HOT.value: 5,
-            LeadTier.WARM.value: 3,
-            LeadTier.COLD.value: 2,
-        }.get(state['tier'], 2)
+        # Get max follow-ups from centralized settings
+        tier_upper = state['tier'].upper()
+        max_follow_ups = settings.FOLLOW_UP_MAX_ATTEMPTS.get(tier_upper, 2)
 
         if state['follow_up_count'] >= max_follow_ups:
             return "no_response_stop"
