@@ -127,6 +127,87 @@ class EmailClient:
             logger.error(f"❌ Email send error: {str(e)}")
             return False
 
+    def _get_email_signature(self) -> str:
+        """Get professional Hume Health email signature.
+        
+        Returns:
+            HTML signature with branding and contact info
+        """
+        return """
+<br><br>
+<table style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; width: 100%; max-width: 600px;" border="0" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td style="padding: 20px 0 15px 0; border-bottom: 2px solid #00A3E0;">
+<table border="0" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td style="vertical-align: middle; padding-right: 15px;">
+<img style="width: 48px; height: 48px; display: block; border-radius: 4px;" alt="Hume Health" src="https://www.google.com/s2/favicons?sz=64&domain=humehealth.com">
+</td>
+<td style="vertical-align: middle;">
+<div style="font-size: 24px; font-weight: 600; color: #0066CC; letter-spacing: -0.5px;"><strong>Hume Health</strong></div>
+<div style="font-size: 12px; color: #666666; margin-top: 2px; font-weight: 500;">Better Metabolic Health Through Data</div>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding: 15px 0;">
+<table style="font-size: 14px; line-height: 20px; color: #333333;" border="0" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td style="padding: 8px 0;">
+<table border="0" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td style="width: 20px; vertical-align: top; padding-top: 2px;">
+<div style="width: 16px; height: 16px; display: inline-block;"></div>
+</td>
+<td style="padding-left: 8px;">
+<div style="color: #333333;">1007 North Orange Street<br>Wilmington, DE 19801<br>United States</div>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding: 8px 0;">
+<table border="0" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td style="width: 20px; vertical-align: middle;">
+<div style="width: 16px; height: 16px; display: inline-block;"></div>
+</td>
+<td style="padding-left: 8px;">
+<div><a href="https://humehealth.com" style="color: #0066CC; text-decoration: none; font-weight: 500;">humehealth.com</a></div>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding: 15px 0 0 0; border-top: 1px solid #E0E0E0;">
+<div style="font-size: 13px; color: #666666; font-style: italic; padding-top: 10px;"><em>Unlock &amp; understand your body's data for better health outcomes</em></div>
+</td>
+</tr>
+<tr>
+<td style="padding: 15px 0 10px 0;">
+<div style="font-size: 11px; color: #999999; line-height: 16px;">This email and any attachments are confidential and intended solely for the addressee. If you are not the intended recipient, please notify the sender immediately and delete this message.</div>
+</td>
+</tr>
+</tbody>
+</table>
+"""
+
     def _get_template(self, template_type: str, tier: str, lead_data: dict = None) -> tuple[str, str]:
         """Get email template based on type and tier.
 
@@ -142,6 +223,9 @@ class EmailClient:
 
         # Personalize greeting
         greeting = f"Hi {first_name}," if first_name else "Hi there,"
+        
+        # Get professional signature
+        signature = self._get_email_signature()
 
         if template_type == "initial_outreach":
             # Tier-based urgency and approach
@@ -160,11 +244,8 @@ We work with a lot of practices in similar situations, and the common thread is 
 
 Not trying to sell you anything yet—just want to understand your specific workflow and see if this makes sense for {company}.<br><br>
 
-Would you be open to a quick 15-minute conversation this week? I can walk you through how other practices are handling this, and we can figure out if it's a fit.<br><br>
-
-Best,<br>
-Hume Health Team<br>
-<a href="mailto:{self.from_email}">{self.from_email}</a>
+Would you be open to a quick 15-minute conversation this week? I can walk you through how other practices are handling this, and we can figure out if it's a fit.
+{signature}
 </body></html>"""
 
             elif tier == "WARM":
@@ -183,11 +264,8 @@ We've built a remote patient monitoring platform (Hume Connect) that integrates 
 
 Not sure if this aligns with your needs, but happy to hop on a quick call to discuss your specific workflow.<br><br>
 
-Let me know if you'd be interested in a 15-minute chat?<br><br>
-
-Best,<br>
-Hume Health Team<br>
-<a href="mailto:{self.from_email}">{self.from_email}</a>
+Let me know if you'd be interested in a 15-minute chat?
+{signature}
 </body></html>"""
 
             else:  # COLD or UNQUALIFIED
@@ -206,11 +284,8 @@ We specialize in helping healthcare practitioners with remote patient monitoring
 
 If that sounds like your practice, I'd be happy to set up a brief call to discuss how we can help.<br><br>
 
-Feel free to reply to this email or book time directly: <a href="https://calendly.com/humehealth">calendly.com/humehealth</a><br><br>
-
-Best,<br>
-Hume Health Team<br>
-<a href="mailto:{self.from_email}">{self.from_email}</a>
+Feel free to reply to this email or book time directly: <a href="https://calendly.com/humehealth">calendly.com/humehealth</a>
+{signature}
 </body></html>"""
 
         elif template_type.startswith("follow_up_"):
@@ -225,11 +300,8 @@ I know you're busy, so I'll keep this short: we help practices like yours automa
 
 Still interested in chatting? Let me know if you have 15 minutes this week.<br><br>
 
-Otherwise, no worries—feel free to reach out whenever the timing is better.<br><br>
-
-Best,<br>
-Hume Health Team<br>
-<a href="mailto:{self.from_email}">{self.from_email}</a>
+Otherwise, no worries—feel free to reach out whenever the timing is better.
+{signature}
 </body></html>"""
 
         else:
@@ -239,10 +311,8 @@ Hume Health Team<br>
 
 Just checking in to see if you're still interested in learning more about Hume Health's remote patient monitoring solutions.<br><br>
 
-Let me know if you'd like to connect!<br><br>
-
-Best,<br>
-Hume Health Team
+Let me know if you'd like to connect!
+{signature}
 </body></html>"""
 
         return subject, body
