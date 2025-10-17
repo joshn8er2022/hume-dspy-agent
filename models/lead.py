@@ -108,10 +108,16 @@ class Lead(BaseModel):
         default_factory=dict,
         description="Complete raw answers array from Typeform webhook"
     )
-    raw_metadata: Dict[str, Any] = Field(
+    raw_metadata: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="Metadata from webhook (landed_at, submitted_at, etc.)"
     )
+
+    @field_validator('raw_metadata', mode='before')
+    @classmethod
+    def handle_null_metadata(cls, v):
+        """Handle NULL raw_metadata from old database records."""
+        return v if v is not None else {}
 
     # ========================================================================
     # RESPONSE METADATA (Optional but useful)
