@@ -156,9 +156,10 @@ async def route_command(text: str, user: str) -> str:
     elif any(word in text_lower for word in ["help", "what can you do", "commands"]):
         return get_help_message()
     
-    # ===== DEFAULT: Strategy Agent Conversational =====
+    # ===== DEFAULT: Strategy Agent Conversational (Pure DSPy) =====
     else:
-        return await strategy_agent.chat_with_josh(text)
+        # Pass user ID for conversation history tracking
+        return await strategy_agent.chat_with_josh(text, user_id=user)
 
 
 # ============================================================================
