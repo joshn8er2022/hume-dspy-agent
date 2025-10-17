@@ -108,7 +108,7 @@ async def process_typeform_event(event: dict):
 
             # Use OpenRouter Sonnet 4.5 if available, otherwise fallback to OpenAI
             if openrouter_api_key:
-                lm = dspy.LM('openrouter/anthropic/claude-sonnet-4-5', api_key=openrouter_api_key)
+                lm = dspy.LM('openrouter/anthropic/claude-sonnet-4.5', api_key=openrouter_api_key)
                 logger.info("✅ DSPy configured with OpenRouter Sonnet 4.5")
             elif openai_api_key:
                 lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)

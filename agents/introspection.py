@@ -114,8 +114,8 @@ class AgentIntrospectionService:
 
         # Create base_model instance - prioritize OpenRouter Sonnet 4.5
         if openrouter_api_key:
-            base_model = dspy.LM('openrouter/anthropic/claude-sonnet-4-5', api_key=openrouter_api_key)
-            logger.info("🔄 Switching to base_model: openrouter/anthropic/claude-sonnet-4-5")
+            base_model = dspy.LM('openrouter/anthropic/claude-sonnet-4.5', api_key=openrouter_api_key)
+            logger.info("🔄 Switching to base_model: openrouter/anthropic/claude-sonnet-4.5")
         elif openai_api_key:
             base_model = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
             logger.info("🔄 Switching to base_model: openai/gpt-4o (fallback)")

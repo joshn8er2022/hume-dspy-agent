@@ -60,7 +60,7 @@ class FollowUpAgent:
         if openrouter_api_key:
             # Use OpenRouter with Sonnet 4.5
             self.llm = ChatOpenAI(
-                model="anthropic/claude-sonnet-4-5",
+                model="anthropic/claude-sonnet-4.5",
                 api_key=openrouter_api_key,
                 base_url="https://openrouter.ai/api/v1",
                 temperature=0.7,
