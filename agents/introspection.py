@@ -29,7 +29,7 @@ class IntrospectionRequest(BaseModel):
     mode: str = Field("query", description="Mode: 'query' (read-only) or 'command' (action)")
     agent_type: str = Field(..., description="Agent to target: 'inbound', 'follow_up', 'research', 'strategy'")
     
-    # Support both old (query_type) and new (action) field names
+    # Support both old (query_type) and new (action) field names - both optional
     action: Optional[str] = Field(None, description="Action: 'show_state', 'explain_score', 'research_lead', etc.")
     query_type: Optional[str] = Field(None, description="[Deprecated] Use 'action' instead")
     
@@ -37,11 +37,14 @@ class IntrospectionRequest(BaseModel):
     parameters: Optional[Dict[str, Any]] = Field(None, description="Additional parameters for the action")
     test_data: Optional[Dict[str, Any]] = Field(None, description="Test lead data for validation")
     
-    def model_post_init(self, __context):
-        """Backwards compatibility: query_type → action"""
-        if self.query_type and not self.action:
-            self.action = self.query_type
-        elif not self.action and not self.query_type:
+    @property
+    def effective_action(self) -> str:
+        """Get the effective action, supporting backwards compatibility."""
+        if self.action:
+            return self.action
+        elif self.query_type:
+            return self.query_type
+        else:
             raise ValueError("Either 'action' or 'query_type' must be provided")
 
 
@@ -161,7 +164,7 @@ class AgentIntrospectionService:
                 return IntrospectionResponse(
                     success=True,
                     mode="query",
-                    action=request.action,
+                    action=request.effective_action,
                     data=data
                 )
             
@@ -170,7 +173,7 @@ class AgentIntrospectionService:
                 return IntrospectionResponse(
                     success=True,
                     mode="command",
-                    action=request.action,
+                    action=request.effective_action,
                     data=result.get("data"),
                     task_id=result.get("task_id"),
                     status=result.get("status", "completed")
@@ -186,7 +189,7 @@ class AgentIntrospectionService:
             return IntrospectionResponse(
                 success=False,
                 mode=request.mode,
-                action=request.action,
+                action=request.effective_action if request.action or request.query_type else "unknown",
                 error=str(e)
             )
     
@@ -232,17 +235,18 @@ class AgentIntrospectionService:
 
     def _handle_follow_up_query(self, request: IntrospectionRequest) -> Dict[str, Any]:
         """Handle follow-up agent queries."""
+        action = request.effective_action
 
-        if request.query_type == "show_state":
+        if action == "show_state":
             if not request.lead_id:
                 raise ValueError("lead_id required for show_state query")
             return self._get_follow_up_state(request.lead_id)
 
-        elif request.query_type == "list_leads":
+        elif action == "list_leads":
             return self._list_active_leads()
 
         else:
-            raise ValueError(f"Unknown follow-up query type: {request.query_type}")
+            raise ValueError(f"Unknown follow-up query type: {action}")
 
     def _get_follow_up_state(self, lead_id: str) -> Dict[str, Any]:
         """Get current state of a lead in the follow-up agent."""
@@ -307,19 +311,20 @@ class AgentIntrospectionService:
 
     def _handle_qualification_query(self, request: IntrospectionRequest) -> Dict[str, Any]:
         """Handle qualification agent queries."""
+        action = request.effective_action
 
-        if request.query_type == "explain_score":
+        if action == "explain_score":
             if not request.lead_id and not request.test_data:
                 raise ValueError("Either lead_id or test_data required for explain_score")
             return self._explain_qualification(request.lead_id, request.test_data)
 
-        elif request.query_type == "test_qualification":
+        elif action == "test_qualification":
             if not request.test_data:
                 raise ValueError("test_data required for test_qualification")
             return self._test_qualification(request.test_data)
 
         else:
-            raise ValueError(f"Unknown qualification query type: {request.query_type}")
+            raise ValueError(f"Unknown qualification query type: {action}")
 
     def _explain_qualification(self, lead_id: Optional[str], test_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Explain qualification scoring for a lead."""
@@ -391,7 +396,7 @@ class AgentIntrospectionService:
     
     def _handle_inbound_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
         """Handle inbound agent commands."""
-        action = request.action
+        action = request.effective_action
         
         if action == "research_lead_deeply":
             # Trigger deep research on a lead
@@ -431,7 +436,7 @@ class AgentIntrospectionService:
     
     def _handle_research_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
         """Handle research agent commands."""
-        action = request.action
+        action = request.effective_action
         
         if action == "research_person":
             params = request.parameters or {}
@@ -501,7 +506,7 @@ class AgentIntrospectionService:
     
     def _handle_follow_up_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
         """Handle follow-up agent commands."""
-        action = request.action
+        action = request.effective_action
         
         if action == "send_follow_up_now":
             lead_id = request.lead_id
@@ -550,7 +555,7 @@ class AgentIntrospectionService:
     
     def _handle_strategy_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
         """Handle strategy agent commands."""
-        action = request.action
+        action = request.effective_action
         
         if action == "analyze_pipeline":
             params = request.parameters or {}
