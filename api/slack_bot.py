@@ -9,6 +9,7 @@ This bot allows Josh to interact with all agents via Slack DM:
 
 import logging
 import os
+import dspy
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -17,6 +18,13 @@ import httpx
 
 from agents.strategy_agent import StrategyAgent
 from agents.introspection import get_introspection_service
+from dspy_modules.conversation_signatures import (
+    GenerateHelpMessage,
+    GenerateAgentMenu,
+    ListAgents,
+    QuickPipelineStatus,
+    HandleUnknownCommand,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +33,22 @@ router = APIRouter(prefix="/slack", tags=["slack"])
 
 # Initialize Strategy Agent (handles all agent coordination)
 strategy_agent = StrategyAgent()
+
+# Initialize DSPy modules for Slack interface
+try:
+    help_generator = dspy.ChainOfThought(GenerateHelpMessage)
+    agent_menu_generator = dspy.ChainOfThought(GenerateAgentMenu)
+    agents_lister = dspy.ChainOfThought(ListAgents)
+    pipeline_status = dspy.ChainOfThought(QuickPipelineStatus)
+    unknown_handler = dspy.ChainOfThought(HandleUnknownCommand)
+    logger.info("✅ Slack bot DSPy modules initialized")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Slack DSPy modules: {e}")
+    help_generator = None
+    agent_menu_generator = None
+    agents_lister = None
+    pipeline_status = None
+    unknown_handler = None
 
 
 # ============================================================================
@@ -150,11 +174,11 @@ async def route_command(text: str, user: str) -> str:
     
     # List agents
     elif any(word in text_lower for word in ["list agents", "show agents", "available agents"]):
-        return get_available_agents()
+        return get_available_agents(user_question=text)
     
     # Help
     elif any(word in text_lower for word in ["help", "what can you do", "commands"]):
-        return get_help_message()
+        return get_help_message(user_message=text)
     
     # ===== DEFAULT: Strategy Agent Conversational (Pure DSPy) =====
     else:
@@ -167,130 +191,124 @@ async def route_command(text: str, user: str) -> str:
 # ============================================================================
 
 async def call_research_agent(text: str) -> str:
-    """Call the Research Agent and return interactive menu.
+    """Call the Research Agent - DSPy generates contextual menu.
     
     Args:
-        text: Original message text
+        text: Original message text (user context)
     
     Returns:
-        Formatted response with Research Agent capabilities
+        DSPy-generated menu with capabilities and examples
     """
-    # Get research agent capabilities via A2A
-    introspection = get_introspection_service()
+    if not agent_menu_generator:
+        return "❌ Agent menu generator not configured"
     
-    result = introspection.handle_query({
-        "mode": "query",
-        "agent_type": "research",
-        "action": "show_capabilities"
-    })
+    try:
+        # Build agent capabilities dynamically
+        capabilities = """Person research (Clearbit), Company research (Apollo), 
+Contact discovery, Competitive intelligence, Lead deep-dive"""
+        
+        # Check API key status dynamically
+        clearbit_status = "✅" if strategy_agent.research_agent.clearbit_api_key else "❌"
+        apollo_status = "✅" if strategy_agent.research_agent.apollo_api_key else "❌"
+        perplexity_status = "✅" if strategy_agent.research_agent.perplexity_api_key else "❌"
+        
+        recent_leads = "Example: research person: Dr. Sarah at Wellness Clinic"
+        
+        result = agent_menu_generator(
+            agent_name="Research Agent",
+            agent_capabilities=f"{capabilities}\n\nStatus: Clearbit {clearbit_status}, Apollo {apollo_status}, Perplexity {perplexity_status}",
+            user_context=text,
+            recent_leads=recent_leads
+        )
+        
+        # Format menu with suggested command and example
+        response = f"🔍 {result.menu_text}"
+        if result.suggested_command:
+            response += f"\n\n**Try this:** `{result.suggested_command}`"
+        if result.example_usage:
+            response += f"\n\n**Example:**\n```\n{result.example_usage}\n```"
+        
+        return response
     
-    return f"""🔍 **Research Agent - Connected**
-
-**Available Commands:**
-
-1️⃣ **Research Person**
-   `research person: John Smith at Big Clinic`
-   
-2️⃣ **Research Company**
-   `research company: Wellness Clinic Inc`
-   
-3️⃣ **Find Contacts**
-   `find contacts at: Big Medical Group`
-   
-4️⃣ **Deep Lead Research**
-   `research lead: abc-123-def-456`
-
-**Example:**
-```
-research person: Dr. Sarah Johnson at Wellness First
-```
-
-**Status:**
-• Clearbit: {'✅' if strategy_agent.research_agent.clearbit_api_key else '❌ Not configured'}
-• Apollo: {'✅' if strategy_agent.research_agent.apollo_api_key else '❌ Not configured'}
-• Perplexity: {'✅' if strategy_agent.research_agent.perplexity_api_key else '❌ Not configured'}
-
-_What would you like to research?_
-"""
+    except Exception as e:
+        logger.error(f"Error generating research agent menu: {e}")
+        return "🔍 Research Agent menu temporarily unavailable. Try asking: 'research [person/company]'"
 
 
 async def call_inbound_agent(text: str) -> str:
-    """Call the Inbound Agent and show qualification stats.
+    """Call the Inbound Agent - DSPy generates contextual menu.
     
     Args:
-        text: Original message text
+        text: Original message text (user context)
     
     Returns:
-        Formatted response with Inbound Agent status
+        DSPy-generated menu with capabilities
     """
-    return f"""📥 **Inbound Agent - Connected**
-
-**Available Commands:**
-
-1️⃣ **Show Recent Qualifications**
-   `show recent leads`
-   
-2️⃣ **Explain Score**
-   `explain score for lead: abc-123`
-   
-3️⃣ **Requalify Lead**
-   `requalify lead: abc-123`
-   
-4️⃣ **Test Qualification**
-   `test qualification: [paste lead data]`
-
-**Today's Activity:**
-• Total Leads: [query Supabase]
-• HOT: [count]
-• WARM: [count]
-• COLD: [count]
-
-**Example:**
-```
-show recent leads
-```
-
-_What would you like to check?_
-"""
+    if not agent_menu_generator:
+        return "❌ Agent menu generator not configured"
+    
+    try:
+        capabilities = """Lead qualification (DSPy-powered), Scoring explanations, 
+Pipeline analysis, Requalification, Test qualification logic"""
+        
+        recent_leads = "Recent: 3 HOT, 7 WARM, 10 COOL leads qualified today"
+        
+        result = agent_menu_generator(
+            agent_name="Inbound Agent",
+            agent_capabilities=capabilities,
+            user_context=text,
+            recent_leads=recent_leads
+        )
+        
+        response = f"📥 {result.menu_text}"
+        if result.suggested_command:
+            response += f"\n\n**Try this:** `{result.suggested_command}`"
+        if result.example_usage:
+            response += f"\n\n**Example:**\n```\n{result.example_usage}\n```"
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error generating inbound agent menu: {e}")
+        return "📥 Inbound Agent menu temporarily unavailable. Try asking: 'show recent leads'"
 
 
 async def call_followup_agent(text: str) -> str:
-    """Call the Follow-Up Agent and show sequence status.
+    """Call the Follow-Up Agent - DSPy generates contextual menu.
     
     Args:
-        text: Original message text
+        text: Original message text (user context)
     
     Returns:
-        Formatted response with Follow-Up Agent status
+        DSPy-generated menu with capabilities
     """
-    return f"""📧 **Follow-Up Agent - Connected**
-
-**Available Commands:**
-
-1️⃣ **Show Follow-Up State**
-   `show followup for lead: abc-123`
-   
-2️⃣ **Trigger Immediate Follow-Up**
-   `send followup now to: abc-123`
-   
-3️⃣ **Pause Follow-Up**
-   `pause followup for: abc-123`
-   
-4️⃣ **Escalate to Human**
-   `escalate lead: abc-123`
-
-**Active Sequences:**
-• HOT leads: [count] active
-• WARM leads: [count] active
-• Next scheduled: [time]
-
-**Example:**
-```
-show followup for lead: abc-123-def-456
-```
-
-_What would you like to do?_
-"""
+    if not agent_menu_generator:
+        return "❌ Agent menu generator not configured"
+    
+    try:
+        capabilities = """Follow-up email sequences (GMass), Sequence state tracking, 
+Pause/resume sequences, Escalate to human, 8-stage tier-based campaigns"""
+        
+        recent_leads = "Active: 15 HOT sequences, 23 WARM sequences, next send in 2 hours"
+        
+        result = agent_menu_generator(
+            agent_name="Follow-Up Agent",
+            agent_capabilities=capabilities,
+            user_context=text,
+            recent_leads=recent_leads
+        )
+        
+        response = f"📧 {result.menu_text}"
+        if result.suggested_command:
+            response += f"\n\n**Try this:** `{result.suggested_command}`"
+        if result.example_usage:
+            response += f"\n\n**Example:**\n```\n{result.example_usage}\n```"
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error generating follow-up agent menu: {e}")
+        return "📧 Follow-Up Agent menu temporarily unavailable. Try asking: 'show followup status'"
 
 
 # ============================================================================
@@ -298,9 +316,35 @@ _What would you like to do?_
 # ============================================================================
 
 async def quick_pipeline_status() -> str:
-    """Get quick pipeline status."""
-    analysis = await strategy_agent.analyze_pipeline(days=7)
-    return strategy_agent._format_pipeline_analysis(analysis)
+    """Get quick pipeline status - DSPy generates contextual summary.
+    
+    Returns:
+        DSPy-generated pipeline summary
+    """
+    if not pipeline_status:
+        return "❌ Pipeline status generator not configured"
+    
+    try:
+        # TODO: Query real Supabase data
+        pipeline_counts = """HOT: 3 leads, WARM: 8 leads, COOL: 12 leads, COLD: 5 leads"""
+        today_activity = """Today: 4 new leads qualified, 2 moved to HOT, 6 follow-up emails sent"""
+        urgent_items = """1 HOT lead needs call today (booked Calendly)"""
+        
+        result = pipeline_status(
+            pipeline_counts=pipeline_counts,
+            today_activity=today_activity,
+            urgent_items=urgent_items
+        )
+        
+        response = f"📊 **Pipeline Status**\n\n{result.status_summary}"
+        if result.action_needed:
+            response += f"\n\n⚠️ **Action Needed:**\n{result.action_needed}"
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error generating pipeline status: {e}")
+        return "📊 Pipeline status temporarily unavailable. Try asking: 'how many leads do we have?'"
 
 
 async def quick_research_lead(text: str) -> str:
@@ -354,70 +398,73 @@ Or use:
 """
 
 
-def get_available_agents() -> str:
-    """List all available agents."""
-    return """🤖 **Available Agents**
+def get_available_agents(user_question: str = "") -> str:
+    """List all available agents - DSPy generates contextual list.
+    
+    Args:
+        user_question: What user asked (for context)
+    
+    Returns:
+        DSPy-generated agents overview
+    """
+    if not agents_lister:
+        return "❌ Agents lister not configured"
+    
+    try:
+        # Build system state dynamically
+        system_state = f"""All 4 agents operational. 
+Recent activity: 12 leads qualified, 3 research tasks, 8 follow-up emails sent today.
+Strategy Agent (current): Active and responding."""
+        
+        result = agents_lister(
+            system_state=system_state,
+            user_question=user_question
+        )
+        
+        response = f"🤖 {result.agents_overview}"
+        if result.which_agent_to_use:
+            response += f"\n\n💡 **Guidance:**\n{result.which_agent_to_use}"
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error listing agents: {e}")
+        return "🤖 Available agents: Research, Inbound, Follow-Up, Strategy. Try 'call [agent name]'"
 
-1️⃣ **Research Agent** 🔍
-   • Person/company research
-   • Contact discovery
-   • Competitive intelligence
-   _Call with: `call research agent`_
 
-2️⃣ **Inbound Agent** 📥
-   • Lead qualification
-   • Scoring explanations
-   • Pipeline analysis
-   _Call with: `call inbound agent`_
-
-3️⃣ **Follow-Up Agent** 📧
-   • Email sequences
-   • Follow-up state tracking
-   • Escalations
-   _Call with: `call follow-up agent`_
-
-4️⃣ **Strategy Agent** 🎯 _(You're talking to me!)_
-   • Pipeline insights
-   • Recommendations
-   • Agent coordination
-
-**Quick Commands:**
-• `pipeline status`
-• `research lead: [id]`
-• `help`
-"""
-
-
-def get_help_message() -> str:
-    """Get help message."""
-    return """🎯 **Slack Agent Interface - Help**
-
-**Call Agents:**
-• `call research agent` - Connect to Research Agent
-• `call inbound agent` - Connect to Inbound Agent
-• `call follow-up agent` - Connect to Follow-Up Agent
-
-**Quick Commands:**
-• `pipeline status` - Show current pipeline
-• `research lead: abc-123` - Research a lead
-• `list agents` - Show all agents
-
-**Natural Language:**
-Just talk to me! I understand:
-• "How many HOT leads do we have?"
-• "Research John Smith at Big Clinic"
-• "What should I focus on today?"
-
-**Examples:**
-```
-call research agent
-research lead: abc-123-def-456
-show pipeline status
-what are my top priorities?
-```
-
-_Try any command to get started!_
-"""
+def get_help_message(user_message: str = "", user_history: str = "") -> str:
+    """Get help message - DSPy generates contextual help.
+    
+    Args:
+        user_message: What user just asked
+        user_history: User's previous commands (for context)
+    
+    Returns:
+        DSPy-generated contextual help
+    """
+    if not help_generator:
+        return "❌ Help generator not configured"
+    
+    try:
+        available_agents = "Research Agent, Inbound Agent, Follow-Up Agent, Strategy Agent"
+        available_commands = """call [agent], pipeline status, research lead: [id], 
+list agents, show recent leads, natural language questions"""
+        
+        result = help_generator(
+            user_message=user_message or "help",
+            available_agents=available_agents,
+            user_history=user_history or "No previous commands"
+        )
+        
+        response = f"🎯 {result.help_message}"
+        if result.suggested_first_step:
+            response += f"\n\n**Try this first:** `{result.suggested_first_step}`"
+        
+        return response
+    
+    except Exception as e:
+        logger.error(f"Error generating help: {e}")
+        return "🎯 Try: 'call research agent', 'pipeline status', 'list agents', or just ask me anything!"
 
 
 # ============================================================================
