@@ -155,7 +155,7 @@ class StrategyAgent:
         await self.send_slack_message(response, channel=channel, thread_ts=ts)
     
     async def chat_with_josh(self, message: str) -> str:
-        """Process conversational request from Josh.
+        """Process conversational request from Josh using LLM intelligence.
         
         This is the main intelligence function that understands requests
         and coordinates sub-agents to provide answers.
@@ -173,8 +173,8 @@ class StrategyAgent:
             analysis = await self.analyze_pipeline(days=7)
             return self._format_pipeline_analysis(analysis)
         
-        # Research request
-        elif any(word in message_lower for word in ["research", "look up", "find out"]):
+        # Research request (specific patterns)
+        elif "research lead" in message_lower or "research person" in message_lower:
             return "🔍 I can research leads! Please provide:\n• Lead ID, or\n• Name and company\n\nExample: 'Research John Smith at Big Clinic'"
         
         # Recommendations
@@ -188,20 +188,12 @@ class StrategyAgent:
             return self._format_outbound_targets(targets)
         
         # Help/capabilities
-        elif any(word in message_lower for word in ["help", "what can you", "capabilities"]):
+        elif "help" in message_lower and len(message_lower) < 15:
             return self._get_help_message()
         
-        # Default: Acknowledge and suggest
+        # Default: Use LLM for intelligent conversation
         else:
-            return (
-                "I'm your Strategy Agent! I can help with:\n\n"
-                "• **Pipeline Analysis** - 'Show me pipeline status'\n"
-                "• **Lead Research** - 'Research [name] at [company]'\n"
-                "• **Recommendations** - 'What should I focus on?'\n"
-                "• **Outbound Targets** - 'Suggest outbound prospects'\n\n"
-                f"Your message: _{message[:100]}_\n\n"
-                "Try one of the commands above, or ask me anything specific!"
-            )
+            return await self._llm_chat(message)
     
     # ===== Core Strategy Functions =====
     
@@ -527,6 +519,131 @@ _Reply with "details" for full analysis_
             formatted.append("")
         
         return "\n".join(formatted)
+    
+    async def _llm_chat(self, message: str) -> str:
+        """Use LLM to generate intelligent response to any question.
+        
+        This gives the bot full conversational capabilities beyond pattern matching.
+        
+        Args:
+            message: User's question/request
+        
+        Returns:
+            LLM-generated response
+        """
+        import os
+        import httpx
+        
+        # Get system context
+        system_prompt = """You are the Strategy Agent for Hume Health's B2B AI sales system.
+
+**YOUR ROLE**: Personal AI advisor to Josh (founder), helping scale B2B sales through intelligent automation.
+
+**INFRASTRUCTURE OVERVIEW**:
+```
+┌─────────────────── HUME AI SYSTEM ───────────────────┐
+│                                                       │
+│  🌐 Entry Points:                                    │
+│  ├─ Typeform → /webhooks/typeform                   │
+│  ├─ Vapi Voice AI → /webhooks/vapi                  │
+│  ├─ Slack Bot → /slack/events                       │
+│  └─ A2A Protocol → /a2a/introspect                  │
+│                                                       │
+│  🤖 Agents:                                          │
+│  ├─ Inbound Agent (Lead Qualification)              │
+│  │   └─ DSPy + Claude Sonnet 4.5                    │
+│  │   └─ Scores: 0-100, Tiers: HOT/WARM/COOL/COLD   │
+│  │                                                   │
+│  ├─ Research Agent (Intelligence Gathering)          │
+│  │   ├─ Clearbit (person/company data)             │
+│  │   ├─ Apollo (contact discovery)                 │
+│  │   └─ Perplexity (deep research)                 │
+│  │                                                   │
+│  ├─ Follow-Up Agent (Email Sequences)               │
+│  │   ├─ GMass API (email sending)                  │
+│  │   ├─ 8-stage sequences by tier                  │
+│  │   └─ Autonomous follow-up management            │
+│  │                                                   │
+│  └─ Strategy Agent (YOU - Coordination)             │
+│      ├─ Pipeline analysis                           │
+│      ├─ Recommendations                             │
+│      └─ Agent orchestration                         │
+│                                                       │
+│  📊 Data Layer:                                      │
+│  ├─ Supabase (PostgreSQL)                           │
+│  │   ├─ leads table                                │
+│  │   ├─ conversations table                        │
+│  │   └─ agent_state table                          │
+│  │                                                   │
+│  └─ Integrations:                                    │
+│      ├─ Slack (notifications + bot)                │
+│      ├─ GMass (email campaigns)                    │
+│      ├─ Close CRM (sync qualified leads)          │
+│      └─ OpenRouter (LLM inference)                 │
+│                                                       │
+│  🚀 Deployment:                                      │
+│  └─ Railway (production)                            │
+│      └─ FastAPI + Uvicorn                          │
+└──────────────────────────────────────────────────────┘
+```
+
+**KEY CAPABILITIES**:
+- Qualify leads automatically (DSPy-powered scoring)
+- Send intelligent email sequences (tier-based)
+- Research prospects (Clearbit + Apollo + Perplexity)
+- Slack notifications + interactive bot
+- Voice AI integration (Vapi)
+- Agent-to-Agent communication (A2A protocol)
+
+**YOUR PERSONALITY**:
+- Knowledgeable but concise
+- Proactive with insights
+- Technical when needed, business-focused always
+- Use emojis sparingly for clarity
+- Format responses with markdown
+
+**RESPONSE STYLE**:
+- Answer questions directly
+- Provide context when helpful
+- Suggest next actions
+- Be conversational but professional
+
+Answer Josh's question naturally and intelligently."""
+
+        try:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                return "⚠️ OpenRouter API key not configured. I can only respond to specific commands."
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "anthropic/claude-3.5-sonnet",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": message}
+                        ],
+                        "max_tokens": 1000,
+                        "temperature": 0.7
+                    },
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    logger.error(f"LLM error: {response.status_code} - {response.text}")
+                    return f"⚠️ I encountered an error processing your request. Try asking in a different way!"
+        
+        except Exception as e:
+            logger.error(f"LLM chat error: {str(e)}")
+            return "⚠️ I'm having trouble right now. Try one of the specific commands: `help`, `pipeline status`, `list agents`"
     
     def _get_help_message(self) -> str:
         """Get help message."""
