@@ -8,6 +8,7 @@ uvicorn[standard]>=0.24.0
 langgraph>=0.2.0
 langchain>=0.3.0
 langchain-anthropic>=0.3.0
+langchain-openai>=0.2.0
 
 # Task Queue for Scheduled Follow-ups
 celery[redis]>=5.4.0
