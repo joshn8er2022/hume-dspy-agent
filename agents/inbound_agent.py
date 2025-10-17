@@ -59,6 +59,13 @@ class InboundAgent(dspy.Module):
         """
         start_time = time.time()
 
+        # COMPATIBILITY FIX: Extract semantic fields from old Typeform field IDs
+        # Old database records have raw field IDs, new ones have semantic names
+        semantic_data = lead.extract_semantic_fields()
+        if semantic_data:
+            # Enrich lead with extracted semantic data for qualification
+            lead._semantic_enrichment = semantic_data
+
         # Step 1: Analyze business fit
         business_fit = self._analyze_business_fit(lead)
 
@@ -139,24 +146,43 @@ class InboundAgent(dspy.Module):
 
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:
         """Analyze business fit using DSPy."""
+        # Use semantic enrichment if available (for old database records)
+        semantic = getattr(lead, '_semantic_enrichment', {})
+
+        # Build context string from use case / business goals
+        use_case = semantic.get('use_case') or lead.get_field('use_case') or lead.get_field('business_goals') or "No use case provided"
+
+        # Get patient volume
+        if 'patient_volume_raw' in semantic:
+            patient_volume = f"{semantic['patient_volume_raw']} patients/members ({semantic.get('patient_volume_category', 'unknown')} volume)"
+        else:
+            patient_volume = lead.get_field('patient_volume') or "Unknown"
+
         result = self.analyze_business(
-            business_size=lead.get_field('business_size') if lead.get_field('business_size') else "Unknown",
-            patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "Unknown",
-            company=lead.get_field('company') or "Unknown",
-            industry="Healthcare",  # Enrichment removed in form-agnostic refactor
+            business_size=lead.get_field('business_size') or semantic.get('business_size') or "Unknown - see use case",
+            patient_volume=patient_volume,
+            company=semantic.get('company') or lead.get_field('company') or "Unknown",
+            industry="Healthcare",
         )
         return {
             "score": result.fit_score,
             "reasoning": result.reasoning,
+            "use_case_context": use_case[:200],  # Pass context for debugging
         }
 
     def _analyze_engagement(self, lead: Lead) -> Dict[str, Any]:
         """Analyze engagement using DSPy."""
+        # Use semantic enrichment if available
+        semantic = getattr(lead, '_semantic_enrichment', {})
+
+        # Check for Calendly in semantic data or regular fields
+        has_calendly = semantic.get('has_calendly', False) or lead.has_field('calendly_url')
+
         result = self.analyze_engagement(
             response_type=lead.response_type,
-            has_calendly_booking=lead.has_field('calendly_url'),
-            body_comp_response=lead.get_field('body_comp_tracking') or "No response provided",
-            ai_summary=lead.get_field('ai_summary') or "No summary available",
+            has_calendly_booking=has_calendly,
+            body_comp_response=lead.get_field('body_comp_tracking') or semantic.get('use_case', '')[:100] or "No response provided",
+            ai_summary=lead.get_field('ai_summary') or semantic.get('use_case', '')[:200] or "No summary available",
         )
         return {
             "score": result.engagement_score,

@@ -218,6 +218,61 @@ class Lead(BaseModel):
         """
         return self.raw_answers.copy()
 
+    def extract_semantic_fields(self) -> Dict[str, Any]:
+        """Extract semantic fields from raw Typeform field IDs.
+
+        For old database records that have Typeform field IDs as keys,
+        this extracts useful information by searching for patterns in values.
+
+        Returns:
+            Dictionary with extracted semantic fields
+        """
+        extracted = {}
+
+        for field_id, value in self.raw_answers.items():
+            if not value or value == "null":
+                continue
+
+            value_str = str(value).lower()
+
+            # Detect Calendly URL
+            if "calendly.com" in value_str:
+                extracted["calendly_url"] = value
+                extracted["has_calendly"] = True
+
+            # Detect email
+            elif "@" in value_str and "." in value_str:
+                extracted["email"] = value
+
+            # Detect company (heuristic: contains LLC, Inc, Corp, or is longer text)
+            elif any(x in value for x in ["LLC", "Inc", "Corp", "Company", "Tactical", "Clinic"]):
+                extracted["company"] = value
+
+            # Detect use case / business goals (long text responses)
+            elif len(value_str) > 100:
+                extracted["use_case"] = value
+                extracted["business_goals"] = value
+
+                # Extract patient volume mentions
+                if "member" in value_str or "patient" in value_str:
+                    import re
+                    numbers = re.findall(r'\d+', value_str)
+                    if numbers:
+                        volume = max([int(n) for n in numbers])
+                        extracted["patient_volume_raw"] = volume
+
+                        # Categorize
+                        if volume >= 300:
+                            extracted["patient_volume_category"] = "very_high"
+                        elif volume >= 100:
+                            extracted["patient_volume_category"] = "high"
+                        elif volume >= 50:
+                            extracted["patient_volume_category"] = "medium"
+                        else:
+                            extracted["patient_volume_category"] = "low"
+
+        return extracted
+
     def is_complete(self) -> bool:
         """Check if this is a complete submission.
 
