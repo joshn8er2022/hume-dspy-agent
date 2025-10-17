@@ -69,7 +69,7 @@ class EmailClient:
 
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}"
+                "X-apikey": self.api_key  # GMass uses X-apikey header per API spec
             }
 
             # Create draft
