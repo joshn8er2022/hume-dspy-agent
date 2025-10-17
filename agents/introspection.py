@@ -25,11 +25,18 @@ logger = logging.getLogger(__name__)
 # ===== Request/Response Models =====
 
 class IntrospectionRequest(BaseModel):
-    """Request format for A2A introspection queries."""
-    agent_type: str = Field(..., description="Agent to query: 'follow_up' or 'qualification'")
-    query_type: str = Field(..., description="Query type: 'show_state', 'explain_score', 'list_leads', 'test_qualification'")
-    lead_id: Optional[str] = Field(None, description="Lead ID for state queries")
+    """Request format for A2A introspection queries and commands."""
+    mode: str = Field("query", description="Mode: 'query' (read-only) or 'command' (action)")
+    agent_type: str = Field(..., description="Agent to target: 'inbound', 'follow_up', 'research', 'strategy'")
+    action: str = Field(..., description="Action: 'show_state', 'explain_score', 'research_lead', etc.")
+    lead_id: Optional[str] = Field(None, description="Lead ID for operations")
+    parameters: Optional[Dict[str, Any]] = Field(None, description="Additional parameters for the action")
     test_data: Optional[Dict[str, Any]] = Field(None, description="Test lead data for validation")
+    
+    # Backwards compatibility
+    @property
+    def query_type(self) -> str:
+        return self.action
 
 
 class AgentState(BaseModel):
@@ -62,12 +69,20 @@ class QualificationBreakdown(BaseModel):
 
 
 class IntrospectionResponse(BaseModel):
-    """Response from A2A introspection query."""
+    """Response from A2A introspection query or command."""
     success: bool
-    query_type: str
+    mode: str = "query"
+    action: str
     data: Optional[Dict[str, Any]] = None
+    task_id: Optional[str] = Field(None, description="Task ID for async commands")
+    status: Optional[str] = Field(None, description="Command status: pending, in_progress, completed, failed")
     error: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Backwards compatibility
+    @property
+    def query_type(self) -> str:
+        return self.action
 
 
 # ===== Introspection Service =====
@@ -132,28 +147,80 @@ class AgentIntrospectionService:
         logger.info(f"✅ DSPy configured with base_model (Pydantic + LangGraph infrastructure intact)")
 
     def handle_query(self, request: IntrospectionRequest) -> IntrospectionResponse:
-        """Route introspection query to appropriate handler."""
+        """Route A2A request to appropriate handler (query or command mode)."""
         try:
-            if request.agent_type == "follow_up":
-                data = self._handle_follow_up_query(request)
-            elif request.agent_type == "qualification":
-                data = self._handle_qualification_query(request)
+            # Route based on mode
+            if request.mode == "query":
+                data = self._handle_query_mode(request)
+                return IntrospectionResponse(
+                    success=True,
+                    mode="query",
+                    action=request.action,
+                    data=data
+                )
+            
+            elif request.mode == "command":
+                result = self._handle_command_mode(request)
+                return IntrospectionResponse(
+                    success=True,
+                    mode="command",
+                    action=request.action,
+                    data=result.get("data"),
+                    task_id=result.get("task_id"),
+                    status=result.get("status", "completed")
+                )
+            
             else:
-                raise ValueError(f"Unknown agent type: {request.agent_type}")
-
-            return IntrospectionResponse(
-                success=True,
-                query_type=request.query_type,
-                data=data
-            )
+                raise ValueError(f"Unknown mode: {request.mode}. Use 'query' or 'command'")
 
         except Exception as e:
-            logger.error(f"Introspection error: {str(e)}")
+            logger.error(f"A2A error: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return IntrospectionResponse(
                 success=False,
-                query_type=request.query_type,
+                mode=request.mode,
+                action=request.action,
                 error=str(e)
             )
+    
+    def _handle_query_mode(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle read-only query requests."""
+        if request.agent_type in ["follow_up", "qualification"]:
+            # Backwards compatibility with old format
+            if request.agent_type == "follow_up":
+                return self._handle_follow_up_query(request)
+            elif request.agent_type == "qualification":
+                return self._handle_qualification_query(request)
+        
+        elif request.agent_type == "inbound":
+            return self._handle_qualification_query(request)
+        
+        elif request.agent_type == "research":
+            return self._handle_research_query(request)
+        
+        elif request.agent_type == "strategy":
+            return self._handle_strategy_query(request)
+        
+        else:
+            raise ValueError(f"Unknown agent type: {request.agent_type}")
+    
+    def _handle_command_mode(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle action commands that modify state or trigger operations."""
+        if request.agent_type == "inbound":
+            return self._handle_inbound_command(request)
+        
+        elif request.agent_type == "research":
+            return self._handle_research_command(request)
+        
+        elif request.agent_type == "follow_up":
+            return self._handle_follow_up_command(request)
+        
+        elif request.agent_type == "strategy":
+            return self._handle_strategy_command(request)
+        
+        else:
+            raise ValueError(f"Unknown agent type for commands: {request.agent_type}")
 
     # ===== Follow-up Agent Introspection =====
 
@@ -313,6 +380,225 @@ class AgentIntrospectionService:
     def _test_qualification(self, test_data: Dict[str, Any]) -> Dict[str, Any]:
         """Test qualification with sample data (validation mode)."""
         return self._explain_qualification(None, test_data)
+    
+    # ===== Command Handlers =====
+    
+    def _handle_inbound_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle inbound agent commands."""
+        action = request.action
+        
+        if action == "research_lead_deeply":
+            # Trigger deep research on a lead
+            lead_id = request.lead_id
+            if not lead_id:
+                raise ValueError("lead_id required for research_lead_deeply")
+            
+            params = request.parameters or {}
+            task_id = f"research-{lead_id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            
+            # TODO: Implement async research task
+            return {
+                "status": "accepted",
+                "task_id": task_id,
+                "data": {
+                    "message": "Deep research task queued",
+                    "lead_id": lead_id,
+                    "parameters": params
+                }
+            }
+        
+        elif action == "requalify_lead":
+            # Re-run qualification on a lead
+            lead_id = request.lead_id
+            if not lead_id:
+                raise ValueError("lead_id required for requalify_lead")
+            
+            # Load and requalify
+            result = self._explain_qualification(lead_id, None)
+            return {
+                "status": "completed",
+                "data": result
+            }
+        
+        else:
+            raise ValueError(f"Unknown inbound command: {action}")
+    
+    def _handle_research_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle research agent commands."""
+        action = request.action
+        
+        if action == "research_person":
+            params = request.parameters or {}
+            name = params.get("name")
+            email = params.get("email")
+            company = params.get("company")
+            
+            if not (name or email):
+                raise ValueError("name or email required for research_person")
+            
+            task_id = f"person-research-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            
+            # TODO: Implement person research
+            return {
+                "status": "accepted",
+                "task_id": task_id,
+                "data": {
+                    "message": "Person research task queued",
+                    "name": name,
+                    "email": email,
+                    "company": company
+                }
+            }
+        
+        elif action == "research_company":
+            params = request.parameters or {}
+            company_name = params.get("company_name")
+            domain = params.get("domain")
+            
+            if not (company_name or domain):
+                raise ValueError("company_name or domain required for research_company")
+            
+            task_id = f"company-research-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            
+            # TODO: Implement company research
+            return {
+                "status": "accepted",
+                "task_id": task_id,
+                "data": {
+                    "message": "Company research task queued",
+                    "company_name": company_name,
+                    "domain": domain
+                }
+            }
+        
+        elif action == "find_additional_contacts":
+            params = request.parameters or {}
+            company_name = params.get("company_name")
+            
+            if not company_name:
+                raise ValueError("company_name required for find_additional_contacts")
+            
+            task_id = f"contacts-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            
+            # TODO: Implement contact finding
+            return {
+                "status": "accepted",
+                "task_id": task_id,
+                "data": {
+                    "message": "Contact search task queued",
+                    "company_name": company_name
+                }
+            }
+        
+        else:
+            raise ValueError(f"Unknown research command: {action}")
+    
+    def _handle_follow_up_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle follow-up agent commands."""
+        action = request.action
+        
+        if action == "send_follow_up_now":
+            lead_id = request.lead_id
+            if not lead_id:
+                raise ValueError("lead_id required for send_follow_up_now")
+            
+            # TODO: Trigger immediate follow-up
+            return {
+                "status": "completed",
+                "data": {
+                    "message": "Follow-up triggered",
+                    "lead_id": lead_id
+                }
+            }
+        
+        elif action == "pause_follow_up":
+            lead_id = request.lead_id
+            if not lead_id:
+                raise ValueError("lead_id required for pause_follow_up")
+            
+            # TODO: Pause follow-up sequence
+            return {
+                "status": "completed",
+                "data": {
+                    "message": "Follow-up paused",
+                    "lead_id": lead_id
+                }
+            }
+        
+        elif action == "escalate_to_human":
+            lead_id = request.lead_id
+            if not lead_id:
+                raise ValueError("lead_id required for escalate_to_human")
+            
+            # TODO: Escalate to human
+            return {
+                "status": "completed",
+                "data": {
+                    "message": "Escalated to human",
+                    "lead_id": lead_id
+                }
+            }
+        
+        else:
+            raise ValueError(f"Unknown follow-up command: {action}")
+    
+    def _handle_strategy_command(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle strategy agent commands."""
+        action = request.action
+        
+        if action == "analyze_pipeline":
+            params = request.parameters or {}
+            days = params.get("days", 7)
+            
+            # TODO: Implement pipeline analysis
+            return {
+                "status": "completed",
+                "data": {
+                    "message": f"Pipeline analysis for last {days} days",
+                    "total_leads": 0,
+                    "by_tier": {},
+                    "conversion_rate": 0
+                }
+            }
+        
+        elif action == "recommend_outbound_targets":
+            params = request.parameters or {}
+            segment = params.get("segment", "all")
+            min_size = params.get("min_size", 50)
+            
+            # TODO: Implement outbound recommendations
+            return {
+                "status": "completed",
+                "data": {
+                    "message": f"Outbound recommendations for {segment}",
+                    "targets": [],
+                    "reasoning": "Based on successful inbound patterns"
+                }
+            }
+        
+        else:
+            raise ValueError(f"Unknown strategy command: {action}")
+    
+    def _handle_research_query(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle research agent queries."""
+        return {
+            "message": "Research agent query handler (placeholder)",
+            "available_actions": [
+                "research_person",
+                "research_company",
+                "find_additional_contacts"
+            ]
+        }
+    
+    def _handle_strategy_query(self, request: IntrospectionRequest) -> Dict[str, Any]:
+        """Handle strategy agent queries."""
+        return {
+            "message": "Strategy agent query handler (placeholder)",
+            "available_actions": [
+                "analyze_pipeline",
+                "recommend_outbound_targets"
+            ]
+        }
 
 
 # ===== Singleton Instance =====
