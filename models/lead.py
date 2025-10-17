@@ -245,7 +245,7 @@ class Lead(BaseModel):
                 extracted["email"] = value
 
             # Detect company (heuristic: contains LLC, Inc, Corp, or is longer text)
-            elif any(x in value for x in ["LLC", "Inc", "Corp", "Company", "Tactical", "Clinic"]):
+            elif isinstance(value, str) and any(x in value for x in ["LLC", "Inc", "Corp", "Company", "Tactical", "Clinic"]):
                 extracted["company"] = value
 
             # Detect use case / business goals (long text responses)
