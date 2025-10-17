@@ -78,6 +78,7 @@ class Settings:
     # ============================================================================
     GMASS_API_KEY = os.getenv("GMASS_API_KEY")
     GMASS_API_URL = "https://api.gmass.co/api"
+    FROM_EMAIL = os.getenv("FROM_EMAIL", "josh@humehealth.com")  # Authenticated Gmail address
     
     CLOSE_API_KEY = os.getenv("CLOSE_API_KEY")
     

@@ -361,25 +361,63 @@ async def process_a2a_event(event: dict):
 async def send_email_via_gmass(lead: Any, result: Any):
     """Send email via GMass API as josh@humehealth.com.
     
-    TEMPORARILY DISABLED: GMass API endpoint returning 404 errors.
-    TODO: Fix GMass API endpoint or migrate to SendGrid.
+    Uses two-step GMass API process:
+    1. Create campaign draft
+    2. Send campaign immediately
     
     Only sends to HOT/WARM tier leads.
     Uses DSPy-generated email template.
     """
+    from utils.email_client import EmailClient
+    import asyncio
+    
     # Format tier for logging
     tier_str = str(result.tier).replace('QualificationTier.', '').replace('LeadTier.', '')
     
-    logger.warning("⚠️ GMass integration temporarily disabled (404 errors)")
-    logger.warning(f"   Would have sent email to: {lead.email}")
-    logger.warning(f"   Subject: Your Hume Partnership Application - {lead.first_name or 'Partner'}")
-    logger.warning(f"   Tier: {tier_str}")
-    logger.warning(f"   Score: {result.score}/100")
+    if not lead.email:
+        logger.warning("⚠️ No email address for lead, skipping GMass send")
+        return None
     
-    # Email template is still generated and stored in result.suggested_email_template
-    # Can be manually sent or used when GMass is re-enabled
+    logger.info(f"📧 Sending email via GMass to {lead.email}...")
+    logger.info(f"   Tier: {tier_str}")
+    logger.info(f"   Score: {result.score}/100")
     
-    return None
+    try:
+        # Prepare lead data for personalization
+        lead_data = {
+            "first_name": lead.first_name or "",
+            "last_name": lead.last_name or "",
+            "company": lead.company or "your practice",
+            "email": lead.email
+        }
+        
+        # Initialize email client
+        email_client = EmailClient()
+        
+        # Send email (synchronous, so wrap in executor)
+        loop = asyncio.get_event_loop()
+        success = await loop.run_in_executor(
+            None,
+            email_client.send_email,
+            lead.email,
+            str(lead.id),
+            "initial_outreach",
+            tier_str,
+            lead_data
+        )
+        
+        if success:
+            logger.info(f"✅ GMass email sent successfully to {lead.email}")
+            return {"status": "sent", "email": lead.email, "tier": tier_str}
+        else:
+            logger.error(f"❌ GMass email failed to send to {lead.email}")
+            return None
+    
+    except Exception as e:
+        logger.error(f"❌ GMass send error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
 
 
 # ============================================================================

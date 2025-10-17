@@ -30,7 +30,11 @@ class EmailClient:
         tier: str,
         lead_data: dict = None
     ) -> bool:
-        """Send an email via GMass.
+        """Send an email via GMass using the correct two-step API process.
+
+        GMass API Process:
+        1. Create draft: POST /api/campaigndrafts → get campaignDraftId
+        2. Send campaign: POST /api/campaigns/{campaignDraftId}
 
         GMass sends emails through your Gmail account, which improves deliverability
         and makes the emails appear more personal (not from a corporate domain).
@@ -53,32 +57,72 @@ class EmailClient:
         subject, body = self._get_template(template_type, tier, lead_data)
 
         try:
-            # GMass API endpoint for sending emails
+            # STEP 1: Create campaign draft
             # Docs: https://www.gmass.co/api
-            payload = {
-                "apiKey": self.api_key,
-                "emailSubject": subject,
-                "emailBody": body,
-                "toAddress": to_email,
-                "fromAddress": self.from_email,
-                "trackOpens": "Y",
-                "trackClicks": "Y",
-                "customTag": f"lead_id:{lead_id},tier:{tier},template:{template_type}"
+            draft_payload = {
+                "fromEmail": self.from_email,
+                "subject": subject,
+                "message": body,
+                "messageType": "html",  # HTML with auto-generated plain text
+                "emailAddresses": to_email
             }
 
-            response = requests.post(
-                "https://api.gmass.co/api/drafts",
-                json=payload,
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}"
+            }
+
+            # Create draft
+            draft_response = requests.post(
+                "https://api.gmass.co/api/campaigndrafts",
+                json=draft_payload,
+                headers=headers,
                 timeout=10
             )
 
-            if response.status_code == 200:
-                logger.info(f"✅ Email sent via GMass to {to_email} (template: {template_type}, tier: {tier})")
-                return True
-            else:
-                logger.error(f"❌ GMass API error: {response.status_code} - {response.text}")
+            if draft_response.status_code != 200:
+                logger.error(f"❌ GMass draft creation failed: {draft_response.status_code} - {draft_response.text}")
                 return False
 
+            draft_data = draft_response.json()
+            campaign_draft_id = draft_data.get("campaignDraftId")
+
+            if not campaign_draft_id:
+                logger.error("❌ GMass draft created but no campaignDraftId returned")
+                logger.error(f"   Response: {draft_data}")
+                return False
+
+            logger.info(f"✅ GMass draft created: {campaign_draft_id}")
+
+            # STEP 2: Send campaign
+            campaign_payload = {
+                "openTracking": True,
+                "clickTracking": True,
+                "friendlyName": f"{template_type}_{tier}_{lead_id[:8]}",
+                # Omit sendTime to send immediately
+            }
+
+            campaign_response = requests.post(
+                f"https://api.gmass.co/api/campaigns/{campaign_draft_id}",
+                json=campaign_payload,
+                headers=headers,
+                timeout=10
+            )
+
+            if campaign_response.status_code == 200:
+                campaign_data = campaign_response.json()
+                campaign_id = campaign_data.get("campaignId")
+                logger.info(f"✅ Email sent via GMass to {to_email}")
+                logger.info(f"   Campaign ID: {campaign_id}")
+                logger.info(f"   Template: {template_type}, Tier: {tier}")
+                return True
+            else:
+                logger.error(f"❌ GMass campaign send failed: {campaign_response.status_code} - {campaign_response.text}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ GMass API request error: {str(e)}")
+            return False
         except Exception as e:
             logger.error(f"❌ Email send error: {str(e)}")
             return False
