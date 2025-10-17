@@ -80,7 +80,7 @@ async def handle_message(event: Dict[str, Any]):
         ts = event.get("ts")
         
         # Remove bot mention if present
-        text = text.replace("<@U123ABC>", "").strip()  # Replace with actual bot ID
+        text = text.replace("<@U0935UUHRC7>", "").strip()  # Bot user ID
         
         logger.info(f"💬 Slack message from {user}: {text[:100]}...")
         
