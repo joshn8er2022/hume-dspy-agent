@@ -35,6 +35,10 @@ app = FastAPI(
     version="2.1.0"
 )
 
+# Include Slack bot router
+from api.slack_bot import router as slack_router
+app.include_router(slack_router)
+
 # Configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL") or "https://mvjqoojihjvohstnepfm.supabase.co"
 SUPABASE_KEY = (
