@@ -93,17 +93,30 @@ async def process_typeform_event(event: dict):
             await send_slack_notification_simple(event['raw_payload'])
             return
         
-        # Step 3: Qualify with DSPy
+        # Step 3: Qualify with DSPy (using context for async)
         result = None
         try:
-            # Configure DSPy if not already configured
-            if not configure_dspy():
-                raise Exception("DSPy configuration failed")
-            
-            from agents.inbound_agent import InboundAgent
-            agent = InboundAgent()
-            result = agent.forward(lead)
-            
+            import dspy
+
+            # Get API key
+            openai_api_key = (
+                os.getenv("OPENAI_API_KEY") or
+                os.getenv("OPENAI_KEY") or
+                os.getenv("OPENAI_API_TOKEN")
+            )
+
+            if not openai_api_key:
+                raise Exception("OpenAI API key not found")
+
+            # Create LM instance
+            lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
+
+            # Use dspy.context() for async tasks (not dspy.configure())
+            with dspy.context(lm=lm):
+                from agents.inbound_agent import InboundAgent
+                agent = InboundAgent()
+                result = agent.forward(lead)
+
             logger.info(f"✅ DSPy qualification complete")
             logger.info(f"   Score: {result.score}/100")
             logger.info(f"   Tier: {result.tier}")
