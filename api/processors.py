@@ -98,18 +98,23 @@ async def process_typeform_event(event: dict):
         try:
             import dspy
 
-            # Get API key
+            # Get API key (prioritize OpenRouter for Sonnet 4.5)
+            openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
             openai_api_key = (
                 os.getenv("OPENAI_API_KEY") or
                 os.getenv("OPENAI_KEY") or
                 os.getenv("OPENAI_API_TOKEN")
             )
 
-            if not openai_api_key:
-                raise Exception("OpenAI API key not found")
-
-            # Create LM instance
-            lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
+            # Use OpenRouter Sonnet 4.5 if available, otherwise fallback to OpenAI
+            if openrouter_api_key:
+                lm = dspy.LM('openrouter/anthropic/claude-sonnet-4-5', api_key=openrouter_api_key)
+                logger.info("✅ DSPy configured with OpenRouter Sonnet 4.5")
+            elif openai_api_key:
+                lm = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
+                logger.info("✅ DSPy configured with OpenAI GPT-4o (fallback)")
+            else:
+                raise Exception("No API key found (OPENROUTER_API_KEY or OPENAI_API_KEY)")
 
             # Use dspy.context() for async tasks (not dspy.configure())
             with dspy.context(lm=lm):

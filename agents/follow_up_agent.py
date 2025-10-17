@@ -15,7 +15,7 @@ import logging
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from models import Lead, LeadTier, LeadStatus
@@ -53,13 +53,31 @@ class FollowUpAgent:
         self.slack = SlackClient()
         self.email_client = EmailClient()
 
-        # Initialize Claude with tool use
-        api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
-        self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
-            api_key=api_key,
-            temperature=0.7,
-        ) if api_key else None
+        # Initialize LLM with OpenRouter Sonnet 4.5 (fallback to Anthropic direct)
+        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+
+        if openrouter_api_key:
+            # Use OpenRouter with Sonnet 4.5
+            self.llm = ChatOpenAI(
+                model="anthropic/claude-sonnet-4-5",
+                api_key=openrouter_api_key,
+                base_url="https://openrouter.ai/api/v1",
+                temperature=0.7,
+            )
+            logger.info("✅ Follow-up agent using OpenRouter Sonnet 4.5")
+        elif anthropic_api_key:
+            # Fallback to Anthropic direct
+            from langchain_anthropic import ChatAnthropic
+            self.llm = ChatAnthropic(
+                model="claude-3-5-sonnet-20241022",
+                api_key=anthropic_api_key,
+                temperature=0.7,
+            )
+            logger.info("✅ Follow-up agent using Anthropic direct (fallback)")
+        else:
+            self.llm = None
+            logger.warning("⚠️ No LLM configured for follow-up agent")
 
         # Build the state graph
         self.graph = self._build_graph()

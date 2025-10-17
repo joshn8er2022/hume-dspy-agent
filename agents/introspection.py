@@ -104,24 +104,26 @@ class AgentIntrospectionService:
         import dspy
         import os
 
-        # Get API key
+        # Get API key (prioritize OpenRouter for Sonnet 4.5)
+        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
         openai_api_key = (
             os.getenv("OPENAI_API_KEY") or
-            os.getenv("OPENAI_KEY") or
-            os.getenv("ANTHROPIC_API_KEY")  # Fallback to Anthropic
+            os.getenv("OPENAI_KEY")
         )
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 
-        if not openai_api_key:
-            raise ValueError("No LM API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY")
-
-        # Create base_model instance
-        # The 'base_model' is the LM that serves as the foundation for all DSPy operations
-        if os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_KEY"):
+        # Create base_model instance - prioritize OpenRouter Sonnet 4.5
+        if openrouter_api_key:
+            base_model = dspy.LM('openrouter/anthropic/claude-sonnet-4-5', api_key=openrouter_api_key)
+            logger.info("🔄 Switching to base_model: openrouter/anthropic/claude-sonnet-4-5")
+        elif openai_api_key:
             base_model = dspy.LM('openai/gpt-4o', api_key=openai_api_key)
-            logger.info("🔄 Switching to base_model: openai/gpt-4o")
+            logger.info("🔄 Switching to base_model: openai/gpt-4o (fallback)")
+        elif anthropic_api_key:
+            base_model = dspy.LM('anthropic/claude-3-5-sonnet-20241022', api_key=anthropic_api_key)
+            logger.info("🔄 Switching to base_model: anthropic/claude-3-5-sonnet-20241022 (fallback)")
         else:
-            base_model = dspy.LM('anthropic/claude-3-5-sonnet-20241022', api_key=openai_api_key)
-            logger.info("🔄 Switching to base_model: anthropic/claude-3-5-sonnet-20241022")
+            raise ValueError("No LM API key found. Set OPENROUTER_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY")
 
         # Swap the LM by reconfiguring with base_model
         # This decouples the LM from the rest of the infrastructure

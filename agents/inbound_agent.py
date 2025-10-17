@@ -21,6 +21,7 @@ from dspy_modules import (
     GenerateSMSMessage,
 )
 from core import settings
+from core.company_context import get_company_context_for_qualification
 
 
 class InboundAgent(dspy.Module):
@@ -94,6 +95,7 @@ class InboundAgent(dspy.Module):
 
         if is_qualified and lead.is_complete():
             email_result = self.generate_email(
+                company_context=get_company_context_for_qualification(),
                 lead_name=(lead.get_field('first_name', '') + ' ' + lead.get_field('last_name', '')).strip() or 'there',
                 company=lead.get_field('company') or "your practice",
                 business_size=lead.get_field('business_size') if lead.get_field('business_size') else "small business",
@@ -159,6 +161,7 @@ class InboundAgent(dspy.Module):
             patient_volume = lead.get_field('patient_volume') or "Unknown"
 
         result = self.analyze_business(
+            company_context=get_company_context_for_qualification(),
             business_size=lead.get_field('business_size') or semantic.get('business_size') or "Unknown - see use case",
             patient_volume=patient_volume,
             company=semantic.get('company') or lead.get_field('company') or "Unknown",
@@ -179,6 +182,7 @@ class InboundAgent(dspy.Module):
         has_calendly = semantic.get('has_calendly', False) or lead.has_field('calendly_url')
 
         result = self.analyze_engagement(
+            company_context=get_company_context_for_qualification(),
             response_type=lead.response_type,
             has_calendly_booking=has_calendly,
             body_comp_response=lead.get_field('body_comp_tracking') or semantic.get('use_case', '')[:100] or "No response provided",
