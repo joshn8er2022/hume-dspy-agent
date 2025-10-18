@@ -504,15 +504,27 @@ result = await app.ainvoke({"lead": new_lead})
 
 ## **📋 Complete Feature List**
 
-### **From Previous Planning**:
-- [ ] Real-time Supabase queries in Strategy Agent responses
+### **🔴 CRITICAL (Blocking Issues - Must Fix First)**:
+- [ ] **PostgreSQL Checkpointer** - Follow-up state currently lost on restart (using MemorySaver)
+- [ ] **Research Agent API Keys** - Clearbit, Apollo, Perplexity (currently returning empty)
+- [ ] **Real Supabase Queries** - Strategy Agent using mock data
+- [ ] **Close CRM Integration** - Currently stub only, needs full implementation
+
+### **🟡 HIGH PRIORITY (Core Functionality)**:
+- [ ] Real-time Supabase queries in all agent responses
 - [ ] Dynamic pipeline visualization generation
 - [ ] Follow-Up Agent status message DSPy formatting
 - [ ] Research Agent result formatting with DSPy
-- [ ] Close CRM two-way sync
+- [ ] Close CRM two-way sync (create leads, update status, sync notes)
 - [ ] Lead scoring refinement based on outcomes
+- [ ] **SMS Integration (Twilio)** - Multi-channel outreach
+- [ ] **Response Detection Webhook** - Detect email replies automatically
+- [ ] **Rate Limiting** - Protect endpoints from abuse
+- [ ] **Request Size Limits** - Security hardening
+- [ ] **Circuit Breakers** - Graceful degradation when APIs fail
+- [ ] **Deep Lead Research** - Full person/company intelligence
 
-### **New Features (This Document)**:
+### **🟢 NEW FEATURES (Advanced Capabilities)**:
 - [ ] DSPy ReAct agents with tool use
 - [ ] DSPy optimization pipeline (BootstrapFewShot, MIPRO)
 - [ ] Autonomous multi-agent collaboration (overnight work)
@@ -525,21 +537,60 @@ result = await app.ainvoke({"lead": new_lead})
 - [ ] Training dataset collection system
 - [ ] Metrics tracking (conversation quality, lead accuracy)
 
+### **🔵 INFRASTRUCTURE (System Improvements)**:
+- [ ] **Persistent Agent State** - All agents save state to PostgreSQL
+- [ ] **Real-time Analytics Dashboard** - Grafana/Metabase for metrics
+- [ ] **Webhook Retry Logic** - Handle failed deliveries
+- [ ] **Email Deliverability Monitoring** - Track bounces, spam scores
+- [ ] **Lead Deduplication** - Prevent duplicate lead processing
+- [ ] **Conversation Threading** - Track full conversation history per lead
+- [ ] **Performance Monitoring** - Track API latency, success rates
+- [ ] **Error Alerting** - Slack notifications for critical errors
+- [ ] **Backup & Recovery** - Automated database backups
+
+### **📱 INTEGRATION EXPANSIONS**:
+- [ ] **LinkedIn Integration** - Profile scraping, company research
+- [ ] **Twitter/X Integration** - Social listening, engagement tracking
+- [ ] **HubSpot Integration** - CRM sync alternative to Close
+- [ ] **Calendly Integration** - Automatic meeting scheduling for HOT leads
+- [ ] **Notion Integration** - Documentation and knowledge base
+- [ ] **Airtable Integration** - Custom lead tracking views
+- [ ] **Google Workspace** - Sheets, Docs, Calendar sync
+
 ---
 
 ## **🎯 Immediate Next Steps**
 
-### **Week 1 Priority:**
-1. **Set up autonomous collaboration framework** (Phase 3)
-2. **Implement cost optimization** (Phase 4)  
-3. **Create nightly scheduled tasks**
+### **⚠️ MUST DO FIRST: Phase 0 (Critical Fixes)**
+**See `docs/PHASE_0_CRITICAL_FIXES.md` for details**
+
+Before anything else, fix blocking issues:
+1. ✅ **PostgreSQL Checkpointer** (30 min) - Stop losing follow-up state
+2. ✅ **Add API Keys** (5 min) - Enable research agent
+3. ✅ **Real Supabase Queries** (2 hours) - Show actual data
+4. ✅ **Close CRM Integration** (3 hours) - Enable CRM sync
+5. ✅ **LinkedIn & Company Intel** (4 hours) - Full research capability
+
+**Timeline**: 2 days  
+**Impact**: 59% → 79% operational (+20%)
+
+**Why first?** Currently losing data & showing fake numbers!
+
+---
+
+### **Week 1-2: Phase 3 & 4 (Your Priority)**
+After Phase 0 is complete:
+
+1. **Autonomous collaboration framework** (Phase 3)
+2. **Cost optimization** (Phase 4)  
+3. **Nightly scheduled tasks**
 4. **Test overnight agent collaboration**
 
 ### **Why This Order?**
-- Your main request is autonomous agent collaboration
-- Cost optimization makes it sustainable
-- Can run in production immediately
-- ReAct & optimization enhance it later
+- Phase 0 fixes critical bugs (data loss, empty results)
+- Your main request is autonomous agent collaboration (Phase 3)
+- Cost optimization makes it sustainable (Phase 4)
+- ReAct & optimization enhance it later (Phase 1 & 2)
 
 ---
 
