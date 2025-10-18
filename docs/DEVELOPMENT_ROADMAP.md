@@ -247,9 +247,130 @@ self.strategy_react = dspy.ReAct(
 
 ---
 
+## **🎯 Phase 1.5: Agent Delegation & Communication (NEW!)**
+**Timeline**: 3-4 days  
+**Priority**: MEDIUM-HIGH  
+**Status**: 🟡 PLANNED
+
+**See**: `docs/AGENT_DELEGATION_ANALYSIS.md` for detailed analysis
+
+### **Goal**:
+Enable agents to delegate complex tasks to subordinate agents and communicate with each other.
+
+**Based on Agent Zero's `call_subordinate` pattern - analyzed from source code!**
+
+### **Implementation**:
+
+#### **1.5.1 Add Delegation Infrastructure** (1 day)
+```python
+# core/agent_delegation.py
+class AgentDelegation:
+    """Enable agents to create specialized subordinates"""
+    
+    def __init__(self, agent):
+        self.agent = agent
+        self.subordinates: Dict[str, Agent] = {}
+    
+    async def call_subordinate(
+        self,
+        profile: str,  # "competitor_analyst", "market_researcher"
+        message: str,
+        reset: bool = False
+    ) -> str:
+        """Delegate complex subtask to specialized subordinate"""
+        
+        if profile not in self.subordinates or reset:
+            subordinate = self.create_subordinate(profile)
+            subordinate.set_data("_superior", self.agent)
+            self.subordinates[profile] = subordinate
+        
+        subordinate = self.subordinates[profile]
+        result = await subordinate.process(message)
+        
+        return result
+```
+
+#### **1.5.2 Add Inter-Agent Communication** (1-2 days)
+```python
+# core/agent_communication.py
+class AgentCommunication:
+    """Enable agents to ask each other for help"""
+    
+    @staticmethod
+    async def ask_agent(from_agent: Agent, to_agent: Agent, question: str) -> str:
+        """One agent asks another for information"""
+        logger.info(f"{from_agent.name} → {to_agent.name}: {question}")
+        
+        response = await to_agent.process(question)
+        
+        return response
+
+# Example: Strategy Agent asks Research Agent
+class StrategyAgent:
+    async def analyze_pipeline(self):
+        # Ask Research Agent for recent research
+        research = await AgentCommunication.ask_agent(
+            from_agent=self,
+            to_agent=research_agent,
+            question="What are the top 5 companies researched this week?"
+        )
+        
+        # Synthesize with own analysis
+        return self.create_insights(research)
+```
+
+#### **1.5.3 Add to Strategy Agent** (1 day)
+```python
+# agents/strategy_agent.py
+class StrategyAgent:
+    def __init__(self):
+        self.delegation = AgentDelegation(self)
+    
+    async def handle_complex_request(self, message: str):
+        """Handle requests that need task decomposition"""
+        
+        if "competitor" in message.lower():
+            # Delegate competitor analysis to subordinate
+            analysis = await self.delegation.call_subordinate(
+                profile="competitor_analyst",
+                message=f"Analyze: {message}"
+            )
+            
+            # Apply strategic expertise to subordinate's research
+            strategy = await self.generate_strategy(analysis)
+            return strategy
+```
+
+### **Benefits**:
+- ✅ **Task Decomposition**: Break complex requests into focused subtasks
+- ✅ **Cleaner Contexts**: Each subordinate has focused context
+- ✅ **Agent Collaboration**: Agents can ask each other for help
+- ✅ **Foundation for Phase 3**: Enables autonomous multi-agent collaboration!
+
+### **Use Case Example**:
+```
+User: "Compare our pricing to top 3 competitors and suggest changes"
+
+Strategy Agent:
+  ↓ spawns subordinate("competitor_analyst", "Competitor A")
+  ↓ spawns subordinate("competitor_analyst", "Competitor B")
+  ↓ spawns subordinate("competitor_analyst", "Competitor C")
+  
+  [Each subordinate researches independently using MCP tools + FAISS memory]
+  
+  ↓ Synthesizes all 3 analyses
+  ↓ Applies pricing strategy expertise
+  ↓ Returns comprehensive recommendation with specific suggestions
+```
+
+**Why after Phase 1?** Subordinates can use ReAct + MCP tools + FAISS memory = WAY more powerful!
+
+---
+
 ## **🎯 Phase 2: DSPy Optimization Pipeline**
-**Timeline**: Week 2-3  
-**Priority**: HIGH
+**Timeline**: Week 5-6  
+**Priority**: HIGH  
+**Status**: 🟡 PLANNED
 
 ### **Goal**:
 Auto-improve prompts based on labeled examples and metrics.
@@ -765,7 +886,36 @@ Based on Agent Zero audit and current system analysis:
 
 ---
 
-#### **Week 6-8: Phases 3 & 4 - Your Original Request** 💡
+#### **Week 5.5: Phase 1.5 - Agent Delegation** 🔄 (NEW!)
+**Status**: 🟡 PLANNED  
+**Timeline**: 3-4 days
+
+**Tasks**:
+1. [ ] Add delegation infrastructure (1 day)
+2. [ ] Add inter-agent communication (1-2 days)
+3. [ ] Integrate with Strategy Agent (1 day)
+
+**Impact**: Complex task decomposition, agent collaboration, foundation for autonomous work
+
+**Why now?** After Phase 1, subordinates can use ReAct + MCP tools + FAISS memory!
+
+---
+
+#### **Week 6-7: Phase 2 - DSPy Optimization** 🎯
+**Status**: 🟡 PLANNED  
+**Timeline**: 1 week
+
+**Tasks**:
+1. [ ] Create training datasets
+2. [ ] Run BootstrapFewShot optimization
+3. [ ] A/B test optimized vs original
+4. [ ] Deploy optimized agents
+
+**Impact**: Auto-improving agents based on real data
+
+---
+
+#### **Week 7-9: Phases 3 & 4 - Your Original Request** 💡
 **Status**: 🟡 PLANNED  
 **Timeline**: 2-3 weeks
 
@@ -777,19 +927,33 @@ Based on Agent Zero audit and current system analysis:
 
 **Impact**: Agents work while you sleep, 50% cost reduction
 
+**Now powered by**: Delegation + Inter-agent communication + MCP tools + Memory!
+
 ---
 
 ### **Why This Order Changed?**
 
 **Original Plan**: Phase 3 & 4 first (autonomous collaboration)  
-**New Plan**: Phase 0 → 0.5 → 1 → 3 & 4
+**Updated Plan**: Phase 0 → 0.5 → 1 → 1.5 → 2 → 3 & 4
 
-**Reason**: Agent Zero audit revealed we can get:
-- **100+ integrations** in 2-3 days (MCP client)
-- **Semantic memory** in 1-2 days (FAISS)
-- **Unlimited tools** in 2-3 days (Instruments)
+**Reason**: Agent Zero audit revealed TWO game-changers:
 
-This foundation makes autonomous collaboration WAY more powerful when we build it in Week 6!
+1. **Infrastructure we can integrate fast**:
+   - **100+ integrations** in 2-3 days (MCP client)
+   - **Semantic memory** in 1-2 days (FAISS)
+   - **Unlimited tools** in 2-3 days (Instruments)
+
+2. **Agent delegation pattern** (NEW!):
+   - **Task decomposition** via subordinate agents
+   - **Inter-agent communication** for collaboration
+   - **Foundation for autonomous work**
+
+**Key Insight**: By adding Phase 1.5 (delegation) AFTER Phase 1 (ReAct), subordinates can:
+- Use MCP tools (100+ integrations)
+- Access FAISS memory (learn & recall)
+- Execute multi-step reasoning (ReAct)
+
+This makes autonomous collaboration (Phase 3) WAY more powerful!
 
 ---
 
@@ -891,7 +1055,15 @@ This foundation makes autonomous collaboration WAY more powerful when we build i
 
 ## **📝 Changelog**
 
-### **October 18, 2025**
+### **October 18, 2025 - PM Update**
+- ✅ Analyzed Agent Zero's `call_subordinate` delegation pattern
+- ✅ Created comprehensive delegation analysis document
+- ✅ Added Phase 1.5 (Agent Delegation & Communication)
+- ✅ Updated roadmap timeline to include delegation
+- ✅ Documented inter-agent communication architecture
+- ✅ Identified delegation as foundation for autonomous collaboration
+
+### **October 18, 2025 - AM Update**
 - ✅ Fixed DSPy configuration (LM not loaded error)
 - ✅ Fixed OpenRouter API integration (405 error)
 - ✅ Fixed AttributeError with optional output fields
