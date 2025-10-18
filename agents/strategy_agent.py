@@ -263,15 +263,16 @@ class StrategyAgent:
             # Format response with suggested actions if provided
             response_text = result.response
             
-            if result.suggested_actions and result.suggested_actions.strip():
+            # Safely check for suggested_actions (might not be in response)
+            if hasattr(result, 'suggested_actions') and result.suggested_actions and result.suggested_actions.strip():
                 actions = [a.strip() for a in result.suggested_actions.split(',') if a.strip()]
                 if actions:
                     response_text += "\n\n**Suggested next steps:**"
                     for action in actions[:3]:
                         response_text += f"\n• {action}"
             
-            # If agent action is required, log it (future: trigger agent)
-            if result.requires_agent_action and result.requires_agent_action.lower() == "yes":
+            # Safely check if agent action is required (might not be in response)
+            if hasattr(result, 'requires_agent_action') and result.requires_agent_action and result.requires_agent_action.lower() == "yes":
                 logger.info(f"🤖 Agent action required for: {message[:50]}...")
             
             return response_text
