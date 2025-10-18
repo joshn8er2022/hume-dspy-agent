@@ -26,7 +26,7 @@ class StrategyConversation(dspy.Signature):
     Be conversational, knowledgeable, and proactive. Use markdown formatting.
     """
     
-    system_context: str = dspy.InputField(desc="Infrastructure context and agent capabilities")
+    context: str = dspy.InputField(desc="Infrastructure context and agent capabilities (JSON format)")
     user_message: str = dspy.InputField(desc="User's question or request")
     conversation_history: str = dspy.InputField(desc="Previous conversation context (last 3 exchanges)")
     

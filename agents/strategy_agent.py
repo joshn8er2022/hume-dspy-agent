@@ -247,7 +247,7 @@ class StrategyAgent:
             
             # Execute DSPy conversation module
             result = self.conversation_module(
-                system_context=system_context,
+                context=system_context,  # Renamed to 'context' to match DSPy signature
                 user_message=message,
                 conversation_history=history_text
             )
