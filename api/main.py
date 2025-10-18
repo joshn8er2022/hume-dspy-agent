@@ -38,15 +38,17 @@ logger = logging.getLogger(__name__)
 try:
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
     if openrouter_key:
+        # OpenRouter uses OpenAI-compatible endpoints
+        # Format: model="openrouter/<provider>/<model-name>"
         lm = dspy.LM(
-            model="anthropic/claude-3.5-sonnet",
+            model="openrouter/anthropic/claude-3.5-sonnet",
             api_key=openrouter_key,
-            api_base="https://openrouter.ai/api/v1",
             max_tokens=2000,
             temperature=0.7
         )
         dspy.configure(lm=lm)
         logger.info("✅ DSPy configured globally with Claude 3.5 Sonnet via OpenRouter")
+        logger.info("   Model: openrouter/anthropic/claude-3.5-sonnet")
     else:
         logger.error("❌ OPENROUTER_API_KEY not found - DSPy will not work!")
         logger.error("   Set OPENROUTER_API_KEY in Railway environment variables")
