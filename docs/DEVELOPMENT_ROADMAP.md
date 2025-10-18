@@ -1,23 +1,44 @@
 # 🗺️ Development Roadmap - Hume DSPy Agent System
 
 **Last Updated**: October 18, 2025  
-**Status**: Pure DSPy Architecture Complete ✅ - Now Adding Advanced Features
+**Status**: DSPy Core Operational ✅ | Agent Zero Audit Complete ✅ | Ready for MCP Integration
 
 ---
 
 ## **📊 Current State Analysis**
 
 ### **What We Have** ✅
+
+**Core Infrastructure**:
 - ✅ DSPy ChainOfThought modules (all agents)
-- ✅ Claude 3.5 Sonnet via OpenRouter (paid inference)
-- ✅ 100% DSPy conversational layer
+- ✅ Claude 3.5 Sonnet via OpenRouter configured globally
+- ✅ 100% DSPy conversational layer (no hardcoded responses)
 - ✅ 4 specialized agents (Inbound, Research, Follow-Up, Strategy)
 - ✅ Slack integration with conversational AI
 - ✅ Supabase database for lead storage
 - ✅ GMass email automation
 - ✅ Typeform/VAPI webhook processing
 
-### **What We DON'T Have** ❌
+**Recent Achievements** (Oct 18, 2025):
+- ✅ Fixed DSPy configuration errors (LM not loaded)
+- ✅ Fixed OpenRouter API integration (405 error resolved)
+- ✅ Fixed AttributeError with optional output fields
+- ✅ Agent Zero framework audit (5000+ lines of code reviewed)
+- ✅ Identified production-ready MCP client implementation
+- ✅ Documented integration strategy for FAISS memory + instruments
+
+### **Critical Gaps** ❌
+
+**Data Loss Issues**:
+- ❌ Follow-up state persistence (using in-memory only)
+- ❌ Research Agent API keys (Clearbit, Apollo, Perplexity)
+- ❌ Real Supabase queries (showing mock data)
+- ❌ Close CRM integration (stub only)
+
+**Advanced Features**:
+- ❌ MCP (Model Context Protocol) integration (100+ instant integrations!)
+- ❌ Vector DB memory (FAISS for semantic search)
+- ❌ Instrument system (unlimited tools without prompt bloat)
 - ❌ DSPy ReAct agents (tool-using agents)
 - ❌ DSPy optimization/training pipeline
 - ❌ Autonomous multi-agent collaboration
@@ -29,9 +50,143 @@
 
 ---
 
+## **🔴 Phase 0: Critical Bug Fixes (DO THIS FIRST!)**
+**Timeline**: 2-3 days  
+**Priority**: CRITICAL - Blocks everything else  
+**Status**: 🔴 NOT STARTED
+
+See `docs/PHASE_0_CRITICAL_FIXES.md` for detailed implementation.
+
+### **Why Phase 0 Exists**:
+Currently losing data and showing fake numbers. Must fix before adding new features.
+
+### **Tasks**:
+1. ✅ **PostgreSQL Checkpointer** (30 min) - Stop losing follow-up state on restart
+2. ✅ **Research Agent API Keys** (5 min) - Add Clearbit, Apollo, Perplexity keys to Railway
+3. ✅ **Real Supabase Queries** (2 hours) - Replace mock data with actual queries
+4. ✅ **Close CRM Integration** (3 hours) - Full two-way sync implementation
+5. ✅ **LinkedIn & Company Intel** (4 hours) - Real research capability
+
+### **Impact**:
+- **Before**: 37/63 tools operational (59%)
+- **After**: 50/63 tools operational (79%)
+- **Gain**: +20% operational, no data loss, real insights
+
+---
+
+## **🚀 Phase 0.5: Agent Zero Integration (NEW!)**
+**Timeline**: 1-2 weeks  
+**Priority**: HIGH - Unlocks massive capability  
+**Status**: 🟡 PLANNED
+
+Based on deep code audit of Agent Zero framework (5000+ lines reviewed).
+
+### **Goal**:
+Integrate production-ready components from Agent Zero for instant capability boost.
+
+### **Tasks**:
+
+#### **0.5.1 MCP Client Integration** (2-3 days) ⭐⭐⭐⭐⭐
+**Value**: 100+ instant integrations (GitHub, Slack, Calendar, Drive, etc.)
+
+```python
+# core/mcp_client.py
+from mcp import ClientSession, stdio_client
+from python.helpers.mcp_handler import MCPConfig  # From Agent Zero
+
+class HumeMCPIntegration:
+    """Port Agent Zero's MCP client"""
+    def __init__(self):
+        self.config = MCPConfig.get_instance()
+    
+    async def initialize(self):
+        # Connect to MCP servers from settings
+        await self.config.update(settings["mcp_servers"])
+    
+    def get_tools_for_agent(self, agent_type: str):
+        # Inject MCP tools into DSPy ReAct agents
+        return self.config.get_tools_prompt()
+```
+
+**Enables**:
+- GitHub integration (repos, issues, PRs)
+- Slack (messaging, channels)
+- Google Calendar, Drive, Gmail
+- PostgreSQL queries
+- Brave Search
+- 100+ more from MCP server ecosystem
+
+#### **0.5.2 FAISS Vector Memory** (1-2 days) ⭐⭐⭐⭐⭐
+**Value**: Semantic memory + learning from past solutions
+
+```python
+# memory/vector_memory.py
+from langchain_community.vectorstores import FAISS
+import faiss
+
+class HumeMemory:
+    """Port Agent Zero's FAISS memory"""
+    def __init__(self):
+        index = faiss.IndexFlatIP(embedding_dim)
+        self.db = FAISS(
+            embedding_function=embedder,
+            index=index,
+            docstore=InMemoryDocstore()
+        )
+    
+    async def remember_solution(self, problem: str, solution: str):
+        self.db.add_documents([
+            Document(page_content=f"{problem} → {solution}",
+                    metadata={"type": "solution"})
+        ])
+    
+    async def recall_similar(self, problem: str):
+        return self.db.similarity_search(problem, k=3)
+```
+
+**Enables**:
+- Agents learn from every interaction
+- Semantic search for past solutions
+- Auto-improving over time
+
+#### **0.5.3 Instrument System** (2-3 days) ⭐⭐⭐⭐
+**Value**: Unlimited tools without prompt bloat
+
+```python
+# instruments/instrument_manager.py
+class InstrumentManager:
+    """Store tool descriptions in vector DB, not system prompt"""
+    def __init__(self):
+        self.vector_db = FAISS(...)
+    
+    def register_instrument(self, name: str, description: str, script_path: str):
+        """Add instrument to vector DB"""
+        self.vector_db.add_documents([
+            Document(page_content=description,
+                    metadata={"name": name, "path": script_path, "type": "instrument"})
+        ])
+    
+    async def recall_relevant_instruments(self, query: str, k=3):
+        """Semantic search for relevant tools"""
+        return self.vector_db.similarity_search(query, k=k)
+```
+
+**Enables**:
+- Add new tools without redeploying
+- No system prompt token bloat
+- Semantic tool discovery
+
+### **Total Impact**:
+- **MCP**: 100+ integrations in 2-3 days (vs months to build manually)
+- **Memory**: Agents get smarter over time
+- **Instruments**: Unlimited extensibility
+
+---
+
 ## **🎯 Phase 1: DSPy ReAct Agents & Tool Use**
-**Timeline**: Week 1-2  
-**Priority**: HIGH
+**Timeline**: Week 3-4  
+**Priority**: HIGH  
+**Status**: 🟡 PLANNED (After Phase 0 + 0.5)
 
 ### **Goal**: 
 Transform agents from pure conversation to tool-using ReAct agents that can:
@@ -561,36 +716,80 @@ result = await app.ainvoke({"lead": new_lead})
 
 ## **🎯 Immediate Next Steps**
 
-### **⚠️ MUST DO FIRST: Phase 0 (Critical Fixes)**
-**See `docs/PHASE_0_CRITICAL_FIXES.md` for details**
+### **Updated Priorities** (Oct 18, 2025)
 
-Before anything else, fix blocking issues:
-1. ✅ **PostgreSQL Checkpointer** (30 min) - Stop losing follow-up state
-2. ✅ **Add API Keys** (5 min) - Enable research agent
-3. ✅ **Real Supabase Queries** (2 hours) - Show actual data
-4. ✅ **Close CRM Integration** (3 hours) - Enable CRM sync
-5. ✅ **LinkedIn & Company Intel** (4 hours) - Full research capability
+Based on Agent Zero audit and current system analysis:
 
-**Timeline**: 2 days  
-**Impact**: 59% → 79% operational (+20%)
+#### **Week 1: Phase 0 - Critical Bug Fixes** 🔴
+**Status**: 🔴 NOT STARTED  
+**Timeline**: 2-3 days  
+**See**: `docs/PHASE_0_CRITICAL_FIXES.md`
 
-**Why first?** Currently losing data & showing fake numbers!
+**Tasks**:
+1. [ ] PostgreSQL Checkpointer (30 min)
+2. [ ] Research Agent API Keys (5 min)
+3. [ ] Real Supabase Queries (2 hours)
+4. [ ] Close CRM Integration (3 hours)
+5. [ ] LinkedIn & Company Intel (4 hours)
+
+**Impact**: Stop data loss, show real numbers (59% → 79% operational)
 
 ---
 
-### **Week 1-2: Phase 3 & 4 (Your Priority)**
-After Phase 0 is complete:
+#### **Week 2-3: Phase 0.5 - Agent Zero Integration** 🚀
+**Status**: 🟡 PLANNED  
+**Timeline**: 1-2 weeks  
+**See**: Section above in roadmap
 
-1. **Autonomous collaboration framework** (Phase 3)
-2. **Cost optimization** (Phase 4)  
-3. **Nightly scheduled tasks**
-4. **Test overnight agent collaboration**
+**Tasks**:
+1. [ ] MCP Client Integration (2-3 days) ⭐⭐⭐⭐⭐
+2. [ ] FAISS Vector Memory (1-2 days) ⭐⭐⭐⭐⭐
+3. [ ] Instrument System (2-3 days) ⭐⭐⭐⭐
 
-### **Why This Order?**
-- Phase 0 fixes critical bugs (data loss, empty results)
-- Your main request is autonomous agent collaboration (Phase 3)
-- Cost optimization makes it sustainable (Phase 4)
-- ReAct & optimization enhance it later (Phase 1 & 2)
+**Impact**: 100+ integrations, semantic memory, unlimited tools
+
+**Why now?** Agent Zero audit revealed production-ready components we can integrate in days vs building from scratch in months!
+
+---
+
+#### **Week 4-5: Phase 1 - DSPy ReAct Agents** 🎯
+**Status**: 🟡 PLANNED  
+**Timeline**: 1-2 weeks
+
+**Tasks**:
+1. [ ] Convert Strategy Agent to ReAct with MCP tools
+2. [ ] Convert Research Agent to ReAct
+3. [ ] Add tool use to Inbound & Follow-Up
+
+**Impact**: Agents can use real data + external tools
+
+---
+
+#### **Week 6-8: Phases 3 & 4 - Your Original Request** 💡
+**Status**: 🟡 PLANNED  
+**Timeline**: 2-3 weeks
+
+**Tasks**:
+1. [ ] Autonomous collaboration framework (Phase 3)
+2. [ ] Cost optimization (Phase 4)
+3. [ ] Nightly scheduled tasks
+4. [ ] Overnight agent collaboration
+
+**Impact**: Agents work while you sleep, 50% cost reduction
+
+---
+
+### **Why This Order Changed?**
+
+**Original Plan**: Phase 3 & 4 first (autonomous collaboration)  
+**New Plan**: Phase 0 → 0.5 → 1 → 3 & 4
+
+**Reason**: Agent Zero audit revealed we can get:
+- **100+ integrations** in 2-3 days (MCP client)
+- **Semantic memory** in 1-2 days (FAISS)
+- **Unlimited tools** in 2-3 days (Instruments)
+
+This foundation makes autonomous collaboration WAY more powerful when we build it in Week 6!
 
 ---
 
@@ -643,15 +842,67 @@ After Phase 0 is complete:
 
 ---
 
-## **🚀 Let's Start!**
+## **🚀 Next Actions**
 
-**Ready to begin?** I recommend starting with:
+### **Recommended Start: Phase 0** (Critical Fixes)
 
-1. **Implement autonomous collaboration** (Phase 3) - Your key request
-2. **Add cost optimization** (Phase 4) - Make it sustainable  
-3. **Test overnight workflows** - Prove the concept
-4. **Then add ReAct + optimization** - Enhance quality
+**Why start here?**
+- Currently losing follow-up state on every restart
+- Research agent returning empty (no API keys)
+- Strategy agent showing fake numbers (mock data)
+- Only takes 2-3 days to fix
 
-This gets you immediate value (agents working while you sleep!) while setting up for long-term improvements.
+**After Phase 0**: System is solid, data is real, no more losses.
 
-**Want me to start building Phase 3 (Autonomous Collaboration)?** 🚀
+---
+
+### **Then: Phase 0.5** (Agent Zero Integration)
+
+**Why this is huge**:
+- MCP client: 100+ integrations in 2-3 days (vs months to build)
+- FAISS memory: Agents learn from every interaction
+- Instruments: Unlimited tools without prompt bloat
+
+**After Phase 0.5**: You have a supercharged system with massive capability.
+
+---
+
+### **Then: Phase 1** (DSPy ReAct)
+
+**Why now it's better**:
+- ReAct agents can use MCP tools (100+ integrations!)
+- Can store results in FAISS memory
+- Can discover instruments semantically
+
+**After Phase 1**: Agents are tool-using powerhouses.
+
+---
+
+### **Finally: Phases 3 & 4** (Your Original Vision)
+
+**Why last**:
+- Autonomous collaboration is MORE powerful with MCP + memory + tools
+- Agents have way more capabilities to collaborate with
+- Cost optimization has more models to choose from
+
+**After All Phases**: Agents work overnight with 100+ tools, learning from everything, costing 50% less!
+
+---
+
+## **📝 Changelog**
+
+### **October 18, 2025**
+- ✅ Fixed DSPy configuration (LM not loaded error)
+- ✅ Fixed OpenRouter API integration (405 error)
+- ✅ Fixed AttributeError with optional output fields
+- ✅ Completed Agent Zero framework audit (5000+ lines)
+- ✅ Identified MCP client for integration
+- ✅ Created Phase 0 (critical fixes) document
+- ✅ Added Phase 0.5 (Agent Zero integration)
+- ✅ Updated roadmap priorities
+
+**Next**: Start Phase 0 implementation
+
+---
+
+**Ready to start Phase 0?** 🛠️
