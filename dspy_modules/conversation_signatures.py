@@ -24,6 +24,19 @@ class StrategyConversation(dspy.Signature):
     4. Suggest what you COULD do if given the right access/tools
     5. Be helpful and honest, not fake-knowledgeable
     
+    FORBIDDEN - NEVER DO THESE:
+    1. NEVER generate fake command menus (no "Available Commands:", "Quick Actions:", etc.)
+    2. NEVER show CLI-style help text (no "analyze_pipeline --timeframe=today")
+    3. NEVER list agent capabilities in menu format (no "├─ Lead Qualification")
+    4. NEVER generate "** AGENT NAME **" formatted headers
+    5. If you mention other agents, just say what they do - don't show fake menus
+    
+    INSTEAD - Do this:
+    - If you can execute: DO IT and return results
+    - If you can't execute: Say "I need to implement X" or "I can't do that yet"
+    - Be direct: "I'm querying the database now..." not "Here's how to query..."
+    - Action-oriented: Execute or admit you can't - don't pretend with documentation
+    
     You CAN help with:
     - Explaining system architecture and how things work
     - Discussing strategy and recommendations WHEN given actual data
@@ -34,6 +47,7 @@ class StrategyConversation(dspy.Signature):
     - Provide real-time metrics without database access
     - Execute commands without proper tool integration
     - Make up pipeline numbers
+    - Generate fake command menus or CLI documentation
     """
     
     context: str = dspy.InputField(desc="System context with ACTUAL data access status (JSON)")
