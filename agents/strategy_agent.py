@@ -141,6 +141,11 @@ class StrategyAgent:
         self.research_agent = ResearchAgent()
         self.follow_up_agent = FollowUpAgent()
         
+        # Initialize audit agent for real data retrieval
+        from agents.audit_agent import get_audit_agent
+        self.audit_agent = get_audit_agent()
+        logger.info("   Audit Agent: ✅ Initialized for real data queries")
+        
         # A2A communication endpoint
         self.a2a_endpoint = os.getenv(
             "A2A_ENDPOINT",
@@ -287,7 +292,13 @@ class StrategyAgent:
             if len(history) > 20:
                 self.conversation_history[user_id] = history[-20:]
             
-            # Just return the response - no forced "suggested actions"
+            # Check if user is asking for an audit or real data
+            if self._is_audit_request(message):
+                logger.info("🔍 Audit request detected - executing real data query")
+                audit_result = await self._execute_audit(message)
+                return audit_result
+            
+            # Otherwise, return conversational response
             return result.response
         
         except Exception as e:
@@ -759,6 +770,59 @@ _Reply with "details" for full analysis_
             formatted.append(f"{role}: {content}")
         
         return "\n".join(formatted)
+    
+    def _is_audit_request(self, message: str) -> bool:
+        """Detect if user is asking for an audit or real data.
+        
+        Args:
+            message: User's message
+        
+        Returns:
+            True if this is an audit request
+        """
+        audit_keywords = [
+            'audit', 'analyze pipeline', 'lead flow', 'email performance',
+            'deliverability', 'open rate', 'response rate', 'speed to lead',
+            'show me', 'pull data', 'get data', 'query', 'real data',
+            'actual numbers', 'campaign stats', 'email stats'
+        ]
+        
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in audit_keywords)
+    
+    async def _execute_audit(self, message: str) -> str:
+        """Execute a real audit using AuditAgent.
+        
+        Args:
+            message: User's audit request
+        
+        Returns:
+            Formatted audit report with REAL data
+        """
+        try:
+            # Determine timeframe from message
+            timeframe_hours = 24  # Default
+            if 'week' in message.lower():
+                timeframe_hours = 168
+            elif 'month' in message.lower():
+                timeframe_hours = 720
+            
+            logger.info(f"⏳ Executing audit for last {timeframe_hours} hours...")
+            
+            # Execute audit
+            audit_data = await self.audit_agent.audit_lead_flow(timeframe_hours)
+            
+            # Format report
+            report = self.audit_agent.format_audit_report(audit_data)
+            
+            logger.info("✅ Audit completed successfully")
+            return report
+        
+        except Exception as e:
+            logger.error(f"❌ Audit execution failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return f"❌ Audit failed: {str(e)}\n\nI tried to pull real data but encountered an error. Check logs for details."
 
 
 # ===== Export =====
