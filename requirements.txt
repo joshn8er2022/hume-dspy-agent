@@ -26,6 +26,7 @@ requests>=2.31.0
 twilio>=8.10.0
 sendgrid>=6.11.0
 slack-sdk>=3.23.0
+fastmcp>=0.1.0  # MCP client for Zapier integration (200+ tools)
 
 # Utilities
 python-dotenv>=1.0.0

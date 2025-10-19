@@ -215,6 +215,10 @@ class StrategyAgent:
         import json
         import asyncio
         from concurrent.futures import ThreadPoolExecutor
+        from core.mcp_client import get_mcp_client
+        
+        # Initialize MCP client for 200+ Zapier tools
+        mcp = get_mcp_client()
         
         # Thread pool for running async functions in sync context
         executor = ThreadPoolExecutor(max_workers=3)
@@ -329,9 +333,108 @@ class StrategyAgent:
             except Exception as e:
                 return json.dumps({"error": str(e)})
         
-        # Return list of tools
-        tools = [audit_lead_flow, query_supabase, get_pipeline_stats]
+        def create_close_lead(
+            name: str,
+            email: str = None,
+            phone: str = None,
+            company: str = None,
+            note: str = None
+        ) -> str:
+            """
+            Create a new lead in Close CRM via MCP (Phase 0 integration).
+            
+            This tool creates a lead in Close CRM with the provided information.
+            Use this when qualifying leads to sync them to the CRM.
+            
+            Args:
+                name: Lead name (required)
+                email: Email address
+                phone: Phone number  
+                company: Company name
+                note: Additional notes or context
+            
+            Returns:
+                JSON string with Close CRM lead creation result
+            """
+            try:
+                logger.info(f"🔧 ReAct MCP tool: create_close_lead(name={name})")
+                result = run_async_in_thread(
+                    mcp.close_create_lead(
+                        name=name,
+                        email=email,
+                        phone=phone,
+                        company=company,
+                        note=note
+                    )
+                )
+                logger.info(f"✅ ReAct MCP tool: create_close_lead succeeded")
+                return json.dumps(result, indent=2)
+            except Exception as e:
+                logger.error(f"❌ ReAct MCP tool create_close_lead failed: {e}")
+                return json.dumps({"error": str(e), "tool": "create_close_lead"})
+        
+        def research_with_perplexity(query: str) -> str:
+            """
+            Research a topic using Perplexity AI via MCP (Phase 0 integration).
+            
+            This tool uses Perplexity's AI to research companies, people, or topics.
+            Use this to enrich lead information or gather competitive intelligence.
+            
+            Args:
+                query: Research query or question
+            
+            Returns:
+                JSON string with Perplexity research results
+            """
+            try:
+                logger.info(f"🔧 ReAct MCP tool: research_with_perplexity(query={query[:50]}...)")
+                result = run_async_in_thread(
+                    mcp.perplexity_research(query)
+                )
+                logger.info(f"✅ ReAct MCP tool: research_with_perplexity succeeded")
+                return json.dumps(result, indent=2)
+            except Exception as e:
+                logger.error(f"❌ ReAct MCP tool research_with_perplexity failed: {e}")
+                return json.dumps({"error": str(e), "tool": "research_with_perplexity"})
+        
+        def scrape_website(url: str) -> str:
+            """
+            Scrape a website URL via Apify MCP tool.
+            
+            This tool scrapes website content (text, markdown, HTML) using Apify.
+            Use this to gather information from company websites or landing pages.
+            
+            Args:
+                url: Website URL to scrape
+            
+            Returns:
+                JSON string with scraped content
+            """
+            try:
+                logger.info(f"🔧 ReAct MCP tool: scrape_website(url={url})")
+                result = run_async_in_thread(
+                    mcp.scrape_url(url)
+                )
+                logger.info(f"✅ ReAct MCP tool: scrape_website succeeded")
+                return json.dumps(result, indent=2)
+            except Exception as e:
+                logger.error(f"❌ ReAct MCP tool scrape_website failed: {e}")
+                return json.dumps({"error": str(e), "tool": "scrape_website"})
+        
+        # Return list of tools (existing + MCP tools)
+        tools = [
+            # Existing audit/query tools
+            audit_lead_flow,
+            query_supabase,
+            get_pipeline_stats,
+            # NEW: MCP-powered tools (Phase 0/0.5)
+            create_close_lead,
+            research_with_perplexity,
+            scrape_website
+        ]
         logger.info(f"   Initialized {len(tools)} ReAct tools")
+        logger.info(f"   - 3 core tools (audit, query, stats)")
+        logger.info(f"   - 3 MCP tools (Close CRM, Perplexity, Apify)")
         return tools
     
     # ===== Slack Communication =====
