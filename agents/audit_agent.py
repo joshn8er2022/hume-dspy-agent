@@ -177,58 +177,70 @@ class AuditAgent:
                 recent_campaigns = []
                 
                 for campaign in campaigns:
-                    # GMass returns dateCreated in format like "2025-10-19T05:05:04.878Z"
-                    date_created_str = campaign.get('dateCreated', '')
-                    if date_created_str:
+                    # GMass returns creationTime in format like "2019-08-24T14:15:22Z"
+                    creation_time_str = campaign.get('creationTime', '')
+                    if creation_time_str:
                         try:
-                            date_created = datetime.fromisoformat(date_created_str.replace('Z', '+00:00'))
-                            if date_created >= cutoff_time:
+                            creation_time = datetime.fromisoformat(creation_time_str.replace('Z', '+00:00'))
+                            if creation_time >= cutoff_time:
                                 recent_campaigns.append(campaign)
                         except:
-                            pass
+                            # If no valid creationTime, include campaign anyway (better to have data)
+                            recent_campaigns.append(campaign)
+                    else:
+                        # If no creationTime field, include campaign (better to have data)
+                        recent_campaigns.append(campaign)
                 
-                # Calculate aggregate metrics
-                total_sent = sum(c.get('sent', 0) for c in recent_campaigns)
-                total_delivered = sum(c.get('delivered', 0) for c in recent_campaigns)
-                total_opened = sum(c.get('opened', 0) for c in recent_campaigns)
-                total_clicked = sum(c.get('clicked', 0) for c in recent_campaigns)
-                total_replied = sum(c.get('replied', 0) for c in recent_campaigns)
-                total_bounced = sum(c.get('bounced', 0) for c in recent_campaigns)
+                # Calculate aggregate metrics from statistics object
+                # GMass nests stats in a 'statistics' object per campaign
+                total_recipients = sum(c.get('statistics', {}).get('recipients', 0) for c in recent_campaigns)
+                total_opens = sum(c.get('statistics', {}).get('opens', 0) for c in recent_campaigns)
+                total_clicks = sum(c.get('statistics', {}).get('clicks', 0) for c in recent_campaigns)
+                total_replies = sum(c.get('statistics', {}).get('replies', 0) for c in recent_campaigns)
+                total_bounces = sum(c.get('statistics', {}).get('bounces', 0) for c in recent_campaigns)
+                total_blocks = sum(c.get('statistics', {}).get('blocks', 0) for c in recent_campaigns)
+                
+                # Calculate delivered as recipients minus bounces and blocks
+                total_delivered = total_recipients - total_bounces - total_blocks
                 
                 return {
                     "total_campaigns": len(recent_campaigns),
-                    "total_emails_sent": total_sent,
+                    "total_emails_sent": total_recipients,
                     "deliverability_rate": round(
-                        (total_delivered / total_sent * 100) if total_sent > 0 else 0,
+                        (total_delivered / total_recipients * 100) if total_recipients > 0 else 0,
                         2
                     ),
                     "open_rate": round(
-                        (total_opened / total_delivered * 100) if total_delivered > 0 else 0,
+                        (total_opens / total_delivered * 100) if total_delivered > 0 else 0,
                         2
                     ),
                     "click_rate": round(
-                        (total_clicked / total_delivered * 100) if total_delivered > 0 else 0,
+                        (total_clicks / total_delivered * 100) if total_delivered > 0 else 0,
                         2
                     ),
                     "reply_rate": round(
-                        (total_replied / total_delivered * 100) if total_delivered > 0 else 0,
+                        (total_replies / total_delivered * 100) if total_delivered > 0 else 0,
                         2
                     ),
                     "bounce_rate": round(
-                        (total_bounced / total_sent * 100) if total_sent > 0 else 0,
+                        (total_bounces / total_recipients * 100) if total_recipients > 0 else 0,
                         2
                     ),
                     "campaigns_detail": [
                         {
                             "campaign_id": c.get('campaignId'),
                             "name": c.get('friendlyName', c.get('subject')),
-                            "sent": c.get('sent', 0),
-                            "delivered": c.get('delivered', 0),
-                            "opened": c.get('opened', 0),
-                            "clicked": c.get('clicked', 0),
-                            "replied": c.get('replied', 0),
-                            "bounced": c.get('bounced', 0),
-                            "date_created": c.get('dateCreated')
+                            "sent": c.get('statistics', {}).get('recipients', 0),
+                            "delivered": c.get('statistics', {}).get('recipients', 0) - c.get('statistics', {}).get('bounces', 0) - c.get('statistics', {}).get('blocks', 0),
+                            "opens": c.get('statistics', {}).get('opens', 0),
+                            "clicks": c.get('statistics', {}).get('clicks', 0),
+                            "replies": c.get('statistics', {}).get('replies', 0),
+                            "bounces": c.get('statistics', {}).get('bounces', 0),
+                            "blocks": c.get('statistics', {}).get('blocks', 0),
+                            "unsubscribes": c.get('statistics', {}).get('unsubscribes', 0),
+                            "creation_time": c.get('creationTime'),
+                            "status": c.get('status'),
+                            "stage": c.get('stage')
                         }
                         for c in recent_campaigns
                     ]
