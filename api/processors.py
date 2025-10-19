@@ -174,18 +174,20 @@ async def process_typeform_event(event: dict):
         # Step 6: Start autonomous follow-up agent (LangGraph)
         if result and slack_thread_ts:
             try:
-                from agents.follow_up_agent import FollowUpAgent
-                follow_up_agent = FollowUpAgent()
+                from api.main import follow_up_agent
 
-                # Start the autonomous lead journey
-                journey_state = follow_up_agent.start_lead_journey(
-                    lead=lead,
-                    tier=result.tier,
-                    slack_thread_ts=slack_thread_ts,
-                    slack_channel=slack_channel or "inbound-leads"
-                )
-                logger.info(f"✅ Autonomous follow-up agent started for lead {lead.id}")
-                logger.info(f"   Journey state: {journey_state.get('status')}")
+                if follow_up_agent:
+                    # Start the autonomous lead journey (using global singleton)
+                    journey_state = follow_up_agent.start_lead_journey(
+                        lead=lead,
+                        tier=result.tier,
+                        slack_thread_ts=slack_thread_ts,
+                        slack_channel=slack_channel or "inbound-leads"
+                    )
+                    logger.info(f"✅ Autonomous follow-up agent started for lead {lead.id}")
+                    logger.info(f"   Journey state: {journey_state.get('status')}")
+                else:
+                    logger.warning("⚠️ Follow-up agent not initialized, skipping lead journey")
             except Exception as e:
                 logger.error(f"❌ Follow-up agent failed: {str(e)}")
                 import traceback

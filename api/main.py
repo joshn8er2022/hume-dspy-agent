@@ -98,6 +98,17 @@ except Exception as e:
     import traceback
     logger.error(traceback.format_exc())
 
+# Initialize global FollowUpAgent (singleton to prevent duplicate email sequences)
+follow_up_agent = None
+try:
+    from agents.follow_up_agent import FollowUpAgent
+    follow_up_agent = FollowUpAgent()
+    logger.info("✅ Global Follow-Up Agent initialized (singleton)")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Follow-Up Agent: {str(e)}")
+    import traceback
+    logger.error(traceback.format_exc())
+
 # Import processors and inject Supabase client
 try:
     from api.processors import (
@@ -254,15 +265,72 @@ async def a2a_introspection(
         )
 
 
-@app.post("/")
 @app.post("/webhooks/typeform")
-@app.post("/webhooks/{source}")
-async def universal_webhook_receiver(
+async def typeform_webhook_receiver(
     request: Request,
-    background_tasks: BackgroundTasks,
-    source: str = "typeform"
+    background_tasks: BackgroundTasks
 ):
-    """Universal webhook receiver."""
+    """Typeform webhook receiver - SINGLE ROUTE to prevent duplicates."""
+    source = "typeform"
+    start_time = datetime.utcnow()
+    
+    try:
+        logger.info("="*80)
+        logger.info(f"📥 WEBHOOK RECEIVED: {source}")
+        logger.info(f"   Path: {request.url.path}")
+        
+        # Get raw body
+        raw_body = await request.body()
+        headers = dict(request.headers)
+        logger.info(f"   Body size: {len(raw_body)} bytes")
+        
+        # Parse JSON
+        try:
+            payload = await request.json()
+        except Exception as e:
+            logger.error(f"❌ Invalid JSON: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={"ok": False, "error": "Invalid JSON"}
+            )
+        
+        # Store raw event
+        event_id = await store_raw_event(source, payload, headers)
+        
+        # Queue for async processing
+        background_tasks.add_task(process_event_async, event_id, source)
+        
+        # Calculate response time
+        response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        
+        logger.info(f"✅ Webhook acknowledged in {response_time:.0f}ms")
+        logger.info(f"   Event ID: {event_id}")
+        logger.info("="*80)
+        
+        return {
+            "ok": True,
+            "event_id": event_id,
+            "message": "Webhook received, processing in background",
+            "response_time_ms": response_time
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Webhook reception failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": str(e)}
+        )
+
+
+@app.post("/webhooks/vapi")
+async def vapi_webhook_receiver(
+    request: Request,
+    background_tasks: BackgroundTasks
+):
+    """VAPI webhook receiver - SINGLE ROUTE to prevent duplicates."""
+    source = "vapi"
     start_time = datetime.utcnow()
     
     try:

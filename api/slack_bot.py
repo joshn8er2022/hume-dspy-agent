@@ -10,8 +10,11 @@ This bot allows Josh to interact with all agents via Slack DM:
 import logging
 import os
 import dspy
+import time
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime
+from collections import OrderedDict
 
 from fastapi import APIRouter, Request, HTTPException
 import httpx
@@ -33,6 +36,10 @@ router = APIRouter(prefix="/slack", tags=["slack"])
 
 # Initialize Strategy Agent (handles all agent coordination)
 strategy_agent = StrategyAgent()
+
+# Event deduplication cache (prevents duplicate responses from Slack retries)
+processed_events: OrderedDict[str, float] = OrderedDict()
+MAX_CACHE_SIZE = 100
 
 # Initialize DSPy modules for Slack interface
 try:
@@ -78,9 +85,25 @@ async def slack_events(request: Request):
             
             # Handle app mentions and DMs
             if event.get("type") in ["app_mention", "message"]:
-                await handle_message(event)
+                # Create unique event ID
+                event_id = f"{event.get('ts')}_{event.get('user')}_{event.get('channel')}"
+                
+                # Check for duplicate (Slack retries if we don't respond in 3 seconds)
+                if event_id in processed_events:
+                    logger.warning(f"⚠️ Duplicate Slack event (retry detected): {event_id}")
+                    return {"ok": True}  # Return 200 but don't process
+                
+                # Mark as processing immediately
+                processed_events[event_id] = time.time()
+                
+                # Limit cache size
+                if len(processed_events) > MAX_CACHE_SIZE:
+                    processed_events.popitem(last=False)  # Remove oldest
+                
+                # Process in background (don't block Slack webhook response)
+                asyncio.create_task(handle_message_async(event, event_id))
             
-            return {"ok": True}
+            return {"ok": True}  # Return immediately to prevent Slack retries
         
         return {"ok": True}
     
@@ -91,11 +114,12 @@ async def slack_events(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def handle_message(event: Dict[str, Any]):
-    """Process incoming Slack message.
+async def handle_message_async(event: Dict[str, Any], event_id: str):
+    """Process incoming Slack message asynchronously (doesn't block webhook).
     
     Args:
         event: Slack event data containing message info
+        event_id: Unique event identifier for deduplication
     """
     try:
         text = event.get("text", "").strip()
@@ -106,7 +130,8 @@ async def handle_message(event: Dict[str, Any]):
         # Remove bot mention if present
         text = text.replace("<@U0935UUHRC7>", "").strip()  # Bot user ID
         
-        logger.info(f"💬 Slack message from {user}: {text[:100]}...")
+        logger.info(f"💬 Slack message from {user} [Event: {event_id}]")
+        logger.info(f"   Message: {text[:100]}...")
         
         # Parse command and route to appropriate handler
         response = await route_command(text, user)
@@ -117,13 +142,20 @@ async def handle_message(event: Dict[str, Any]):
             channel=channel,
             thread_ts=ts
         )
+        
+        logger.info(f"✅ Response sent [Event: {event_id}]")
     
     except Exception as e:
-        logger.error(f"❌ Message handling error: {str(e)}")
-        await strategy_agent.send_slack_message(
-            message=f"❌ Error: {str(e)}",
-            channel=event.get("channel")
-        )
+        logger.error(f"❌ Message handling error [Event: {event_id}]: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        try:
+            await strategy_agent.send_slack_message(
+                message=f"❌ Error: {str(e)}",
+                channel=event.get("channel")
+            )
+        except:
+            pass  # Don't fail if error response also fails
 
 
 # ============================================================================
