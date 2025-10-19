@@ -38,17 +38,21 @@ logger = logging.getLogger(__name__)
 try:
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
     if openrouter_key:
-        # OpenRouter uses OpenAI-compatible endpoints
-        # Format: model="openrouter/<provider>/<model-name>"
+        # Two-tier paid model system:
+        # - Haiku 4.5: Fast, cheap for routine low-level agentic work (DEFAULT)
+        # - Sonnet 4.5: Premium for complex high-level reasoning
+        # Configure with Haiku 4.5 as default (most tasks are standard customer-facing)
         lm = dspy.LM(
-            model="openrouter/anthropic/claude-3.5-sonnet",
+            model="openrouter/anthropic/claude-haiku-4.5",
             api_key=openrouter_key,
             max_tokens=2000,
             temperature=0.7
         )
         dspy.configure(lm=lm)
-        logger.info("✅ DSPy configured globally with Claude 3.5 Sonnet via OpenRouter")
-        logger.info("   Model: openrouter/anthropic/claude-3.5-sonnet")
+        logger.info("✅ DSPy configured globally with Claude Haiku 4.5 via OpenRouter")
+        logger.info("   Low-tier: claude-haiku-4.5 (default for standard tasks)")
+        logger.info("   High-tier: claude-sonnet-4.5 (for complex reasoning)")
+        logger.info("   Use core.model_selector for dynamic model selection")
     else:
         logger.error("❌ OPENROUTER_API_KEY not found - DSPy will not work!")
         logger.error("   Set OPENROUTER_API_KEY in Railway environment variables")

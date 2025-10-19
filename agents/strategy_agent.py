@@ -134,8 +134,21 @@ class StrategyAgent:
         )
         self.a2a_api_key = os.getenv("A2A_API_KEY")
         
-        # Configure DSPy modules (assume DSPy already configured globally)
+        # Configure DSPy with Sonnet 4.5 for high-level reasoning
+        # Strategy Agent does complex analysis, so uses premium model
         try:
+            openrouter_key = os.getenv("OPENROUTER_API_KEY")
+            if openrouter_key:
+                strategy_lm = dspy.LM(
+                    model="openrouter/anthropic/claude-sonnet-4.5",
+                    api_key=openrouter_key,
+                    max_tokens=3000,  # More tokens for complex reasoning
+                    temperature=0.7
+                )
+                dspy.configure(lm=strategy_lm)
+                logger.info("   Strategy Agent: ✅ Using Sonnet 4.5 for high-level reasoning")
+            
+            # Initialize DSPy modules with Sonnet 4.5
             self.conversation_module = dspy.ChainOfThought(StrategyConversation)
             self.pipeline_analyzer = dspy.ChainOfThought(PipelineAnalysisSignature)
             self.recommendation_generator = dspy.ChainOfThought(GenerateRecommendations)

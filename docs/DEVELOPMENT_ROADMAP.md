@@ -603,25 +603,30 @@ class ModelSelector:
         "openrouter/qwen/qwen-2.5-72b-instruct"
     ]
     
-    PAID_MODEL = "openrouter/anthropic/claude-3.5-sonnet"
+    PAID_MODEL_LOW = "openrouter/anthropic/claude-haiku-4.5"  # Fast, cheap for routine work
+    PAID_MODEL_HIGH = "openrouter/anthropic/claude-sonnet-4.5"  # Premium for complex reasoning
     
-    def select_model(self, task_type: str, is_overnight: bool = False) -> str:
-        """Select appropriate model"""
+    def select_model(self, task_type: str, is_overnight: bool = False, complexity: str = "low") -> str:
+        """Select appropriate model based on task and complexity"""
         
         # Overnight work = always free
         if is_overnight:
             return random.choice(self.FREE_MODELS)
         
-        # Customer-facing = paid
-        if task_type in ["email_to_lead", "slack_response", "final_decision"]:
-            return self.PAID_MODEL
+        # High-complexity customer-facing = Sonnet 4.5
+        if complexity == "high" or task_type in ["strategy_analysis", "complex_research", "competitor_analysis"]:
+            return self.PAID_MODEL_HIGH
+        
+        # Standard customer-facing = Haiku 4.5
+        if task_type in ["email_to_lead", "slack_response", "qualification", "follow_up"]:
+            return self.PAID_MODEL_LOW
         
         # Background = free
         if task_type in ["research", "brainstorm", "analysis", "draft"]:
             return random.choice(self.FREE_MODELS)
         
-        # Default = paid for safety
-        return self.PAID_MODEL
+        # Default = low-tier paid for safety
+        return self.PAID_MODEL_LOW
 
 # Use in agents
 class ResearchAgent:
