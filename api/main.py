@@ -20,9 +20,8 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional
 import json
-import dspy
 
-# Configure logging
+# Configure logging FIRST
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -31,9 +30,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================================
+# PHOENIX OBSERVABILITY (MUST BE FIRST!)
+# ============================================================================
+# Initialize Phoenix tracing BEFORE any DSPy/agent code runs
+# This gives us complete visibility into all LLM calls and agent behavior
+
+from core.observability import setup_observability
+
+logger.info("🔭 Initializing Phoenix observability...")
+tracer_provider = setup_observability()
+if tracer_provider:
+    logger.info("✅ Phoenix tracing active - all DSPy calls will be traced")
+    logger.info("   View traces at: https://app.phoenix.arize.com/")
+else:
+    logger.info("⚠️ Phoenix tracing disabled - set PHOENIX_API_KEY to enable")
+
+# ============================================================================
 # DSPY GLOBAL CONFIGURATION (CRITICAL!)
 # ============================================================================
-# This must happen BEFORE any agents are imported!
+# This must happen AFTER Phoenix but BEFORE any agents are imported!
+
+import dspy
 
 try:
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
