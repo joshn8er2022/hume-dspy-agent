@@ -168,14 +168,19 @@ class StrategyAgent:
                 logger.info("   Strategy Agent: ✅ Using Sonnet 4.5 for high-level reasoning")
             
             # Initialize DSPy modules with Sonnet 4.5
-            self.conversation_module = dspy.ChainOfThought(StrategyConversation)
+            # IMPORTANT: Use Predict for simple queries (fast), ChainOfThought for complex (reasoning)
+            self.simple_conversation = dspy.Predict(StrategyConversation)  # No reasoning
+            self.complex_conversation = dspy.ChainOfThought(StrategyConversation)  # With reasoning
             self.pipeline_analyzer = dspy.ChainOfThought(PipelineAnalysisSignature)
             self.recommendation_generator = dspy.ChainOfThought(GenerateRecommendations)
-            self.quick_status = dspy.ChainOfThought(QuickPipelineStatus)
-            logger.info("   DSPy Modules: ✅ All conversation modules initialized")
+            self.quick_status = dspy.Predict(QuickPipelineStatus)  # Status check is simple
+            logger.info("   DSPy Modules: ✅ Dual-mode conversation (Predict + ChainOfThought)")
+            logger.info("   Simple queries → Predict (fast, no reasoning)")
+            logger.info("   Complex queries → ChainOfThought (slower, with reasoning)")
         except Exception as e:
             logger.error(f"   DSPy Modules: ❌ Failed to initialize: {e}")
-            self.conversation_module = None
+            self.simple_conversation = None
+            self.complex_conversation = None
             self.pipeline_analyzer = None
             self.recommendation_generator = None
             self.quick_status = None
@@ -263,7 +268,7 @@ class StrategyAgent:
         Returns:
             DSPy-generated response text
         """
-        if not self.conversation_module:
+        if not self.simple_conversation or not self.complex_conversation:
             return "⚠️ Conversational AI not configured. Please set OPENROUTER_API_KEY."
         
         try:
@@ -277,8 +282,20 @@ class StrategyAgent:
             history = self.conversation_history[user_id]
             history_text = self._format_conversation_history(history)
             
-            # Execute DSPy conversation module
-            result = self.conversation_module(
+            # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought
+            is_simple = self._is_simple_query(message)
+            
+            if is_simple:
+                # Use Predict for simple queries (fast, no reasoning step)
+                logger.info(f"📝 Simple query detected → Using Predict (fast)")
+                conversation_module = self.simple_conversation
+            else:
+                # Use ChainOfThought for complex queries (with reasoning)
+                logger.info(f"🧠 Complex query detected → Using ChainOfThought (reasoning)")
+                conversation_module = self.complex_conversation
+            
+            # Execute selected DSPy module
+            result = conversation_module(
                 context=system_context,  # Renamed to 'context' to match DSPy signature
                 user_message=message,
                 conversation_history=history_text
@@ -770,6 +787,63 @@ _Reply with "details" for full analysis_
             formatted.append(f"{role}: {content}")
         
         return "\n".join(formatted)
+    
+    def _is_simple_query(self, message: str) -> bool:
+        """Determine if query is simple (use Predict) or complex (use ChainOfThought).
+        
+        Simple queries are:
+        - Greetings (hey, hi, hello)
+        - Status checks (status, ping, how are you)
+        - Very short messages (< 4 words)
+        - No complex keywords
+        
+        Complex queries are:
+        - Analysis requests (analyze, compare, explain)
+        - Audit requests (audit, query, pull data)
+        - Multi-sentence questions
+        - Requests requiring reasoning
+        
+        Args:
+            message: User's message
+        
+        Returns:
+            True if simple (use Predict), False if complex (use ChainOfThought)
+        """
+        message_lower = message.lower().strip()
+        word_count = len(message.split())
+        
+        # Definite simple patterns (greetings, status checks)
+        simple_patterns = [
+            'hey', 'hi', 'hello', 'yo', 'sup', 'whats up', 'what\'s up',
+            'status', 'ping', 'you there', 'hello there',
+            'how are you', 'how\'s it going', 'wassup'
+        ]
+        
+        if any(pattern in message_lower for pattern in simple_patterns):
+            return True
+        
+        # Very short messages (< 4 words) are usually simple
+        if word_count <= 3:
+            return True
+        
+        # Complex keywords that require reasoning
+        complex_keywords = [
+            'audit', 'analyze', 'compare', 'explain', 'why',
+            'how does', 'what if', 'recommend', 'strategy',
+            'breakdown', 'deep dive', 'investigate', 'assess',
+            'evaluate', 'review', 'report', 'summary'
+        ]
+        
+        if any(keyword in message_lower for keyword in complex_keywords):
+            return False
+        
+        # Medium-length questions (4-10 words) without complex keywords
+        # These are conversational questions, treat as simple
+        if word_count <= 10:
+            return True
+        
+        # Long messages (>10 words) likely need reasoning
+        return False
     
     def _is_audit_request(self, message: str) -> bool:
         """Detect if user is asking for an audit or real data.
