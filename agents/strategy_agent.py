@@ -174,13 +174,22 @@ class StrategyAgent:
             self.pipeline_analyzer = dspy.ChainOfThought(PipelineAnalysisSignature)
             self.recommendation_generator = dspy.ChainOfThought(GenerateRecommendations)
             self.quick_status = dspy.Predict(QuickPipelineStatus)  # Status check is simple
-            logger.info("   DSPy Modules: ✅ Dual-mode conversation (Predict + ChainOfThought)")
+            
+            # Initialize ReAct for tool calling (action queries)
+            self.tools = self._init_tools()
+            self.action_agent = dspy.ReAct(StrategyConversation, tools=self.tools)
+            
+            logger.info("   DSPy Modules: ✅ Triple-mode conversation")
             logger.info("   Simple queries → Predict (fast, no reasoning)")
             logger.info("   Complex queries → ChainOfThought (slower, with reasoning)")
+            logger.info("   Action queries → ReAct (tool calling for real data)")
+            logger.info(f"   ReAct Tools: {len(self.tools)} available ({', '.join([t.__name__ for t in self.tools][:3])}...)")
         except Exception as e:
             logger.error(f"   DSPy Modules: ❌ Failed to initialize: {e}")
             self.simple_conversation = None
             self.complex_conversation = None
+            self.action_agent = None
+            self.tools = []
             self.pipeline_analyzer = None
             self.recommendation_generator = None
             self.quick_status = None
@@ -191,6 +200,113 @@ class StrategyAgent:
         logger.info("🎯 Strategy Agent initialized")
         logger.info(f"   Slack: {'✅ Configured' if self.slack_bot_token else '❌ Not configured'}")
         logger.info(f"   A2A: {'✅ Configured' if self.a2a_api_key else '❌ Not configured'}")
+    
+    # ===== ReAct Tools =====
+    
+    def _init_tools(self) -> List:
+        """Initialize tools that ReAct can call.
+        
+        Tools allow ReAct to actually execute actions instead of just talking about them.
+        Each tool is a Python function that ReAct can invoke.
+        
+        Returns:
+            List of callable tools
+        """
+        import json
+        import asyncio
+        
+        def audit_lead_flow(timeframe_hours: int = 24) -> str:
+            """
+            Audit lead flow with real data from Supabase and GMass.
+            
+            This tool queries actual databases and APIs to get:
+            - Lead capture metrics
+            - Email campaign statistics
+            - Deliverability rates
+            - Engagement metrics (opens, clicks, responses)
+            
+            Args:
+                timeframe_hours: How many hours back to audit (default: 24)
+            
+            Returns:
+                JSON string with complete audit results
+            """
+            try:
+                # Execute async audit
+                result = asyncio.run(
+                    self.audit_agent.audit_lead_flow(timeframe_hours)
+                )
+                return json.dumps(result, indent=2)
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+        
+        def query_supabase(table: str, limit: int = 100) -> str:
+            """
+            Query Supabase database tables.
+            
+            Available tables:
+            - leads: Lead records with qualification data
+            - conversations: Interaction history
+            - agent_state: Agent execution state
+            
+            Args:
+                table: Table name to query
+                limit: Maximum rows to return (default: 100)
+            
+            Returns:
+                JSON string with query results
+            """
+            try:
+                if not self.supabase:
+                    return json.dumps({"error": "Supabase not configured"})
+                
+                result = self.supabase.table(table).select("*").limit(limit).execute()
+                return json.dumps(result.data, indent=2)
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+        
+        def get_pipeline_stats() -> str:
+            """
+            Get current pipeline statistics.
+            
+            Returns:
+                JSON string with pipeline metrics:
+                - Total leads
+                - Breakdown by tier (HOT/WARM/COOL/COLD)
+                - Breakdown by source (typeform, vapi, etc.)
+                - Recent activity
+            """
+            try:
+                if not self.supabase:
+                    return json.dumps({"error": "Supabase not configured"})
+                
+                # Query recent leads
+                result = self.supabase.table('leads').select("*").limit(100).execute()
+                
+                # Calculate stats
+                total = len(result.data)
+                by_tier = {}
+                by_source = {}
+                
+                for lead in result.data:
+                    tier = lead.get('tier', 'UNKNOWN')
+                    by_tier[tier] = by_tier.get(tier, 0) + 1
+                    
+                    source = lead.get('source', 'UNKNOWN')
+                    by_source[source] = by_source.get(source, 0) + 1
+                
+                return json.dumps({
+                    "total_leads": total,
+                    "by_tier": by_tier,
+                    "by_source": by_source
+                }, indent=2)
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+        
+        # Return list of tools
+        tools = [audit_lead_flow, query_supabase, get_pipeline_stats]
+        logger.info(f"   Initialized {len(tools)} ReAct tools")
+        return tools
     
     # ===== Slack Communication =====
     
@@ -268,7 +384,7 @@ class StrategyAgent:
         Returns:
             DSPy-generated response text
         """
-        if not self.simple_conversation or not self.complex_conversation:
+        if not self.simple_conversation or not self.complex_conversation or not self.action_agent:
             return "⚠️ Conversational AI not configured. Please set OPENROUTER_API_KEY."
         
         try:
@@ -282,16 +398,20 @@ class StrategyAgent:
             history = self.conversation_history[user_id]
             history_text = self._format_conversation_history(history)
             
-            # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought
-            is_simple = self._is_simple_query(message)
+            # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought vs ReAct
+            query_type = self._classify_query(message)
             
-            if is_simple:
+            if query_type == "simple":
                 # Use Predict for simple queries (fast, no reasoning step)
-                logger.info(f"📝 Simple query detected → Using Predict (fast)")
+                logger.info(f"📝 Simple query → Using Predict (fast)")
                 conversation_module = self.simple_conversation
+            elif query_type == "action":
+                # Use ReAct for action queries (tool calling)
+                logger.info(f"🔧 Action query → Using ReAct (tool calling for real data)")
+                conversation_module = self.action_agent
             else:
                 # Use ChainOfThought for complex queries (with reasoning)
-                logger.info(f"🧠 Complex query detected → Using ChainOfThought (reasoning)")
+                logger.info(f"🧠 Complex query → Using ChainOfThought (reasoning)")
                 conversation_module = self.complex_conversation
             
             # Execute selected DSPy module
@@ -309,13 +429,8 @@ class StrategyAgent:
             if len(history) > 20:
                 self.conversation_history[user_id] = history[-20:]
             
-            # Check if user is asking for an audit or real data
-            if self._is_audit_request(message):
-                logger.info("🔍 Audit request detected - executing real data query")
-                audit_result = await self._execute_audit(message)
-                return audit_result
-            
-            # Otherwise, return conversational response
+            # Return response from selected module
+            # Note: ReAct handles audit requests automatically via tools
             return result.response
         
         except Exception as e:
@@ -788,31 +903,34 @@ _Reply with "details" for full analysis_
         
         return "\n".join(formatted)
     
-    def _is_simple_query(self, message: str) -> bool:
-        """Determine if query is simple (use Predict) or complex (use ChainOfThought).
+    def _classify_query(self, message: str) -> str:
+        """Classify query type for module selection.
         
-        Simple queries are:
-        - Greetings (hey, hi, hello)
-        - Status checks (status, ping, how are you)
-        - Very short messages (< 4 words)
-        - No complex keywords
-        
-        Complex queries are:
-        - Analysis requests (analyze, compare, explain)
-        - Audit requests (audit, query, pull data)
-        - Multi-sentence questions
-        - Requests requiring reasoning
+        Returns "simple", "action", or "complex":
+        - simple: Greetings, status checks → Predict (fast)
+        - action: Audit, query, pull data → ReAct (tool calling)
+        - complex: Analysis, explain, recommend → ChainOfThought (reasoning)
         
         Args:
             message: User's message
         
         Returns:
-            True if simple (use Predict), False if complex (use ChainOfThought)
+            "simple", "action", or "complex"
         """
         message_lower = message.lower().strip()
         word_count = len(message.split())
         
-        # Definite simple patterns (greetings, status checks)
+        # ACTION queries (need tools - highest priority!)
+        action_keywords = [
+            'audit', 'query', 'pull', 'get data', 'show me', 'fetch',
+            'check gmass', 'check supabase', 'real data', 'actual numbers',
+            'campaign stats', 'email stats', 'lead stats', 'pipeline data'
+        ]
+        
+        if any(keyword in message_lower for keyword in action_keywords):
+            return "action"
+        
+        # SIMPLE queries (greetings, status)
         simple_patterns = [
             'hey', 'hi', 'hello', 'yo', 'sup', 'whats up', 'what\'s up',
             'status', 'ping', 'you there', 'hello there',
@@ -820,30 +938,28 @@ _Reply with "details" for full analysis_
         ]
         
         if any(pattern in message_lower for pattern in simple_patterns):
-            return True
+            return "simple"
         
         # Very short messages (< 4 words) are usually simple
         if word_count <= 3:
-            return True
+            return "simple"
         
-        # Complex keywords that require reasoning
+        # COMPLEX keywords (need reasoning but no tools)
         complex_keywords = [
-            'audit', 'analyze', 'compare', 'explain', 'why',
-            'how does', 'what if', 'recommend', 'strategy',
-            'breakdown', 'deep dive', 'investigate', 'assess',
-            'evaluate', 'review', 'report', 'summary'
+            'analyze', 'compare', 'explain why', 'why', 'how does',
+            'what if', 'recommend', 'strategy', 'breakdown',
+            'deep dive', 'investigate', 'assess', 'evaluate'
         ]
         
         if any(keyword in message_lower for keyword in complex_keywords):
-            return False
+            return "complex"
         
-        # Medium-length questions (4-10 words) without complex keywords
-        # These are conversational questions, treat as simple
+        # Medium-length conversational questions (default to simple)
         if word_count <= 10:
-            return True
+            return "simple"
         
-        # Long messages (>10 words) likely need reasoning
-        return False
+        # Long messages likely need reasoning
+        return "complex"
     
     def _is_audit_request(self, message: str) -> bool:
         """Detect if user is asking for an audit or real data.
