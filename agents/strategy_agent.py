@@ -214,6 +214,27 @@ class StrategyAgent:
         """
         import json
         import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        # Thread pool for running async functions in sync context
+        executor = ThreadPoolExecutor(max_workers=3)
+        
+        def run_async_in_thread(coro):
+            """Run async coroutine in a new thread with its own event loop.
+            
+            This avoids 'asyncio.run() cannot be called from a running event loop' errors
+            that happen when DSPy ReAct tries to call async functions.
+            """
+            def run_in_thread():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(coro)
+                finally:
+                    loop.close()
+            
+            future = executor.submit(run_in_thread)
+            return future.result(timeout=60)  # 60 second timeout
         
         def audit_lead_flow(timeframe_hours: int = 24) -> str:
             """
@@ -232,13 +253,18 @@ class StrategyAgent:
                 JSON string with complete audit results
             """
             try:
-                # Execute async audit
-                result = asyncio.run(
+                # Execute async audit in separate thread to avoid event loop conflicts
+                logger.info(f"🔧 ReAct tool: audit_lead_flow(timeframe_hours={timeframe_hours})")
+                result = run_async_in_thread(
                     self.audit_agent.audit_lead_flow(timeframe_hours)
                 )
+                logger.info(f"✅ ReAct tool: audit_lead_flow returned {len(str(result))} chars")
                 return json.dumps(result, indent=2)
             except Exception as e:
-                return json.dumps({"error": str(e)})
+                logger.error(f"❌ ReAct tool audit_lead_flow failed: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return json.dumps({"error": str(e), "tool": "audit_lead_flow"})
         
         def query_supabase(table: str, limit: int = 100) -> str:
             """
