@@ -15,8 +15,38 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 import httpx
 import os
+import dspy
 
 logger = logging.getLogger(__name__)
+
+
+# ===== DSPy Signatures =====
+
+class ResearchPlanning(dspy.Signature):
+    """Plan research strategy for a lead.
+    
+    Given information about a lead, determine what research to conduct
+    and prioritize information gathering steps.
+    """
+    lead_info: str = dspy.InputField(desc="Available information about the lead")
+    research_goals: str = dspy.InputField(desc="What information we need")
+    
+    research_plan: str = dspy.OutputField(desc="Step-by-step research plan")
+    priority_targets: str = dspy.OutputField(desc="High-priority information to find")
+
+
+class ResearchSynthesis(dspy.Signature):
+    """Synthesize research findings into actionable insights.
+    
+    Analyze collected data and generate strategic recommendations
+    for engaging with the lead.
+    """
+    person_data: str = dspy.InputField(desc="Information about the person")
+    company_data: str = dspy.InputField(desc="Information about the company")
+    
+    key_insights: str = dspy.OutputField(desc="Key insights from research")
+    engagement_strategy: str = dspy.OutputField(desc="Recommended engagement approach")
+    talking_points: str = dspy.OutputField(desc="Relevant talking points for outreach")
 
 
 # ===== Data Models =====
@@ -79,21 +109,89 @@ class ResearchResult(BaseModel):
 
 # ===== Research Agent =====
 
-class ResearchAgent:
-    """Agent for conducting deep research on leads and companies."""
+class ResearchAgent(dspy.Module):
+    """Agent for conducting deep research on leads and companies.
+    
+    Refactored as dspy.Module for better architecture and DSPy optimization.
+    Phase 0.3 - October 19, 2025
+    """
     
     def __init__(self):
+        super().__init__()  # Initialize dspy.Module
+        
+        # DSPy modules for research workflow
+        self.plan_research = dspy.ChainOfThought(ResearchPlanning)
+        self.synthesize_findings = dspy.ChainOfThought(ResearchSynthesis)
         self.clearbit_api_key = os.getenv("CLEARBIT_API_KEY")
         self.apollo_api_key = os.getenv("APOLLO_API_KEY")
         self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
         
         logger.info("🔍 Research Agent initialized")
+        logger.info("   DSPy Modules: ✅ Research planning + synthesis")
         if self.clearbit_api_key:
             logger.info("   ✅ Clearbit API configured")
         if self.apollo_api_key:
             logger.info("   ✅ Apollo API configured")
         if self.perplexity_api_key:
             logger.info("   ✅ Perplexity API configured")
+    
+    def forward(
+        self,
+        lead_id: str,
+        name: Optional[str] = None,
+        email: Optional[str] = None,
+        company: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """DSPy Module forward pass - main entry point.
+        
+        This is the standard dspy.Module interface that enables:
+        - DSPy compilation/optimization
+        - Consistent API across all modules
+        - Better composability
+        
+        Args:
+            lead_id: Lead UUID
+            name: Person's name
+            email: Person's email  
+            company: Company name
+        
+        Returns:
+            Dict with research results
+        """
+        # Forward() is a sync wrapper around async research_lead_deeply
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context
+                return loop.create_task(
+                    self.research_lead_deeply(
+                        lead_id=lead_id,
+                        name=name,
+                        email=email,
+                        company=company
+                    )
+                )
+            else:
+                # We're in sync context
+                return loop.run_until_complete(
+                    self.research_lead_deeply(
+                        lead_id=lead_id,
+                        name=name,
+                        email=email,
+                        company=company
+                    )
+                )
+        except RuntimeError:
+            # No event loop, create one
+            return asyncio.run(
+                self.research_lead_deeply(
+                    lead_id=lead_id,
+                    name=name,
+                    email=email,
+                    company=company
+                )
+            )
     
     async def research_lead_deeply(
         self,

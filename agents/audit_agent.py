@@ -15,14 +15,22 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import httpx
 from supabase import create_client, Client
+import dspy
 
 logger = logging.getLogger(__name__)
 
 
-class AuditAgent:
-    """Agent that performs real data audits - no hallucinations, just facts."""
+class AuditAgent(dspy.Module):
+    """Agent that performs real data audits - no hallucinations, just facts.
+    
+    Refactored as dspy.Module for consistency with other agents.
+    This remains primarily a data service (not conversational).
+    Phase 0.3 - October 19, 2025
+    """
     
     def __init__(self):
+        super().__init__()  # Initialize dspy.Module
+        
         # Initialize Supabase
         self.supabase: Optional[Client] = None
         try:
@@ -42,6 +50,29 @@ class AuditAgent:
             logger.info("✅ Audit Agent: GMass API configured")
         else:
             logger.warning("⚠️ Audit Agent: No GMass API key")
+    
+    def forward(self, timeframe_hours: int = 24) -> Dict[str, Any]:
+        """DSPy Module forward pass - main entry point.
+        
+        This is the standard dspy.Module interface for consistency.
+        AuditAgent is primarily a data service, so forward() just
+        wraps the async audit_lead_flow() method.
+        
+        Args:
+            timeframe_hours: Hours of data to audit
+        
+        Returns:
+            Dict with audit results
+        """
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                return loop.create_task(self.audit_lead_flow(timeframe_hours))
+            else:
+                return loop.run_until_complete(self.audit_lead_flow(timeframe_hours))
+        except RuntimeError:
+            return asyncio.run(self.audit_lead_flow(timeframe_hours))
     
     async def audit_lead_flow(
         self,
