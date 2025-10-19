@@ -111,10 +111,15 @@ class StrategyConversation(dspy.Signature):
 
 # ===== Strategy Agent =====
 
-class StrategyAgent:
-    """Personal AI advisor for strategic decision-making."""
+class StrategyAgent(dspy.Module):
+    """Personal AI advisor for strategic decision-making.
+    
+    Refactored as dspy.Module for better architecture and DSPy optimization.
+    Phase 0.3 - October 19, 2025
+    """
     
     def __init__(self):
+        super().__init__()  # Initialize dspy.Module
         self.slack_bot_token = (
             os.getenv("SLACK_BOT_TOKEN") or
             os.getenv("SLACK_MCP_XOXB_TOKEN") or
@@ -499,6 +504,37 @@ class StrategyAgent:
         
         # Send response in thread
         await self.send_slack_message(response, channel=channel, thread_ts=ts)
+    
+    def forward(self, message: str, context: dict = None, user_id: str = "default") -> str:
+        """DSPy Module forward pass - main entry point.
+        
+        This is the standard dspy.Module interface that enables:
+        - DSPy compilation/optimization
+        - Consistent API across all modules
+        - Better composability
+        
+        Args:
+            message: User's query/request
+            context: Optional additional context dict
+            user_id: User identifier for conversation history
+        
+        Returns:
+            Response string
+        """
+        # For now, forward() is a sync wrapper around async chat_with_josh
+        # In production, we'd make this fully async or use asyncio.run()
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're in an async context, return a coroutine
+                return loop.create_task(self.chat_with_josh(message, user_id))
+            else:
+                # We're in sync context, run the async function
+                return loop.run_until_complete(self.chat_with_josh(message, user_id))
+        except RuntimeError:
+            # No event loop, create one
+            return asyncio.run(self.chat_with_josh(message, user_id))
     
     async def chat_with_josh(self, message: str, user_id: str = "default") -> str:
         """Process conversational request using pure DSPy intelligence.
