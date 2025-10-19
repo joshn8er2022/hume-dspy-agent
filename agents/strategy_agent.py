@@ -805,12 +805,12 @@ _Reply with "details" for full analysis_
             try:
                 if self.supabase:
                     # Query actual lead counts from Supabase
-                    result = self.supabase.table('leads').select('tier', count='exact').execute()
+                    result = self.supabase.table('leads').select('qualification_tier', count='exact').execute()
                     
                     # Count by tier
                     tier_counts = {"HOT": 0, "WARM": 0, "COOL": 0, "COLD": 0, "UNQUALIFIED": 0}
                     for lead in result.data:
-                        tier = lead.get('tier', 'UNQUALIFIED')
+                        tier = lead.get('qualification_tier', 'UNQUALIFIED').upper()
                         if tier in tier_counts:
                             tier_counts[tier] += 1
                     
