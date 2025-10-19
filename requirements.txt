@@ -10,6 +10,11 @@ langgraph-checkpoint-postgres>=1.0.0  # PostgreSQL checkpointer for persistent s
 langchain>=0.3.0
 langchain-anthropic>=0.3.0
 langchain-openai>=0.2.0
+langchain-community>=0.3.0  # Community integrations
+
+# Vector Memory (Phase 0.5)
+faiss-cpu>=1.7.4  # FAISS for semantic search
+numpy>=1.24.0  # Required by FAISS
 
 # Task Queue for Scheduled Follow-ups
 celery[redis]>=5.4.0
