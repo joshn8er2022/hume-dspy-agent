@@ -72,6 +72,20 @@ def initialize_phoenix_tracing() -> Optional[object]:
         except Exception as e:
             logger.error(f"❌ DSPy instrumentation failed: {e}")
         
+        # Instrument LangChain (used by LangGraph in Follow-Up Agent)
+        try:
+            from openinference.instrumentation.langchain import LangChainInstrumentor
+            
+            LangChainInstrumentor().instrument()
+            logger.info("✅ LangChain instrumentation enabled")
+            logger.info("   LangGraph workflows (Follow-Up Agent) will be traced")
+        
+        except ImportError:
+            logger.warning("⚠️ openinference-instrumentation-langchain not installed")
+            logger.warning("   Run: pip install openinference-instrumentation-langchain")
+        except Exception as e:
+            logger.error(f"❌ LangChain instrumentation failed: {e}")
+        
         return tracer_provider
     
     except ImportError:
