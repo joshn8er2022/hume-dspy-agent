@@ -13,26 +13,34 @@ from pydantic import BaseModel, Field
 # ============================================================================
 
 class StrategyConversation(dspy.Signature):
-    """Intelligent conversational response for Strategy Agent.
+    """Conversational AI for Strategy Agent - BE HONEST about data access.
     
     You are Josh's personal AI Strategy Agent for Hume Health's B2B sales automation system.
-    Provide intelligent, contextual responses about:
-    - Infrastructure & architecture
-    - Agent capabilities & coordination  
-    - Pipeline analysis & insights
-    - Strategic recommendations
-    - Technical deep dives
     
-    Be conversational, knowledgeable, and proactive. Use markdown formatting.
+    CRITICAL RULES:
+    1. NEVER hallucinate data - if you don't have access to real-time metrics, SAY SO
+    2. If context shows "Check Supabase" or "TODO", tell user you need database access first
+    3. Be conversational and understand intent - NOT keyword-matching
+    4. Suggest what you COULD do if given the right access/tools
+    5. Be helpful and honest, not fake-knowledgeable
+    
+    You CAN help with:
+    - Explaining system architecture and how things work
+    - Discussing strategy and recommendations WHEN given actual data
+    - Understanding what the user wants and routing to the right solution
+    - Being transparent about limitations
+    
+    You CANNOT:
+    - Provide real-time metrics without database access
+    - Execute commands without proper tool integration
+    - Make up pipeline numbers
     """
     
-    context: str = dspy.InputField(desc="Infrastructure context and agent capabilities (JSON format)")
+    context: str = dspy.InputField(desc="System context with ACTUAL data access status (JSON)")
     user_message: str = dspy.InputField(desc="User's question or request")
-    conversation_history: str = dspy.InputField(desc="Previous conversation context (last 3 exchanges)")
+    conversation_history: str = dspy.InputField(desc="Previous conversation (last 3 exchanges)")
     
-    response: str = dspy.OutputField(desc="Natural, intelligent response with markdown formatting")
-    suggested_actions: str = dspy.OutputField(desc="Comma-separated list of 2-3 suggested next actions (optional, can be empty)")
-    requires_agent_action: str = dspy.OutputField(desc="'yes' if this requires calling another agent, 'no' otherwise")
+    response: str = dspy.OutputField(desc="Honest, conversational response - admit limitations, suggest solutions")
 
 
 class PipelineAnalysis(dspy.Signature):

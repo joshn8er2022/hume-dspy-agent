@@ -122,6 +122,20 @@ class StrategyAgent:
         )
         self.josh_slack_dm_channel = os.getenv("JOSH_SLACK_DM_CHANNEL", "U123ABC")
         
+        # Initialize Supabase for REAL data access
+        self.supabase = None
+        try:
+            from supabase import create_client
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
+            if supabase_url and supabase_key:
+                self.supabase = create_client(supabase_url, supabase_key)
+                logger.info("   Supabase: ✅ Connected (real data access enabled)")
+            else:
+                logger.warning("   Supabase: ❌ No credentials (will not have real-time data)")
+        except Exception as e:
+            logger.error(f"   Supabase: ❌ Failed to connect: {e}")
+        
         # Initialize sub-agents
         self.inbound_agent = InboundAgent()
         self.research_agent = ResearchAgent()
@@ -273,22 +287,8 @@ class StrategyAgent:
             if len(history) > 20:
                 self.conversation_history[user_id] = history[-20:]
             
-            # Format response with suggested actions if provided
-            response_text = result.response
-            
-            # Safely check for suggested_actions (might not be in response)
-            if hasattr(result, 'suggested_actions') and result.suggested_actions and result.suggested_actions.strip():
-                actions = [a.strip() for a in result.suggested_actions.split(',') if a.strip()]
-                if actions:
-                    response_text += "\n\n**Suggested next steps:**"
-                    for action in actions[:3]:
-                        response_text += f"\n• {action}"
-            
-            # Safely check if agent action is required (might not be in response)
-            if hasattr(result, 'requires_agent_action') and result.requires_agent_action and result.requires_agent_action.lower() == "yes":
-                logger.info(f"🤖 Agent action required for: {message[:50]}...")
-            
-            return response_text
+            # Just return the response - no forced "suggested actions"
+            return result.response
         
         except Exception as e:
             logger.error(f"DSPy conversation error: {str(e)}")
@@ -631,22 +631,39 @@ _Reply with "details" for full analysis_
             JSON string with current system state
         """
         try:
-            # Get actual pipeline data if available
+            # Get REAL pipeline data if Supabase is connected
             pipeline_data = {}
             try:
-                # TODO: Query Supabase for real counts
-                # For now, return structure that DSPy can work with
-                pipeline_data = {
-                    "leads_by_tier": {
-                        "HOT": "Check Supabase",
-                        "WARM": "Check Supabase", 
-                        "COOL": "Check Supabase",
-                        "COLD": "Check Supabase"
-                    },
-                    "recent_activity": "Check Supabase for last 24h activity"
-                }
+                if self.supabase:
+                    # Query actual lead counts from Supabase
+                    result = self.supabase.table('leads').select('tier', count='exact').execute()
+                    
+                    # Count by tier
+                    tier_counts = {"HOT": 0, "WARM": 0, "COOL": 0, "COLD": 0, "UNQUALIFIED": 0}
+                    for lead in result.data:
+                        tier = lead.get('tier', 'UNQUALIFIED')
+                        if tier in tier_counts:
+                            tier_counts[tier] += 1
+                    
+                    pipeline_data = {
+                        "data_access": "LIVE",
+                        "leads_by_tier": tier_counts,
+                        "total_leads": sum(tier_counts.values()),
+                        "data_source": "Supabase (real-time)"
+                    }
+                else:
+                    pipeline_data = {
+                        "data_access": "NONE",
+                        "message": "Supabase not connected - cannot provide real-time metrics",
+                        "what_i_need": "SUPABASE_URL and SUPABASE_KEY environment variables"
+                    }
             except Exception as e:
-                logger.debug(f"Could not fetch pipeline data: {e}")
+                logger.error(f"Error fetching pipeline data: {e}")
+                pipeline_data = {
+                    "data_access": "ERROR",
+                    "error": str(e),
+                    "message": "Database query failed - check Supabase connection"
+                }
             
             # Build context dynamically
             context = {
