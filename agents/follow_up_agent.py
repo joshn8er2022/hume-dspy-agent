@@ -109,9 +109,11 @@ class FollowUpAgent:
             }
         )
 
+        # After sending initial email, END the workflow (don't send follow-ups immediately)
         workflow.add_edge("send_initial_email", "update_slack")
-        workflow.add_edge("update_slack", "wait_for_response")
-
+        workflow.add_edge("update_slack", END)  # STOP HERE - follow-ups scheduled separately
+        
+        # Follow-up workflow (triggered by scheduled job later)
         workflow.add_conditional_edges(
             "wait_for_response",
             self.check_response_status,
@@ -209,8 +211,16 @@ class FollowUpAgent:
         return state
 
     def wait_for_response(self, state: LeadJourneyState) -> LeadJourneyState:
-        """This is a placeholder - actual waiting happens via Celery scheduling."""
+        """Mark lead as awaiting response.
+        
+        NOTE: This doesn't actually wait - it just sets status.
+        Follow-ups should be triggered by a scheduled job (Railway cron, Celery, etc.)
+        that calls continue_lead_journey() after the appropriate delay.
+        
+        For now, we END the workflow after initial email to prevent spam.
+        """
         state['status'] = LeadStatus.AWAITING_RESPONSE.value
+        logger.info(f"Lead {state['lead_id']} awaiting response - workflow paused")
         return state
 
     def update_slack(self, state: LeadJourneyState) -> LeadJourneyState:
