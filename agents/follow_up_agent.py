@@ -15,6 +15,7 @@ import logging
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -128,9 +129,30 @@ class FollowUpAgent:
         workflow.add_edge("escalate_hot_lead", END)
         workflow.add_edge("mark_cold", END)
 
-        # Compile with memory for persistence
-        memory = MemorySaver()
-        return workflow.compile(checkpointer=memory)
+        # Compile with PostgreSQL persistence (survives restarts)
+        # Falls back to in-memory if no DATABASE_URL configured
+        checkpointer = self._get_checkpointer()
+        return workflow.compile(checkpointer=checkpointer)
+    
+    def _get_checkpointer(self):
+        """Get PostgreSQL checkpointer or fallback to in-memory.
+        
+        Returns:
+            PostgresSaver if DATABASE_URL is set, otherwise MemorySaver
+        """
+        database_url = os.getenv("DATABASE_URL")
+        
+        if database_url:
+            try:
+                # Use PostgreSQL for persistent state
+                logger.info("✅ Follow-up agent: Using PostgreSQL checkpointer")
+                return PostgresSaver.from_conn_string(database_url)
+            except Exception as e:
+                logger.warning(f"⚠️ PostgreSQL checkpointer failed, using in-memory: {e}")
+                return MemorySaver()
+        else:
+            logger.warning("⚠️ No DATABASE_URL set, using in-memory checkpointer (state lost on restart)")
+            return MemorySaver()
 
     # ===== NODES (Actions) =====
 
