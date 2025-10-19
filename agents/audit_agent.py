@@ -103,7 +103,7 @@ class AuditAgent:
         try:
             # Query all leads in timeframe
             response = self.supabase.table('leads').select(
-                'id, email, first_name, last_name, company, tier, qualification_score, '
+                'id, email, first_name, last_name, company, qualification_tier, qualification_score, '
                 'status, created_at, submitted_at'
             ).gte('created_at', cutoff_time.isoformat()).execute()
             
@@ -112,7 +112,7 @@ class AuditAgent:
             # Count by tier
             tier_counts = {}
             for lead in leads:
-                tier = lead.get('tier', 'UNQUALIFIED')
+                tier = lead.get('qualification_tier', 'UNQUALIFIED')
                 tier_counts[tier] = tier_counts.get(tier, 0) + 1
             
             # Calculate speed to lead (time from submission to creation in our system)
@@ -143,7 +143,7 @@ class AuditAgent:
                         "name": f"{l.get('first_name', 'Unknown')} {l.get('last_name', '')}".strip(),
                         "email": l.get('email'),
                         "company": l.get('company'),
-                        "tier": l.get('tier'),
+                        "tier": l.get('qualification_tier'),
                         "score": l.get('qualification_score'),
                         "status": l.get('status'),
                         "created_at": l.get('created_at')
