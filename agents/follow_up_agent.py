@@ -149,8 +149,18 @@ class FollowUpAgent:
                 import psycopg
                 from psycopg_pool import ConnectionPool
                 
-                # Create connection pool for sync usage
-                conn_pool = ConnectionPool(database_url, min_size=1, max_size=10)
+                # Create connection pool with faster timeout settings
+                conn_pool = ConnectionPool(
+                    database_url,
+                    min_size=1,
+                    max_size=5,
+                    timeout=5.0,  # 5 second timeout
+                    open=False  # Don't pre-connect, lazy connect
+                )
+                
+                # Open the pool (this actually establishes connections)
+                conn_pool.open()
+                
                 checkpointer = PostgresSaver(conn_pool)
                 
                 # Setup the checkpointer (creates tables if needed)
