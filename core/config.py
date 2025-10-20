@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     
     # DSPy Configuration
     dspy_model: str = "gpt-4o"
-    dspy_max_tokens: int = 4000
+    dspy_max_tokens: int = 5000  # Increased from 4000 to handle long responses (Phase 0 Fix)
     dspy_temperature: float = 0.7
     
     # Supabase (OPTIONAL with defaults)

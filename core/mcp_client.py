@@ -83,13 +83,15 @@ class MCPClient:
     async def call_tool(
         self,
         tool_name: str,
-        params: Dict[str, Any]
+        params: Dict[str, Any],
+        max_retries: int = 3
     ) -> Dict[str, Any]:
-        """Call a specific MCP tool with parameters.
+        """Call a specific MCP tool with parameters and retry logic (Phase 0 Fix).
         
         Args:
             tool_name: Name of the tool to call
             params: Dictionary of parameters for the tool
+            max_retries: Maximum number of retry attempts (default: 3)
         
         Returns:
             Tool result as dictionary
@@ -100,42 +102,62 @@ class MCPClient:
                 "error": "MCP client not initialized (missing MCP_SERVER_URL)"
             }
         
-        try:
-            async with self.client:
-                logger.info(f"🔧 MCP Tool: {tool_name}")
-                logger.info(f"   Params: {json.dumps(params, indent=2)[:200]}...")
+        last_error = None
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                if attempt > 1:
+                    logger.info(f"🔄 MCP Tool retry attempt {attempt}/{max_retries} for {tool_name}")
+                    # Exponential backoff: 1s, 2s, 4s
+                    await asyncio.sleep(2 ** (attempt - 2))
                 
-                result = await self.client.call_tool(tool_name, params)
-                
-                # Parse result from TextContent
-                if result.content and len(result.content) > 0:
-                    result_text = result.content[0].text
-                    try:
-                        parsed_result = json.loads(result_text)
-                        logger.info(f"✅ MCP Tool {tool_name} succeeded")
+                async with self.client:
+                    if attempt == 1:
+                        logger.info(f"🔧 MCP Tool: {tool_name}")
+                        logger.info(f"   Params: {json.dumps(params, indent=2)[:200]}...")
+                    
+                    result = await self.client.call_tool(tool_name, params)
+                    
+                    # Parse result from TextContent
+                    if result.content and len(result.content) > 0:
+                        result_text = result.content[0].text
+                        try:
+                            parsed_result = json.loads(result_text)
+                            if attempt > 1:
+                                logger.info(f"✅ MCP Tool {tool_name} succeeded on attempt {attempt}")
+                            else:
+                                logger.info(f"✅ MCP Tool {tool_name} succeeded")
+                            return {
+                                "success": True,
+                                "data": parsed_result
+                            }
+                        except json.JSONDecodeError:
+                            # Return as-is if not JSON
+                            if attempt > 1:
+                                logger.info(f"✅ MCP Tool {tool_name} returned text on attempt {attempt}")
+                            else:
+                                logger.info(f"✅ MCP Tool {tool_name} returned text")
+                            return {
+                                "success": True,
+                                "data": result_text
+                            }
+                    else:
                         return {
                             "success": True,
-                            "data": parsed_result
+                            "data": None
                         }
-                    except json.JSONDecodeError:
-                        # Return as-is if not JSON
-                        logger.info(f"✅ MCP Tool {tool_name} returned text")
-                        return {
-                            "success": True,
-                            "data": result_text
-                        }
+                    
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries:
+                    logger.warning(f"⚠️ MCP Tool {tool_name} failed on attempt {attempt}/{max_retries}: {e}")
                 else:
-                    return {
-                        "success": True,
-                        "data": None
-                    }
-                
-        except Exception as e:
-            logger.error(f"❌ MCP Tool {tool_name} failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+                    logger.error(f"❌ MCP Tool {tool_name} failed after {max_retries} attempts: {e}")
+        
+        return {
+            "success": False,
+            "error": str(last_error)
+        }
     
     async def close_create_lead(
         self,

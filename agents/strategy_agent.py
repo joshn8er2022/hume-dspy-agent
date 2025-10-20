@@ -658,9 +658,14 @@ class StrategyAgent(dspy.Module):
                         await asyncio.sleep(0.5)
                 
                 except Exception as e:
-                    logger.error(f"Exception sending chunk {i+1}/{len(chunks)}: {e}")
+                    # Only critical if first chunk fails (Phase 0 Fix: improved logging)
                     if i == 0:
+                        logger.error(f"❌ CRITICAL: Failed to send first chunk: {e}")
                         return None
+                    else:
+                        # Non-critical for subsequent chunks (message partially delivered)
+                        logger.warning(f"⚠️ Failed to send chunk {i+1}/{len(chunks)} (non-critical): {e}")
+                        # Continue with remaining chunks
         
         return first_ts
     
