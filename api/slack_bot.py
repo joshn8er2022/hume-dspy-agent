@@ -38,8 +38,10 @@ router = APIRouter(prefix="/slack", tags=["slack"])
 strategy_agent = StrategyAgent()
 
 # Event deduplication cache (prevents duplicate responses from Slack retries)
+# Phase 0 Fix #3: Enhanced with time-based expiration
 processed_events: OrderedDict[str, float] = OrderedDict()
 MAX_CACHE_SIZE = 100
+EVENT_EXPIRY_SECONDS = 300  # Remove events older than 5 minutes
 
 # Initialize DSPy modules for Slack interface
 try:
@@ -88,15 +90,24 @@ async def slack_events(request: Request):
                 # Create unique event ID
                 event_id = f"{event.get('ts')}_{event.get('user')}_{event.get('channel')}"
                 
+                # Phase 0 Fix #3: Clean up old events first (time-based expiration)
+                current_time = time.time()
+                expired_events = [
+                    eid for eid, timestamp in processed_events.items()
+                    if current_time - timestamp > EVENT_EXPIRY_SECONDS
+                ]
+                for eid in expired_events:
+                    del processed_events[eid]
+                
                 # Check for duplicate (Slack retries if we don't respond in 3 seconds)
                 if event_id in processed_events:
                     logger.warning(f"⚠️ Duplicate Slack event (retry detected): {event_id}")
                     return {"ok": True}  # Return 200 but don't process
                 
                 # Mark as processing immediately
-                processed_events[event_id] = time.time()
+                processed_events[event_id] = current_time
                 
-                # Limit cache size
+                # Limit cache size (backup to time-based cleanup)
                 if len(processed_events) > MAX_CACHE_SIZE:
                     processed_events.popitem(last=False)  # Remove oldest
                 

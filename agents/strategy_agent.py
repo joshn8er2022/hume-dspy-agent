@@ -106,7 +106,11 @@ class StrategyConversation(dspy.Signature):
     conversation_history: str = dspy.InputField(desc="Previous conversation context")
     
     response: str = dspy.OutputField(desc="Natural, intelligent response to user")
-    suggested_actions: str = dspy.OutputField(desc="Comma-separated list of suggested next actions (optional)")
+    # Made truly optional - prevents parsing errors on long responses (Phase 0 Fix #1)
+    suggested_actions: str = dspy.OutputField(
+        desc="Comma-separated list of suggested next actions (optional, leave blank if none)",
+        prefix="Suggested Actions (optional):"
+    )
 
 
 # ===== Strategy Agent =====
@@ -527,21 +531,65 @@ class StrategyAgent(dspy.Module):
     
     # ===== Slack Communication =====
     
+    def _chunk_message(self, message: str, max_length: int = 3000) -> List[str]:
+        """Intelligently chunk long messages at paragraph boundaries (Phase 0 Fix #2).
+        
+        Args:
+            message: Message to chunk
+            max_length: Maximum length per chunk (Slack safe limit)
+        
+        Returns:
+            List of message chunks
+        """
+        if len(message) <= max_length:
+            return [message]
+        
+        chunks = []
+        current_chunk = ""
+        
+        # Split by double newlines (paragraphs) for clean breaks
+        paragraphs = message.split('\n\n')
+        
+        for para in paragraphs:
+            # If this paragraph alone exceeds max_length, split by lines
+            if len(para) > max_length:
+                lines = para.split('\n')
+                for line in lines:
+                    if len(current_chunk) + len(line) + 2 > max_length:
+                        if current_chunk:
+                            chunks.append(current_chunk.strip())
+                        current_chunk = line + '\n'
+                    else:
+                        current_chunk += line + '\n'
+            # Normal paragraph handling
+            elif len(current_chunk) + len(para) + 2 > max_length:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = para + '\n\n'
+            else:
+                current_chunk += para + '\n\n'
+        
+        # Add remaining content
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
     async def send_slack_message(
         self,
         message: str,
         channel: Optional[str] = None,
         thread_ts: Optional[str] = None
     ) -> Optional[str]:
-        """Send message to Slack.
+        """Send message to Slack with auto-chunking for long messages (Phase 0 Fix #2).
         
         Args:
-            message: Message text
+            message: Message text (will be chunked if > 3000 chars)
             channel: Channel ID (defaults to Josh's DM)
             thread_ts: Thread timestamp for replies
         
         Returns:
-            Message timestamp (ts) or None
+            Message timestamp (ts) of first message, or None
         """
         if not self.slack_bot_token:
             logger.warning("⚠️ Slack not configured, cannot send message")
@@ -549,27 +597,62 @@ class StrategyAgent(dspy.Module):
         
         target_channel = channel or self.josh_slack_dm_channel
         
+        # Chunk long messages to avoid Slack API timeouts
+        chunks = self._chunk_message(message)
+        
+        if len(chunks) > 1:
+            logger.info(f"📝 Chunking long message into {len(chunks)} parts")
+        
+        first_ts = None
+        parent_ts = thread_ts
+        
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://slack.com/api/chat.postMessage",
-                headers={
-                    "Authorization": f"Bearer {self.slack_bot_token}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "channel": target_channel,
-                    "text": message,
-                    "thread_ts": thread_ts
-                },
-                timeout=10.0
-            )
-            
-            data = response.json()
-            if data.get("ok"):
-                return data.get("ts")
-            else:
-                logger.error(f"Slack send failed: {data.get('error')}")
-                return None
+            for i, chunk in enumerate(chunks):
+                # Add part indicator for multi-part messages
+                if len(chunks) > 1:
+                    header = f"*[Part {i+1}/{len(chunks)}]*\n\n"
+                    chunk_with_header = header + chunk
+                else:
+                    chunk_with_header = chunk
+                
+                try:
+                    response = await client.post(
+                        "https://slack.com/api/chat.postMessage",
+                        headers={
+                            "Authorization": f"Bearer {self.slack_bot_token}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "channel": target_channel,
+                            "text": chunk_with_header,
+                            "thread_ts": parent_ts
+                        },
+                        timeout=10.0
+                    )
+                    
+                    data = response.json()
+                    if data.get("ok"):
+                        ts = data.get("ts")
+                        if i == 0:
+                            first_ts = ts
+                            # Thread subsequent messages to the first one
+                            if not parent_ts:
+                                parent_ts = ts
+                    else:
+                        logger.error(f"Slack send failed for chunk {i+1}: {data.get('error')}")
+                        if i == 0:
+                            return None
+                    
+                    # Rate limit: 0.5 second between chunks to avoid API limits
+                    if i < len(chunks) - 1:
+                        await asyncio.sleep(0.5)
+                
+                except Exception as e:
+                    logger.error(f"Exception sending chunk {i+1}/{len(chunks)}: {e}")
+                    if i == 0:
+                        return None
+        
+        return first_ts
     
     async def handle_slack_message(self, message: str, user: str, channel: str, ts: str):
         """Handle incoming message from Slack.
@@ -682,12 +765,25 @@ class StrategyAgent(dspy.Module):
                 logger.info(f"🧠 Complex query → Using ChainOfThought (reasoning)")
                 conversation_module = self.complex_conversation
             
-            # Execute selected DSPy module
-            result = conversation_module(
-                context=system_context + memory_context,  # Include memory context
-                user_message=message,
-                conversation_history=history_text
-            )
+            # Execute selected DSPy module with error recovery (Phase 0 Fix #1)
+            try:
+                result = conversation_module(
+                    context=system_context + memory_context,  # Include memory context
+                    user_message=message,
+                    conversation_history=history_text
+                )
+            except Exception as parse_error:
+                # Handle DSPy parsing errors gracefully (e.g., missing suggested_actions)
+                if "AdapterParseError" in str(type(parse_error).__name__) or "parse" in str(parse_error).lower():
+                    logger.warning(f"⚠️ DSPy parsing error (likely missing optional field), retrying with simpler signature...")
+                    # Retry with simple conversation module (Predict only, no optional fields)
+                    result = self.simple_conversation(
+                        context=system_context + memory_context,
+                        user_message=message,
+                        conversation_history=history_text
+                    )
+                else:
+                    raise  # Re-raise if not a parsing error
             
             # Update conversation history
             history.append({"role": "user", "content": message})
