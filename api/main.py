@@ -84,6 +84,33 @@ app = FastAPI(
     version="2.1.0"
 )
 
+# ============================================================================
+# PHASE 0.6.1: AUTO-START PROACTIVE MONITORING
+# ============================================================================
+
+@app.on_event("startup")
+async def start_background_tasks():
+    """Start proactive monitoring on server startup (Phase 0.6.1).
+    
+    This enables the agent to:
+    - Continuously monitor production logs
+    - Detect anomalies and patterns
+    - Generate fix proposals
+    - Post to Slack for approval
+    """
+    import asyncio
+    
+    try:
+        from monitoring.proactive_monitor import start_monitoring
+        
+        # Start monitoring in background (checks every 5 minutes)
+        asyncio.create_task(start_monitoring(interval_seconds=300))
+        logger.info("🔄 Proactive monitoring started (5-minute intervals)")
+        logger.info("   Phase 0.6: Self-healing enabled with human approval")
+    except Exception as e:
+        logger.warning(f"⚠️ Proactive monitoring failed to start: {e}")
+        logger.info("   System will continue without proactive monitoring")
+
 # Include Slack bot router
 from api.slack_bot import router as slack_router
 app.include_router(slack_router)

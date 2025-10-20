@@ -466,6 +466,45 @@ class StrategyAgent(dspy.Module):
                 logger.error(f"❌ ReAct MCP tool scrape_website failed: {e}")
                 return json.dumps({"error": str(e), "tool": "scrape_website"})
         
+        def list_mcp_tools() -> str:
+            """
+            List all available MCP tools and integrations from Zapier.
+            Shows what integrations (Google Drive, Close CRM, etc.) are available.
+            
+            Returns:
+                JSON string with list of available MCP tools and their descriptions
+            """
+            try:
+                logger.info(f"🔧 ReAct tool: list_mcp_tools()")
+                result = run_async_in_thread(self.mcp_client.list_tools())
+                
+                # Format into readable structure
+                tools_summary = {
+                    "total_tools": len(result),
+                    "tools_by_integration": {},
+                    "all_tools": result
+                }
+                
+                # Group by integration (extract from tool name)
+                for tool in result:
+                    tool_name = tool.get('name', '')
+                    # Extract integration name (e.g., "close_create_lead" -> "close")
+                    integration = tool_name.split('_')[0] if '_' in tool_name else 'other'
+                    
+                    if integration not in tools_summary["tools_by_integration"]:
+                        tools_summary["tools_by_integration"][integration] = []
+                    
+                    tools_summary["tools_by_integration"][integration].append({
+                        "name": tool_name,
+                        "description": tool.get('description', 'No description')[:100]
+                    })
+                
+                logger.info(f"✅ ReAct tool: list_mcp_tools returned {len(result)} tools")
+                return json.dumps(tools_summary, indent=2)
+            except Exception as e:
+                logger.error(f"❌ ReAct tool list_mcp_tools failed: {e}")
+                return json.dumps({"error": str(e), "tool": "list_mcp_tools"})
+        
         # Return list of tools (existing + MCP tools)
         tools = [
             # Existing audit/query tools
@@ -475,11 +514,12 @@ class StrategyAgent(dspy.Module):
             # NEW: MCP-powered tools (Phase 0/0.5)
             create_close_lead,
             research_with_perplexity,
-            scrape_website
+            scrape_website,
+            list_mcp_tools  # NEW: List available Zapier integrations
         ]
         logger.info(f"   Initialized {len(tools)} ReAct tools")
         logger.info(f"   - 3 core tools (audit, query, stats)")
-        logger.info(f"   - 3 MCP tools (Close CRM, Perplexity, Apify)")
+        logger.info(f"   - 4 MCP tools (Close CRM, Perplexity, Apify, List)")
         return tools
     
     def _register_instruments(self):
@@ -535,6 +575,14 @@ class StrategyAgent(dspy.Module):
             function=lambda url="": "Use scrape_website tool in ReAct",
             category="research",
             examples=["scrape company website", "get page content", "extract website info"]
+        )
+        
+        self.instruments.register_instrument(
+            name="list_mcp_tools",
+            description="List all available MCP/Zapier integrations. Shows what tools are available (Google Drive, Close CRM, Shopify, etc.) and their capabilities.",
+            function=lambda: "Use list_mcp_tools tool in ReAct",
+            category="system",
+            examples=["what zapier tools do we have", "list mcp integrations", "show available integrations", "audit zapier access"]
         )
         
         logger.debug(f"   Registered {len(self.instruments.instruments)} instruments")
