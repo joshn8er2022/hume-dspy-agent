@@ -807,12 +807,6 @@ class StrategyAgent(dspy.Module):
             elif "reject fix_" in message.lower():
                 return await self._handle_fix_rejection(message)
             
-            # Explicit routing for MCP/Zapier tool listing (Force ReAct)
-            if ("list" in message.lower() or "show" in message.lower()) and \
-               ("zapier" in message.lower() or "mcp" in message.lower() or "tool" in message.lower()):
-                logger.info("🎯 Explicit routing: MCP tool listing → Using ReAct")
-                return await self._execute_with_react(message, user_id)
-            
             # Build dynamic system context from actual system state
             system_context = await self._build_system_context()
             
@@ -868,7 +862,13 @@ class StrategyAgent(dspy.Module):
                     logger.error(f"MCP server selection failed: {e}")
             
             # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought vs ReAct
-            query_type = self._classify_query(message)
+            # Explicit routing for MCP/Zapier tool listing (Force ReAct)
+            if ("list" in message.lower() or "show" in message.lower()) and \
+               ("zapier" in message.lower() or "mcp" in message.lower() or "tool" in message.lower()):
+                logger.info("🎯 Explicit routing: MCP tool listing → Forcing ReAct")
+                query_type = "action"  # Force ReAct for tool listing
+            else:
+                query_type = self._classify_query(message)
             
             if query_type == "simple":
                 # Use Predict for simple queries (fast, no reasoning step)
