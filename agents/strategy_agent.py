@@ -202,6 +202,32 @@ class StrategyAgent(dspy.Module):
         # Conversation history (per-user, in-memory for now)
         self.conversation_history: Dict[str, List[Dict[str, str]]] = {}
         
+        # Phase 0.5: Initialize FAISS vector memory
+        self.memory = None
+        try:
+            from memory.vector_memory import get_agent_memory
+            self.memory = get_agent_memory("strategy_agent")
+            if self.memory:
+                logger.info("   Memory: ✅ FAISS vector memory enabled")
+            else:
+                logger.info("   Memory: ⚠️ Disabled (FAISS not available)")
+        except Exception as e:
+            logger.warning(f"   Memory: ⚠️ Failed to initialize: {e}")
+        
+        # Phase 0.5: Initialize instrument manager
+        self.instruments = None
+        try:
+            from instruments.instrument_manager import get_instrument_manager
+            self.instruments = get_instrument_manager()
+            if self.instruments and self.instruments.enabled:
+                # Register existing tools as instruments
+                self._register_instruments()
+                logger.info(f"   Instruments: ✅ {len(self.instruments.instruments)} tools registered")
+            else:
+                logger.info("   Instruments: ⚠️ Disabled")
+        except Exception as e:
+            logger.warning(f"   Instruments: ⚠️ Failed to initialize: {e}")
+        
         logger.info("🎯 Strategy Agent initialized")
         logger.info(f"   Slack: {'✅ Configured' if self.slack_bot_token else '❌ Not configured'}")
         logger.info(f"   A2A: {'✅ Configured' if self.a2a_api_key else '❌ Not configured'}")
@@ -442,6 +468,63 @@ class StrategyAgent(dspy.Module):
         logger.info(f"   - 3 MCP tools (Close CRM, Perplexity, Apify)")
         return tools
     
+    def _register_instruments(self):
+        """Register all tools as instruments for semantic discovery (Phase 0.5)."""
+        if not self.instruments or not self.instruments.enabled:
+            return
+        
+        # Register core data tools
+        self.instruments.register_instrument(
+            name="audit_lead_flow",
+            description="Audit lead flow with real data from Supabase and GMass. Returns lead metrics, email campaign stats, deliverability, opens, clicks, replies.",
+            function=lambda timeframe_hours=24: "Use audit_lead_flow tool in ReAct",
+            category="data",
+            examples=["audit last 24 hours", "check email deliverability", "get pipeline metrics"]
+        )
+        
+        self.instruments.register_instrument(
+            name="query_supabase",
+            description="Execute SQL query on Supabase database. Can query leads, campaigns, or any table. Returns JSON results.",
+            function=lambda query="": "Use query_supabase tool in ReAct",
+            category="data",
+            examples=["query hot leads", "get all leads from last week", "count leads by tier"]
+        )
+        
+        self.instruments.register_instrument(
+            name="get_pipeline_stats",
+            description="Get pipeline statistics and metrics. Returns counts by tier, conversion rates, average scores.",
+            function=lambda days=7: "Use get_pipeline_stats tool in ReAct",
+            category="analytics",
+            examples=["show pipeline stats", "how's the pipeline", "conversion metrics"]
+        )
+        
+        # Register MCP tools
+        self.instruments.register_instrument(
+            name="create_close_lead",
+            description="Create a new lead in Close CRM with contact info and notes. Syncs data to CRM.",
+            function=lambda data={}: "Use create_close_lead tool in ReAct",
+            category="crm",
+            examples=["add to Close CRM", "sync lead to CRM", "create CRM contact"]
+        )
+        
+        self.instruments.register_instrument(
+            name="research_with_perplexity",
+            description="Research using Perplexity AI for current information. Good for company research, market intel, competitive analysis.",
+            function=lambda query="": "Use research_with_perplexity tool in ReAct",
+            category="research",
+            examples=["research company", "find market information", "competitive intel"]
+        )
+        
+        self.instruments.register_instrument(
+            name="scrape_website",
+            description="Scrape website content using Apify. Extracts text, markdown, HTML from any URL.",
+            function=lambda url="": "Use scrape_website tool in ReAct",
+            category="research",
+            examples=["scrape company website", "get page content", "extract website info"]
+        )
+        
+        logger.debug(f"   Registered {len(self.instruments.instruments)} instruments")
+    
     # ===== Slack Communication =====
     
     async def send_slack_message(
@@ -563,6 +646,26 @@ class StrategyAgent(dspy.Module):
             history = self.conversation_history[user_id]
             history_text = self._format_conversation_history(history)
             
+            # Phase 0.5: Recall relevant memories
+            memory_context = ""
+            if self.memory:
+                try:
+                    from memory.vector_memory import MemoryType
+                    relevant_memories = self.memory.recall_sync(
+                        query=message,
+                        k=3,
+                        memory_type=MemoryType.CONVERSATION,
+                        min_score=0.5
+                    )
+                    if relevant_memories:
+                        memory_context = "\n\nRelevant past conversations:\n" + "\n".join([
+                            f"- ({m['relevance_score']:.2f}) {m['content'][:200]}"
+                            for m in relevant_memories[:2]  # Top 2 only
+                        ])
+                        logger.debug(f"💭 Recalled {len(relevant_memories)} relevant memories")
+                except Exception as e:
+                    logger.error(f"Memory recall failed: {e}")
+            
             # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought vs ReAct
             query_type = self._classify_query(message)
             
@@ -581,7 +684,7 @@ class StrategyAgent(dspy.Module):
             
             # Execute selected DSPy module
             result = conversation_module(
-                context=system_context,  # Renamed to 'context' to match DSPy signature
+                context=system_context + memory_context,  # Include memory context
                 user_message=message,
                 conversation_history=history_text
             )
@@ -593,6 +696,22 @@ class StrategyAgent(dspy.Module):
             # Keep history manageable (last 20 messages = 10 exchanges)
             if len(history) > 20:
                 self.conversation_history[user_id] = history[-20:]
+            
+            # Phase 0.5: Remember this conversation
+            if self.memory:
+                try:
+                    from memory.vector_memory import MemoryType
+                    self.memory.remember_sync(
+                        content=f"Q: {message}\nA: {result.response[:500]}",  # Limit length
+                        memory_type=MemoryType.CONVERSATION,
+                        metadata={
+                            "user_id": user_id,
+                            "query_type": query_type
+                        }
+                    )
+                    logger.debug(f"💾 Remembered conversation")
+                except Exception as e:
+                    logger.error(f"Memory storage failed: {e}")
             
             # Return response from selected module
             # Note: ReAct handles audit requests automatically via tools
