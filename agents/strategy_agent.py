@@ -806,6 +806,13 @@ class StrategyAgent(dspy.Module):
                 return await self._handle_fix_approval(message)
             elif "reject fix_" in message.lower():
                 return await self._handle_fix_rejection(message)
+            
+            # Explicit routing for MCP/Zapier tool listing (Force ReAct)
+            if ("list" in message.lower() or "show" in message.lower()) and \
+               ("zapier" in message.lower() or "mcp" in message.lower() or "tool" in message.lower()):
+                logger.info("🎯 Explicit routing: MCP tool listing → Using ReAct")
+                return await self._execute_with_react(message, user_id)
+            
             # Build dynamic system context from actual system state
             system_context = await self._build_system_context()
             
@@ -1343,7 +1350,10 @@ _Reply with "details" for full analysis_
                         "slack": f"{'✅' if self.slack_bot_token else '❌'}",
                         "gmass": "Email campaigns",
                         "close_crm": "Qualified lead sync",
-                        "openrouter": "LLM inference (Claude 3.5 Sonnet)"
+                        "openrouter": "LLM inference (Claude 3.5 Sonnet)",
+                        "mcp_zapier": f"{'✅ 200+ integrations via MCP (use list_mcp_tools to see all)' if self.mcp_client and self.mcp_client.client else '❌ Not configured'}",
+                        "mcp_perplexity": "AI research via MCP",
+                        "mcp_apify": "Web scraping via MCP"
                     },
                     "deployment": {
                         "platform": "Railway",
@@ -1499,7 +1509,8 @@ I've received approval to implement this fix.
         action_keywords = [
             'audit', 'query', 'pull', 'get data', 'show me', 'fetch',
             'check gmass', 'check supabase', 'real data', 'actual numbers',
-            'campaign stats', 'email stats', 'lead stats', 'pipeline data'
+            'campaign stats', 'email stats', 'lead stats', 'pipeline data',
+            'list', 'show', 'check'  # Added for MCP tool discovery
         ]
         
         if any(keyword in message_lower for keyword in action_keywords):
