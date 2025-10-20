@@ -132,10 +132,10 @@ class AuditAgent(dspy.Module):
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
         
         try:
-            # Query all leads in timeframe
+            # Query all leads in timeframe (Phase 0 Fix: removed non-existent submitted_at column)
             response = self.supabase.table('leads').select(
                 'id, email, first_name, last_name, company, qualification_tier, qualification_score, '
-                'status, created_at, submitted_at'
+                'status, created_at, updated_at'
             ).gte('created_at', cutoff_time.isoformat()).execute()
             
             leads = response.data
@@ -146,14 +146,19 @@ class AuditAgent(dspy.Module):
                 tier = lead.get('qualification_tier', 'UNQUALIFIED')
                 tier_counts[tier] = tier_counts.get(tier, 0) + 1
             
-            # Calculate speed to lead (time from submission to creation in our system)
+            # Calculate processing time (created_at to updated_at as proxy for speed-to-lead)
+            # Note: submitted_at column doesn't exist, using updated_at as alternative
             speed_to_lead_times = []
             for lead in leads:
-                if lead.get('submitted_at') and lead.get('created_at'):
-                    submitted = datetime.fromisoformat(lead['submitted_at'].replace('Z', '+00:00'))
-                    created = datetime.fromisoformat(lead['created_at'].replace('Z', '+00:00'))
-                    diff_seconds = (created - submitted).total_seconds()
-                    speed_to_lead_times.append(diff_seconds)
+                if lead.get('created_at') and lead.get('updated_at'):
+                    try:
+                        created = datetime.fromisoformat(lead['created_at'].replace('Z', '+00:00'))
+                        updated = datetime.fromisoformat(lead['updated_at'].replace('Z', '+00:00'))
+                        diff_seconds = (updated - created).total_seconds()
+                        if diff_seconds > 0:  # Only count if updated after created
+                            speed_to_lead_times.append(diff_seconds)
+                    except:
+                        pass  # Skip invalid timestamps
             
             avg_speed_to_lead = (
                 sum(speed_to_lead_times) / len(speed_to_lead_times)
