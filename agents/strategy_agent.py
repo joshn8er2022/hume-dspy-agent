@@ -254,6 +254,26 @@ class StrategyAgent(dspy.Module):
         except Exception as e:
             logger.warning(f"   MCP Orchestrator: ⚠️ Failed to initialize: {e}")
         
+        # Phase 1.5: Initialize Agent Delegation (Agent Zero style)
+        self.delegation = None
+        try:
+            from core.agent_delegation import enable_delegation
+            self.delegation = enable_delegation(self)
+            logger.info("   Delegation: ✅ Agent Zero-style subordinate spawning enabled")
+            logger.info("      Profiles: competitor_analyst, market_researcher, account_researcher, +2 more")
+        except Exception as e:
+            logger.warning(f"   Delegation: ⚠️ Failed to initialize: {e}")
+        
+        # Phase 1.5: Initialize Inter-Agent Communication
+        self.communication = None
+        try:
+            from core.agent_communication import enable_communication
+            self.communication = enable_communication(self)
+            logger.info("   Communication: ✅ Inter-agent communication enabled")
+            logger.info("      Can ask/notify: InboundAgent, ResearchAgent, FollowUpAgent, AuditAgent")
+        except Exception as e:
+            logger.warning(f"   Communication: ⚠️ Failed to initialize: {e}")
+        
         logger.info("🎯 Strategy Agent initialized")
         logger.info(f"   Slack: {'✅ Configured' if self.slack_bot_token else '❌ Not configured'}")
         logger.info(f"   A2A: {'✅ Configured' if self.a2a_api_key else '❌ Not configured'}")
@@ -524,7 +544,99 @@ class StrategyAgent(dspy.Module):
                 logger.error(f"❌ ReAct tool list_mcp_tools failed: {e}")
                 return json.dumps({"error": str(e), "tool": "list_mcp_tools"})
         
-        # Return list of tools (existing + MCP tools)
+        # Phase 1.5: Delegation tool
+        def delegate_to_subordinate(profile: str, task: str) -> str:
+            """
+            Delegate a complex subtask to a specialized subordinate agent.
+            
+            Use this for tasks that need focused expertise:
+            - competitor_analyst: Analyze specific competitors
+            - market_researcher: Research markets and trends  
+            - account_researcher: Deep dive on target accounts
+            - content_strategist: Content planning and strategy
+            - campaign_analyst: Analyze campaign performance
+            
+            Args:
+                profile: Subordinate type (e.g., "competitor_analyst")
+                task: Detailed task description for subordinate
+                
+            Returns:
+                Result from subordinate agent
+            
+            Example:
+                delegate_to_subordinate("competitor_analyst", "Analyze pricing strategy of Company X vs our offerings")
+            """
+            try:
+                logger.info(f"🎯 ReAct delegating to: {profile}")
+                
+                if not self.delegation:
+                    return json.dumps({"error": "Delegation not available"})
+                
+                result = run_async_in_thread(
+                    self.delegation.call_subordinate(profile, task)
+                )
+                
+                logger.info(f"✅ Subordinate {profile} completed task")
+                return result
+                
+            except Exception as e:
+                logger.error(f"❌ Delegation to {profile} failed: {e}")
+                return json.dumps({"error": str(e), "profile": profile})
+        
+        # Phase 1.5: Inter-agent communication tool
+        def ask_other_agent(agent_name: str, question: str) -> str:
+            """
+            Ask another agent for information or help.
+            
+            Available agents:
+            - InboundAgent: Lead qualification info
+            - ResearchAgent: Company/person research
+            - FollowUpAgent: Email sequence status
+            - AuditAgent: Analytics and metrics
+            
+            Args:
+                agent_name: Name of agent to ask (e.g., "ResearchAgent")
+                question: Question or request for the agent
+                
+            Returns:
+                Response from the other agent
+            
+            Example:
+                ask_other_agent("ResearchAgent", "What companies did we research this week?")
+            """
+            try:
+                logger.info(f"🤝 ReAct asking: {agent_name}")
+                
+                if not self.communication:
+                    return json.dumps({"error": "Communication not available"})
+                
+                # Map agent names to instances
+                agent_map = {
+                    "InboundAgent": self.inbound_agent,
+                    "ResearchAgent": self.research_agent,
+                    "FollowUpAgent": self.follow_up_agent,
+                    "AuditAgent": self.audit_agent
+                }
+                
+                target_agent = agent_map.get(agent_name)
+                if not target_agent:
+                    return json.dumps({
+                        "error": f"Unknown agent: {agent_name}",
+                        "available": list(agent_map.keys())
+                    })
+                
+                result = run_async_in_thread(
+                    self.communication.ask_agent(target_agent, question)
+                )
+                
+                logger.info(f"✅ {agent_name} responded")
+                return result
+                
+            except Exception as e:
+                logger.error(f"❌ Communication with {agent_name} failed: {e}")
+                return json.dumps({"error": str(e), "agent": agent_name})
+        
+        # Return list of tools (existing + MCP + delegation + communication)
         tools = [
             # Existing audit/query tools
             audit_lead_flow,
@@ -534,11 +646,15 @@ class StrategyAgent(dspy.Module):
             create_close_lead,
             research_with_perplexity,
             scrape_website,
-            list_mcp_tools  # NEW: List available Zapier integrations
+            list_mcp_tools,  # List available Zapier integrations
+            # NEW: Phase 1.5 - Agent collaboration tools
+            delegate_to_subordinate,  # Spawn specialized subordinates
+            ask_other_agent  # Ask other agents for help
         ]
-        logger.info(f"   Initialized {len(tools)} ReAct tools")
+        logger.info(f"   Initialized {len(tools)} ReAct tools (including delegation + communication)")
         logger.info(f"   - 3 core tools (audit, query, stats)")
         logger.info(f"   - 4 MCP tools (Close CRM, Perplexity, Apify, List)")
+        logger.info(f"   - 2 Phase 1.5 tools (delegate_to_subordinate, ask_other_agent)")
         return tools
     
     def _register_instruments(self):
