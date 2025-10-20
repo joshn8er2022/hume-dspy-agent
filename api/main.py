@@ -237,6 +237,50 @@ async def health_check():
     }
 
 
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": "Hume DSPy Agent API",
+        "version": "2.1.0-full-pipeline",
+        "status": "operational",
+        "endpoints": {
+            "health": "GET /health",
+            "typeform_webhook": "POST /webhooks/typeform",
+            "vapi_webhook": "POST /webhooks/vapi",
+            "a2a_introspection": "POST /a2a/introspect",
+            "slack_events": "POST /slack/events"
+        },
+        "documentation": "See /docs for API documentation"
+    }
+
+
+@app.post("/")
+async def root_post_handler(request: Request):
+    """
+    Catch-all for incorrect webhook URLs.
+    
+    Common mistake: Typeform webhook configured as just the domain
+    without the /webhooks/typeform path.
+    """
+    logger.warning("❌ POST to root path (/) - likely misconfigured webhook URL")
+    logger.warning("   Typeform webhooks should POST to: /webhooks/typeform")
+    logger.warning("   VAPI webhooks should POST to: /webhooks/vapi")
+    
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "Wrong endpoint",
+            "message": "You're posting to the root path. Did you mean /webhooks/typeform?",
+            "correct_urls": {
+                "typeform": f"{request.base_url}webhooks/typeform",
+                "vapi": f"{request.base_url}webhooks/vapi"
+            },
+            "hint": "Update your webhook URL in Typeform/VAPI to include the full path"
+        }
+    )
+
+
 # ============================================================================
 # A2A INTROSPECTION API
 # ============================================================================
