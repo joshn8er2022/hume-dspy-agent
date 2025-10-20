@@ -204,7 +204,7 @@ class SubordinateAgent:
                         """Dynamically created MCP tool wrapper"""
                         try:
                             result = run_async(
-                                mcp.call_tool(name, arguments=kwargs)
+                                mcp.call_tool(name, kwargs)
                             )
                             return json.dumps(result) if result else json.dumps({"error": "No result"})
                         except Exception as e:
