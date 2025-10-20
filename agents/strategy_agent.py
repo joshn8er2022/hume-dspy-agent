@@ -232,6 +232,16 @@ class StrategyAgent(dspy.Module):
         except Exception as e:
             logger.warning(f"   Instruments: ⚠️ Failed to initialize: {e}")
         
+        # Phase 0.7: Initialize MCP Orchestrator for dynamic tool loading
+        self.mcp_orchestrator = None
+        try:
+            from core.mcp_orchestrator import get_mcp_orchestrator
+            self.mcp_orchestrator = get_mcp_orchestrator()
+            logger.info(f"   MCP Orchestrator: ✅ Dynamic tool loading enabled")
+            logger.info(f"      Agentic server selection (70% token reduction expected)")
+        except Exception as e:
+            logger.warning(f"   MCP Orchestrator: ⚠️ Failed to initialize: {e}")
+        
         logger.info("🎯 Strategy Agent initialized")
         logger.info(f"   Slack: {'✅ Configured' if self.slack_bot_token else '❌ Not configured'}")
         logger.info(f"   A2A: {'✅ Configured' if self.a2a_api_key else '❌ Not configured'}")
@@ -748,6 +758,30 @@ class StrategyAgent(dspy.Module):
                         logger.debug(f"💭 Recalled {len(relevant_memories)} relevant memories")
                 except Exception as e:
                     logger.error(f"Memory recall failed: {e}")
+            
+            # Phase 0.7: Dynamic MCP server selection (Agentic Configuration)
+            selected_servers = []
+            if self.mcp_orchestrator:
+                try:
+                    selected_servers = await self.mcp_orchestrator.select_servers_for_task(
+                        task=message,
+                        context={
+                            "user_type": "owner",
+                            "recent_queries": len(history)
+                        }
+                    )
+                    
+                    if selected_servers:
+                        # Mark servers as active for this request
+                        await self.mcp_orchestrator.mark_servers_active(selected_servers)
+                        
+                        # Log context savings
+                        savings = self.mcp_orchestrator.estimate_context_savings(selected_servers)
+                        logger.info(f"💰 Context optimization:")
+                        logger.info(f"      Tools: {savings['optimized_tools']} vs {savings['baseline_tools']} (saved {savings['tools_saved']})")
+                        logger.info(f"      Tokens: {savings['optimized_tokens']} vs {savings['baseline_tokens']} ({savings['savings_percentage']}% reduction)")
+                except Exception as e:
+                    logger.error(f"MCP server selection failed: {e}")
             
             # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought vs ReAct
             query_type = self._classify_query(message)
