@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 try:
     from langchain_community.vectorstores import FAISS
     from langchain_openai import OpenAIEmbeddings
-    from langchain.docstore.in_memory import InMemoryDocstore
+    from langchain_community.docstore.in_memory import InMemoryDocstore  # Fixed import path
     from langchain_core.documents import Document
     import faiss
     import numpy as np
