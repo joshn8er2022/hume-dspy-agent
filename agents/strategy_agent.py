@@ -734,6 +734,11 @@ class StrategyAgent(dspy.Module):
             return "⚠️ Conversational AI not configured. Please set OPENROUTER_API_KEY."
         
         try:
+            # Phase 0.6: Check for proactive monitoring commands
+            if "implement fix_" in message.lower():
+                return await self._handle_fix_approval(message)
+            elif "reject fix_" in message.lower():
+                return await self._handle_fix_rejection(message)
             # Build dynamic system context from actual system state
             system_context = await self._build_system_context()
             
@@ -1321,6 +1326,90 @@ _Reply with "details" for full analysis_
             formatted.append(f"{role}: {content}")
         
         return "\n".join(formatted)
+    
+    async def _handle_fix_approval(self, message: str) -> str:
+        """Handle fix approval command from Josh (Phase 0.6).
+        
+        Args:
+            message: Message containing "implement fix_XXXX"
+        
+        Returns:
+            Status message
+        """
+        import re
+        
+        # Extract fix ID
+        match = re.search(r'fix_\d{8}_\d{6}', message)
+        if not match:
+            return "⚠️ Invalid fix ID format. Expected: fix_YYYYMMDD_HHMMSS"
+        
+        fix_id = match.group(0)
+        logger.info(f"🔧 Fix approval received: {fix_id}")
+        
+        try:
+            # Import here to avoid circular deps
+            from monitoring.proactive_monitor import get_proactive_monitor
+            from monitoring.fix_implementor import get_fix_implementor
+            
+            # Get the proposed fix
+            monitor = get_proactive_monitor()
+            if fix_id not in monitor.proposed_fixes:
+                return f"❌ Fix {fix_id} not found in proposed fixes. It may have expired."
+            
+            proposed_fix = monitor.proposed_fixes[fix_id]
+            
+            # Implement the fix
+            implementor = get_fix_implementor()
+            
+            # TODO: Parse proposed changes into file edits
+            # For now, return acknowledgment
+            return f"""✅ **Fix Approved: {fix_id}**
+
+I've received approval to implement this fix. 
+
+**Note**: Phase 0.6 is in initial deployment. The fix has been logged and I'll work with you to implement it manually for now. Full autonomous implementation coming soon!
+
+**Proposed fix**:
+{proposed_fix.proposed_changes[0]['description']}
+
+**Next**: I'll help you apply these changes step by step."""
+            
+        except Exception as e:
+            logger.error(f"Error handling fix approval: {e}")
+            return f"❌ Error processing fix approval: {e}"
+    
+    async def _handle_fix_rejection(self, message: str) -> str:
+        """Handle fix rejection command from Josh (Phase 0.6).
+        
+        Args:
+            message: Message containing "reject fix_XXXX"
+        
+        Returns:
+            Status message
+        """
+        import re
+        
+        # Extract fix ID
+        match = re.search(r'fix_\d{8}_\d{6}', message)
+        if not match:
+            return "⚠️ Invalid fix ID format. Expected: fix_YYYYMMDD_HHMMSS"
+        
+        fix_id = match.group(0)
+        logger.info(f"❌ Fix rejected: {fix_id}")
+        
+        try:
+            from monitoring.proactive_monitor import get_proactive_monitor
+            
+            monitor = get_proactive_monitor()
+            if fix_id in monitor.proposed_fixes:
+                del monitor.proposed_fixes[fix_id]
+                return f"✅ Fix {fix_id} has been rejected and removed from the queue."
+            else:
+                return f"⚠️ Fix {fix_id} not found. It may have already been processed or expired."
+                
+        except Exception as e:
+            logger.error(f"Error handling fix rejection: {e}")
+            return f"❌ Error processing fix rejection: {e}"
     
     def _classify_query(self, message: str) -> str:
         """Classify query type for module selection.
