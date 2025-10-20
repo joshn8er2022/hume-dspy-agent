@@ -254,13 +254,14 @@ class StrategyAgent(dspy.Module):
         except Exception as e:
             logger.warning(f"   MCP Orchestrator: ⚠️ Failed to initialize: {e}")
         
-        # Phase 1.5: Initialize Agent Delegation (Agent Zero style)
+        # Phase 1.5: Initialize Agent Delegation (Enhanced with Agent Zero patterns)
         self.delegation = None
         try:
-            from core.agent_delegation import enable_delegation
+            from core.agent_delegation_enhanced import enable_delegation
             self.delegation = enable_delegation(self)
-            logger.info("   Delegation: ✅ Agent Zero-style subordinate spawning enabled")
-            logger.info("      Profiles: competitor_analyst, market_researcher, account_researcher, +2 more")
+            logger.info("   Delegation: ✅ Enhanced Agent Zero-style subordinate spawning")
+            logger.info("      Features: Dynamic tools, DSPy modules, Memory, Iterative refinement")
+            logger.info("      Profiles: document_analyst, competitor_analyst, market_researcher, +3 more")
         except Exception as e:
             logger.warning(f"   Delegation: ⚠️ Failed to initialize: {e}")
         
@@ -636,7 +637,46 @@ class StrategyAgent(dspy.Module):
                 logger.error(f"❌ Communication with {agent_name} failed: {e}")
                 return json.dumps({"error": str(e), "agent": agent_name})
         
-        # Return list of tools (existing + MCP + delegation + communication)
+        # Phase 1.5: Iterative refinement tool
+        def refine_subordinate_work(profile: str, feedback: str) -> str:
+            """
+            Provide feedback to a subordinate agent to refine their work.
+            
+            Use this when a subordinate's initial result needs improvement,
+            clarification, or additional detail. The subordinate will process
+            your feedback and return refined results.
+            
+            Args:
+                profile: Subordinate type (e.g., "document_analyst")
+                feedback: Specific feedback or clarification to provide
+                
+            Returns:
+                Refined result from subordinate
+            
+            Example:
+                refine_subordinate_work(
+                    "document_analyst",
+                    "Focus more on financial spreadsheets and extract revenue data"
+                )
+            """
+            try:
+                logger.info(f"🔄 Refining {profile} work")
+                
+                if not self.delegation:
+                    return json.dumps({"error": "Delegation not available"})
+                
+                result = run_async_in_thread(
+                    self.delegation.refine_subordinate_work(profile, feedback)
+                )
+                
+                logger.info(f"✅ {profile} refined work based on feedback")
+                return result
+                
+            except Exception as e:
+                logger.error(f"❌ Refinement of {profile} failed: {e}")
+                return json.dumps({"error": str(e), "profile": profile})
+        
+        # Return list of tools (existing + MCP + delegation + communication + refinement)
         tools = [
             # Existing audit/query tools
             audit_lead_flow,
@@ -649,12 +689,13 @@ class StrategyAgent(dspy.Module):
             list_mcp_tools,  # List available Zapier integrations
             # NEW: Phase 1.5 - Agent collaboration tools
             delegate_to_subordinate,  # Spawn specialized subordinates
-            ask_other_agent  # Ask other agents for help
+            ask_other_agent,  # Ask other agents for help
+            refine_subordinate_work  # Iterative refinement
         ]
-        logger.info(f"   Initialized {len(tools)} ReAct tools (including delegation + communication)")
+        logger.info(f"   Initialized {len(tools)} ReAct tools (including enhanced delegation)")
         logger.info(f"   - 3 core tools (audit, query, stats)")
         logger.info(f"   - 4 MCP tools (Close CRM, Perplexity, Apify, List)")
-        logger.info(f"   - 2 Phase 1.5 tools (delegate_to_subordinate, ask_other_agent)")
+        logger.info(f"   - 3 Phase 1.5 tools (delegate, ask_agent, refine)")
         return tools
     
     def _register_instruments(self):
