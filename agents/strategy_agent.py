@@ -155,6 +155,18 @@ class StrategyAgent(dspy.Module):
         self.audit_agent = get_audit_agent()
         logger.info("   Audit Agent: ✅ Initialized for real data queries")
         
+        # Initialize MCP client for Zapier integrations (Phase 0/0.5)
+        self.mcp_client = None
+        try:
+            from core.mcp_client import get_mcp_client
+            self.mcp_client = get_mcp_client()
+            if self.mcp_client and self.mcp_client.client:
+                logger.info("   MCP Client: ✅ Connected to Zapier (200+ tools)")
+            else:
+                logger.warning("   MCP Client: ⚠️ Not configured (set MCP_SERVER_URL)")
+        except Exception as e:
+            logger.error(f"   MCP Client: ❌ Failed to initialize: {e}")
+        
         # A2A communication endpoint
         self.a2a_endpoint = os.getenv(
             "A2A_ENDPOINT",
@@ -260,10 +272,9 @@ class StrategyAgent(dspy.Module):
         import json
         import asyncio
         from concurrent.futures import ThreadPoolExecutor
-        from core.mcp_client import get_mcp_client
         
-        # Initialize MCP client for 200+ Zapier tools
-        mcp = get_mcp_client()
+        # Use the MCP client initialized in __init__
+        mcp = self.mcp_client
         
         # Thread pool for running async functions in sync context
         executor = ThreadPoolExecutor(max_workers=3)
@@ -476,7 +487,15 @@ class StrategyAgent(dspy.Module):
             """
             try:
                 logger.info(f"🔧 ReAct tool: list_mcp_tools()")
-                result = run_async_in_thread(self.mcp_client.list_tools())
+                
+                if not mcp or not mcp.client:
+                    return json.dumps({
+                        "error": "MCP client not initialized",
+                        "message": "MCP_SERVER_URL environment variable not set",
+                        "tool": "list_mcp_tools"
+                    })
+                
+                result = run_async_in_thread(mcp.list_tools())
                 
                 # Format into readable structure
                 tools_summary = {
