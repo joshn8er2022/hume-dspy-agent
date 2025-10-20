@@ -144,9 +144,20 @@ class FollowUpAgent:
         
         if database_url:
             try:
-                # Use PostgreSQL for persistent state
+                # PostgresSaver.from_conn_string() returns a context manager
+                # We need to use it with setup() for sync usage
+                import psycopg
+                from psycopg_pool import ConnectionPool
+                
+                # Create connection pool for sync usage
+                conn_pool = ConnectionPool(database_url, min_size=1, max_size=10)
+                checkpointer = PostgresSaver(conn_pool)
+                
+                # Setup the checkpointer (creates tables if needed)
+                checkpointer.setup()
+                
                 logger.info("✅ Follow-up agent: Using PostgreSQL checkpointer")
-                return PostgresSaver.from_conn_string(database_url)
+                return checkpointer
             except Exception as e:
                 logger.warning(f"⚠️ PostgreSQL checkpointer failed, using in-memory: {e}")
                 return MemorySaver()

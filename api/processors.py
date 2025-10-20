@@ -26,6 +26,10 @@ def set_supabase_client(client):
 # DSPy configuration (lazy initialization)
 dspy_configured = False
 
+# Idempotency tracking for Slack messages (prevents duplicates)
+# Key: lead_id, Value: (channel, thread_ts)
+slack_sent_cache = {}
+
 
 def configure_dspy():
     """Configure DSPy with OpenAI LM."""
@@ -232,6 +236,12 @@ async def save_lead_to_database(lead: Any, result: Any):
 @async_retry(max_attempts=3)
 async def send_slack_notification_with_qualification(lead: Any, result: Any, transcript: str = ""):
     """Enhanced Slack with qualification (with retry logic)."""
+    # Idempotency check - prevent duplicate messages for same lead
+    lead_id = lead.id if hasattr(lead, 'id') else str(lead.email)
+    if lead_id in slack_sent_cache:
+        logger.info(f"⏭️ Slack message already sent for lead {lead_id}, skipping duplicate")
+        return slack_sent_cache[lead_id]  # Return cached (channel, thread_ts)
+    
     try:
         import httpx
         SLACK_BOT_TOKEN = settings.SLACK_BOT_TOKEN
@@ -292,8 +302,12 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
             response_data = response.json() if response.status_code == 200 else {}
             if response_data.get('ok'):
                 logger.info("✅ Enhanced Slack sent")
+                # Cache successful result to prevent duplicates
+                channel = response_data.get('channel')
+                thread_ts = response_data.get('ts')
+                slack_sent_cache[lead_id] = (channel, thread_ts)
                 # Return thread info for follow-up agent
-                return response_data.get('channel'), response_data.get('ts')
+                return channel, thread_ts
             else:
                 logger.error(f"❌ Slack API error: {response_data}")
                 return None, None
