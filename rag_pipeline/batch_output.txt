@@ -1,0 +1,839 @@
+================================================================================
+🚀 BATCH PROCESSING ALL FILES IN GOOGLE DRIVE
+================================================================================
+
+This will process ALL files, not just recent changes.
+Perfect for initial knowledge base setup!
+
+Loaded configuration from /Users/joshisrael/hume-dspy-agent/rag_pipeline/config.json
+Resuming from last check time: 2025-10-21 09:24:15.076924
+📡 Connecting to Google Drive...
+✅ Connected!
+
+📂 Fetching complete file list...
+✅ Found 107 files to process
+   (Excluded 1 trashed files)
+
+🔄 Starting batch processing...
+
+[1/107] Processing: Hume Health's Appointment Log
+Deleted 46 document chunks for file ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g
+Deleted 209 document rows for file ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g
+Deleted metadata for file ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g
+Inserted metadata for file 'Hume Health's Appointment Log' (ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g)
+Deleted existing rows for file ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g
+Inserted 209 rows for file ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g
+Successfully processed file 'Hume Health's Appointment Log' (ID: 1BJ8ynhfWelmNAtUUQ0y8GE9V42pfy41AH__q3qtxO_g)
+   ✅ Success!
+
+[2/107] Processing: HUMEPR Orders
+Deleted 49 document chunks for file ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4
+Deleted 119 document rows for file ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4
+Deleted metadata for file ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4
+Inserted metadata for file 'HUMEPR Orders' (ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4)
+Deleted existing rows for file ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4
+Inserted 119 rows for file ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4
+Successfully processed file 'HUMEPR Orders' (ID: 1_Nzy2BMhTKHLb2IPzTvy0UImLI1LlcRw8qmkLT4HYN4)
+   ✅ Success!
+
+[3/107] Processing: Steven Closer KPI Tracker 
+Deleted 13 document chunks for file ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k
+Deleted 21 document rows for file ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k
+Deleted metadata for file ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k
+Inserted metadata for file 'Steven Closer KPI Tracker ' (ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k)
+Deleted existing rows for file ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k
+Inserted 21 rows for file ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k
+Successfully processed file 'Steven Closer KPI Tracker ' (ID: 1rRKSUay4g5A-rWl7SXa4JXgrv5FVk-_6vW_gQJQgW4k)
+   ✅ Success!
+
+[4/107] Processing: Better Version Nutrition Welcome Pack
+Deleted 9 document chunks for file ID: 1W4zRD9sevV9FBSsMEE9BWp25VQJfmyWNDmvP2YKVebk
+Deleted 0 document rows for file ID: 1W4zRD9sevV9FBSsMEE9BWp25VQJfmyWNDmvP2YKVebk
+Deleted metadata for file ID: 1W4zRD9sevV9FBSsMEE9BWp25VQJfmyWNDmvP2YKVebk
+Inserted metadata for file 'Better Version Nutrition Welcome Pack' (ID: 1W4zRD9sevV9FBSsMEE9BWp25VQJfmyWNDmvP2YKVebk)
+Successfully processed file 'Better Version Nutrition Welcome Pack' (ID: 1W4zRD9sevV9FBSsMEE9BWp25VQJfmyWNDmvP2YKVebk)
+   ✅ Success!
+
+[5/107] Processing: Lead entitlements & Shipping
+Deleted 63 document chunks for file ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y
+Deleted 76 document rows for file ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y
+Deleted metadata for file ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y
+Inserted metadata for file 'Lead entitlements & Shipping' (ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y)
+Deleted existing rows for file ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y
+Inserted 76 rows for file ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y
+Successfully processed file 'Lead entitlements & Shipping' (ID: 124PBpLkt9ZjTyF6cQMG4ZE1aZRd3Kn9s1gWIrgHfW7Y)
+   ✅ Success!
+
+[6/107] Processing: Not Paid B2B Affiliates
+Deleted 2 document chunks for file ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg
+Deleted 3 document rows for file ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg
+Deleted metadata for file ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg
+Inserted metadata for file 'Not Paid B2B Affiliates' (ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg)
+Deleted existing rows for file ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg
+Inserted 3 rows for file ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg
+Successfully processed file 'Not Paid B2B Affiliates' (ID: 1lf4xIh29SWWxR-TS1wwPczW9O_Z7zACjrvWq6XbEQhg)
+   ✅ Success!
+
+[7/107] Processing: John VA KPI Tracker
+Deleted 8 document chunks for file ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU
+Deleted 56 document rows for file ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU
+Deleted metadata for file ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU
+Inserted metadata for file 'John VA KPI Tracker' (ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU)
+Deleted existing rows for file ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU
+Inserted 56 rows for file ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU
+Successfully processed file 'John VA KPI Tracker' (ID: 1cNksZhhVfKgaZf11Si7oqTyjsJocagNpYR8hp0Ys9uU)
+   ✅ Success!
+
+[8/107] Processing: Niki Capobianco and Julian Hunt - 2025/10/15 11:59 EDT - Recording
+   ⏭️  Skipped (unsupported type: video/mp4)
+[9/107] Processing: Ethan Closer KPI Tracker 
+Deleted 13 document chunks for file ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY
+Deleted 21 document rows for file ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY
+Deleted metadata for file ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY
+Inserted metadata for file 'Ethan Closer KPI Tracker ' (ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY)
+Deleted existing rows for file ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY
+Inserted 21 rows for file ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY
+Successfully processed file 'Ethan Closer KPI Tracker ' (ID: 1L-OA2YG-96cptjQE9lDJ01olm84q5_Gd-I96AtAqvtY)
+   ✅ Success!
+
+[10/107] Processing: Weekly Sales Reporting
+Deleted 72 document chunks for file ID: 1TPNl_8loY_T66o6Coc0FcF4QjXH_TOGCz1sVQK6RdpI
+Deleted 0 document rows for file ID: 1TPNl_8loY_T66o6Coc0FcF4QjXH_TOGCz1sVQK6RdpI
+Deleted metadata for file ID: 1TPNl_8loY_T66o6Coc0FcF4QjXH_TOGCz1sVQK6RdpI
+Inserted metadata for file 'Weekly Sales Reporting' (ID: 1TPNl_8loY_T66o6Coc0FcF4QjXH_TOGCz1sVQK6RdpI)
+Successfully processed file 'Weekly Sales Reporting' (ID: 1TPNl_8loY_T66o6Coc0FcF4QjXH_TOGCz1sVQK6RdpI)
+   ✅ Success!
+
+[11/107] Processing: V5-AI-Test-Oct.10-AthropicClaudeSonnet_4.5
+Failed to download file 'V5-AI-Test-Oct.10-AthropicClaudeSonnet_4.5' (ID: 185kmh31VQE2FIB02dtdIUVSCXN2bAd3fEPGY1PalYZI)
+   ✅ Success!
+
+[12/107] Processing: Hume - Operations Weekly
+Deleted 1695 document chunks for file ID: 1-2LqZro0egxZCavLQS6RZ70M1yD4D-UEQ61OhZTrerw
+Deleted 0 document rows for file ID: 1-2LqZro0egxZCavLQS6RZ70M1yD4D-UEQ61OhZTrerw
+Deleted metadata for file ID: 1-2LqZro0egxZCavLQS6RZ70M1yD4D-UEQ61OhZTrerw
+Inserted metadata for file 'Hume - Operations Weekly' (ID: 1-2LqZro0egxZCavLQS6RZ70M1yD4D-UEQ61OhZTrerw)
+Successfully processed file 'Hume - Operations Weekly' (ID: 1-2LqZro0egxZCavLQS6RZ70M1yD4D-UEQ61OhZTrerw)
+   ✅ Success!
+
+[13/107] Processing: WEEK 41 REPORTS
+Deleted 11 document chunks for file ID: 1gZngSAFthpPXNdO1OhVL3N2KQs7dvu50Qwdbgf8jIxo
+Deleted 0 document rows for file ID: 1gZngSAFthpPXNdO1OhVL3N2KQs7dvu50Qwdbgf8jIxo
+Deleted metadata for file ID: 1gZngSAFthpPXNdO1OhVL3N2KQs7dvu50Qwdbgf8jIxo
+Inserted metadata for file 'WEEK 41 REPORTS' (ID: 1gZngSAFthpPXNdO1OhVL3N2KQs7dvu50Qwdbgf8jIxo)
+Successfully processed file 'WEEK 41 REPORTS' (ID: 1gZngSAFthpPXNdO1OhVL3N2KQs7dvu50Qwdbgf8jIxo)
+   ✅ Success!
+
+[14/107] Processing: Get Thin_Hume Press Release_10-13-25
+Deleted 8 document chunks for file ID: 1CeVg3EvZ5urPBzmYuEi8h7zwEHby7YfQ_vgv08gWHts
+Deleted 0 document rows for file ID: 1CeVg3EvZ5urPBzmYuEi8h7zwEHby7YfQ_vgv08gWHts
+Deleted metadata for file ID: 1CeVg3EvZ5urPBzmYuEi8h7zwEHby7YfQ_vgv08gWHts
+Inserted metadata for file 'Get Thin_Hume Press Release_10-13-25' (ID: 1CeVg3EvZ5urPBzmYuEi8h7zwEHby7YfQ_vgv08gWHts)
+Successfully processed file 'Get Thin_Hume Press Release_10-13-25' (ID: 1CeVg3EvZ5urPBzmYuEi8h7zwEHby7YfQ_vgv08gWHts)
+   ✅ Success!
+
+[15/107] Processing: INVOICES
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[16/107] Processing: invoice--000001.pdf
+Deleted 1 document chunks for file ID: 1e7u6AJwSsmHl1Kxmd9G5clL-WOkWlOc_
+Deleted 0 document rows for file ID: 1e7u6AJwSsmHl1Kxmd9G5clL-WOkWlOc_
+Deleted metadata for file ID: 1e7u6AJwSsmHl1Kxmd9G5clL-WOkWlOc_
+Inserted metadata for file 'invoice--000001.pdf' (ID: 1e7u6AJwSsmHl1Kxmd9G5clL-WOkWlOc_)
+Successfully processed file 'invoice--000001.pdf' (ID: 1e7u6AJwSsmHl1Kxmd9G5clL-WOkWlOc_)
+   ✅ Success!
+
+[17/107] Processing: invoice--000002.pdf
+Deleted 1 document chunks for file ID: 1d74Ou67ugbAn-9VKbQnnRYah8wrQN2c0
+Deleted 0 document rows for file ID: 1d74Ou67ugbAn-9VKbQnnRYah8wrQN2c0
+Deleted metadata for file ID: 1d74Ou67ugbAn-9VKbQnnRYah8wrQN2c0
+Inserted metadata for file 'invoice--000002.pdf' (ID: 1d74Ou67ugbAn-9VKbQnnRYah8wrQN2c0)
+Successfully processed file 'invoice--000002.pdf' (ID: 1d74Ou67ugbAn-9VKbQnnRYah8wrQN2c0)
+   ✅ Success!
+
+[18/107] Processing: B2B Affiliates - Commission and Payment Schedule.xlsx
+Deleted 0 document chunks for file ID: 19Cn4ldPlUzgrb_BtQJmLrcra7ll731C9
+Deleted 0 document rows for file ID: 19Cn4ldPlUzgrb_BtQJmLrcra7ll731C9
+Deleted metadata for file ID: 19Cn4ldPlUzgrb_BtQJmLrcra7ll731C9
+Error extracting schema from CSV: new-line character seen in unquoted field - do you need to open the file with newline=''?
+Inserted metadata for file 'B2B Affiliates - Commission and Payment Schedule.xlsx' (ID: 19Cn4ldPlUzgrb_BtQJmLrcra7ll731C9)
+Error extracting rows from CSV: new-line character seen in unquoted field - do you need to open the file with newline=''?
+Error inserting/updating document chunks: {'message': 'unsupported Unicode escape sequence', 'code': '22P05', 'hint': None, 'details': '\\u0000 cannot be converted to text.'}
+Successfully processed file 'B2B Affiliates - Commission and Payment Schedule.xlsx' (ID: 19Cn4ldPlUzgrb_BtQJmLrcra7ll731C9)
+   ✅ Success!
+
+[19/107] Processing: Untitled document
+Deleted 202 document chunks for file ID: 1blSJLfS0dHKVllapYmSnNuvT41JdoYzXYNiK3g5LTC0
+Deleted 0 document rows for file ID: 1blSJLfS0dHKVllapYmSnNuvT41JdoYzXYNiK3g5LTC0
+Deleted metadata for file ID: 1blSJLfS0dHKVllapYmSnNuvT41JdoYzXYNiK3g5LTC0
+Inserted metadata for file 'Untitled document' (ID: 1blSJLfS0dHKVllapYmSnNuvT41JdoYzXYNiK3g5LTC0)
+Successfully processed file 'Untitled document' (ID: 1blSJLfS0dHKVllapYmSnNuvT41JdoYzXYNiK3g5LTC0)
+   ✅ Success!
+
+[20/107] Processing: Hume Band FAQ
+Deleted 65 document chunks for file ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU
+Deleted 53 document rows for file ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU
+Deleted metadata for file ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU
+Inserted metadata for file 'Hume Band FAQ' (ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU)
+Deleted existing rows for file ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU
+Inserted 53 rows for file ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU
+Successfully processed file 'Hume Band FAQ' (ID: 18ciLM7wJ_Cs__ABU3huTZ15QNpwt9B0AzYDcZ9z51UU)
+   ✅ Success!
+
+[21/107] Processing: Distributor List
+Deleted 1 document chunks for file ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no
+Deleted 4 document rows for file ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no
+Deleted metadata for file ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no
+Inserted metadata for file 'Distributor List' (ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no)
+Deleted existing rows for file ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no
+Inserted 4 rows for file ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no
+Successfully processed file 'Distributor List' (ID: 18il0HEKvJRQsp1SZ9F6tLyuynBt68of_78aO_rCW7no)
+   ✅ Success!
+
+[22/107] Processing: Your Hume Body Pod.mp4
+   ⏭️  Skipped (unsupported type: video/mp4)
+[23/107] Processing: The Body Pod Pairing Guide.mp4
+   ⏭️  Skipped (unsupported type: video/mp4)
+[24/107] Processing: Impromptu Google Meet Meeting - July 17
+Deleted 3 document chunks for file ID: 1wQCcNowqB3B-TvHaYKi3FcSqaR2XUtTfuf9q5aeqZ8o
+Deleted 0 document rows for file ID: 1wQCcNowqB3B-TvHaYKi3FcSqaR2XUtTfuf9q5aeqZ8o
+Deleted metadata for file ID: 1wQCcNowqB3B-TvHaYKi3FcSqaR2XUtTfuf9q5aeqZ8o
+Inserted metadata for file 'Impromptu Google Meet Meeting - July 17' (ID: 1wQCcNowqB3B-TvHaYKi3FcSqaR2XUtTfuf9q5aeqZ8o)
+Successfully processed file 'Impromptu Google Meet Meeting - July 17' (ID: 1wQCcNowqB3B-TvHaYKi3FcSqaR2XUtTfuf9q5aeqZ8o)
+   ✅ Success!
+
+[25/107] Processing: Amino Acid Therapy Quiz - Stand Alone TEMPLATE
+Deleted 15 document chunks for file ID: 1MzNFv2UYrIjp4frOacG2jAgWWfWqH7WrcnZabbu-sVk
+Deleted 102 document rows for file ID: 1MzNFv2UYrIjp4frOacG2jAgWWfWqH7WrcnZabbu-sVk
+Deleted metadata for file ID: 1MzNFv2UYrIjp4frOacG2jAgWWfWqH7WrcnZabbu-sVk
+Error inserting/updating document metadata: The read operation timed out
+Deleted existing rows for file ID: 1MzNFv2UYrIjp4frOacG2jAgWWfWqH7WrcnZabbu-sVk
+Error inserting document rows: {'message': 'insert or update on table "document_rows" violates foreign key constraint "document_rows_file_id_fkey"', 'code': '23503', 'hint': None, 'details': 'Key (file_id)=(1MzNFv2UYrIjp4frOacG2jAgWWfWqH7WrcnZabbu-sVk) is not present in table "document_metadata".'}
+Successfully processed file 'Amino Acid Therapy Quiz - Stand Alone TEMPLATE' (ID: 1MzNFv2UYrIjp4frOacG2jAgWWfWqH7WrcnZabbu-sVk)
+   ✅ Success!
+
+[26/107] Processing: 02 - Josh I (FSC)
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[27/107] Processing: getthinmd_research.pdf
+Error downloading file 1lbHWxV_rYhC3yExQGgMN_Dq7Q8Ade_9-: [Errno 54] Connection reset by peer
+Failed to download file 'getthinmd_research.pdf' (ID: 1lbHWxV_rYhC3yExQGgMN_Dq7Q8Ade_9-)
+   ✅ Success!
+
+[28/107] Processing: proposed_pr_partnership.md
+Deleted 10 document chunks for file ID: 1sLtoN8zc1YW751iOpS33v-ao7qxYiNZN
+Deleted 0 document rows for file ID: 1sLtoN8zc1YW751iOpS33v-ao7qxYiNZN
+Deleted metadata for file ID: 1sLtoN8zc1YW751iOpS33v-ao7qxYiNZN
+Inserted metadata for file 'proposed_pr_partnership.md' (ID: 1sLtoN8zc1YW751iOpS33v-ao7qxYiNZN)
+Successfully processed file 'proposed_pr_partnership.md' (ID: 1sLtoN8zc1YW751iOpS33v-ao7qxYiNZN)
+   ✅ Success!
+
+[29/107] Processing: Saved from Chrome
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[30/107] Processing: Untitled document
+Deleted 3 document chunks for file ID: 1vJz513dCYQTiwwP7QhbaEIB2raYMqZO9_VnHSnpq9JU
+Deleted 0 document rows for file ID: 1vJz513dCYQTiwwP7QhbaEIB2raYMqZO9_VnHSnpq9JU
+Deleted metadata for file ID: 1vJz513dCYQTiwwP7QhbaEIB2raYMqZO9_VnHSnpq9JU
+Inserted metadata for file 'Untitled document' (ID: 1vJz513dCYQTiwwP7QhbaEIB2raYMqZO9_VnHSnpq9JU)
+Successfully processed file 'Untitled document' (ID: 1vJz513dCYQTiwwP7QhbaEIB2raYMqZO9_VnHSnpq9JU)
+   ✅ Success!
+
+[31/107] Processing: Copy of INSTANTLY_CANCELLATION_FOLLOWUP.csv
+Deleted 107 document chunks for file ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ
+Deleted 45 document rows for file ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ
+Deleted metadata for file ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ
+Inserted metadata for file 'Copy of INSTANTLY_CANCELLATION_FOLLOWUP.csv' (ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ)
+Deleted existing rows for file ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ
+Inserted 45 rows for file ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ
+Successfully processed file 'Copy of INSTANTLY_CANCELLATION_FOLLOWUP.csv' (ID: 1NG6Qcb7Mb2c2PsguPVtbflXPHmwyYML9CIeyXIGEXJQ)
+   ✅ Success!
+
+[32/107] Processing: Untitled document
+Deleted 128 document chunks for file ID: 1lf3oYDkhW-SjZV0LFh_VYF1B2XrGZXspUliJuq8xeJ8
+Deleted 0 document rows for file ID: 1lf3oYDkhW-SjZV0LFh_VYF1B2XrGZXspUliJuq8xeJ8
+Deleted metadata for file ID: 1lf3oYDkhW-SjZV0LFh_VYF1B2XrGZXspUliJuq8xeJ8
+Inserted metadata for file 'Untitled document' (ID: 1lf3oYDkhW-SjZV0LFh_VYF1B2XrGZXspUliJuq8xeJ8)
+Successfully processed file 'Untitled document' (ID: 1lf3oYDkhW-SjZV0LFh_VYF1B2XrGZXspUliJuq8xeJ8)
+   ✅ Success!
+
+[33/107] Processing: INSTANTLY_CANCELLATION_FOLLOWUP.csv
+Deleted 107 document chunks for file ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM
+Deleted 45 document rows for file ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM
+Deleted metadata for file ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM
+Inserted metadata for file 'INSTANTLY_CANCELLATION_FOLLOWUP.csv' (ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM)
+Deleted existing rows for file ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM
+Inserted 45 rows for file ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM
+Successfully processed file 'INSTANTLY_CANCELLATION_FOLLOWUP.csv' (ID: 1z1nW_xPXppCmXAaavicENJQEVVFP7HRRB5OKcjNqGWM)
+   ✅ Success!
+
+[34/107] Processing: AI_Lead_Scoring___Engagement__contd__1_.zip
+   ⏭️  Skipped (unsupported type: application/zip)
+[35/107] Processing: Untitled document
+Deleted 1265 document chunks for file ID: 1WRAiXzEraMBUAbg3hxFE_GVUF2-INqEz3O8RDbDrFYk
+Deleted 0 document rows for file ID: 1WRAiXzEraMBUAbg3hxFE_GVUF2-INqEz3O8RDbDrFYk
+Deleted metadata for file ID: 1WRAiXzEraMBUAbg3hxFE_GVUF2-INqEz3O8RDbDrFYk
+Inserted metadata for file 'Untitled document' (ID: 1WRAiXzEraMBUAbg3hxFE_GVUF2-INqEz3O8RDbDrFYk)
+Successfully processed file 'Untitled document' (ID: 1WRAiXzEraMBUAbg3hxFE_GVUF2-INqEz3O8RDbDrFYk)
+   ✅ Success!
+
+[36/107] Processing: Untitled document
+Deleted 1 document chunks for file ID: 1S2DnbAeABvF1JyZefcev8Ke6RfBqkjwOd12xQlzD0Ik
+Deleted 0 document rows for file ID: 1S2DnbAeABvF1JyZefcev8Ke6RfBqkjwOd12xQlzD0Ik
+Deleted metadata for file ID: 1S2DnbAeABvF1JyZefcev8Ke6RfBqkjwOd12xQlzD0Ik
+Inserted metadata for file 'Untitled document' (ID: 1S2DnbAeABvF1JyZefcev8Ke6RfBqkjwOd12xQlzD0Ik)
+Successfully processed file 'Untitled document' (ID: 1S2DnbAeABvF1JyZefcev8Ke6RfBqkjwOd12xQlzD0Ik)
+   ✅ Success!
+
+[37/107] Processing: Hume Health - Sales Tracker 2025
+Deleted 7 document chunks for file ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo
+Deleted 38 document rows for file ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo
+Deleted metadata for file ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo
+Inserted metadata for file 'Hume Health - Sales Tracker 2025' (ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo)
+Deleted existing rows for file ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo
+Inserted 38 rows for file ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo
+Successfully processed file 'Hume Health - Sales Tracker 2025' (ID: 1uu59BZUwqnNVVLXavHpVEVo9YHdxjBXp7YbtNcSKMFo)
+   ✅ Success!
+
+[38/107] Processing: VP Sales Analytics Dashboard - Executive Summary
+Deleted 1 document chunks for file ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc
+Deleted 1 document rows for file ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc
+Deleted metadata for file ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc
+Inserted metadata for file 'VP Sales Analytics Dashboard - Executive Summary' (ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc)
+Deleted existing rows for file ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc
+Inserted 1 rows for file ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc
+Successfully processed file 'VP Sales Analytics Dashboard - Executive Summary' (ID: 1_V0pQ9fr-klp04FBi7USLydQPkH0RgHV7tmoIHWL7Zc)
+   ✅ Success!
+
+[39/107] Processing: Crisis Analytics - Delta Revenue Monitoring
+Deleted 1 document chunks for file ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY
+Deleted 2 document rows for file ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY
+Deleted metadata for file ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY
+Inserted metadata for file 'Crisis Analytics - Delta Revenue Monitoring' (ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY)
+Deleted existing rows for file ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY
+Inserted 2 rows for file ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY
+Successfully processed file 'Crisis Analytics - Delta Revenue Monitoring' (ID: 1YV8I6ZhCplSoTSzZEZDpi8dK8bBzqWMoXQKw3at8uNY)
+   ✅ Success!
+
+[40/107] Processing: VP Sales Analytics Dashboard - September 2025
+Deleted 2 document chunks for file ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU
+Deleted 6 document rows for file ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU
+Deleted metadata for file ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU
+Inserted metadata for file 'VP Sales Analytics Dashboard - September 2025' (ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU)
+Deleted existing rows for file ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU
+Inserted 6 rows for file ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU
+Successfully processed file 'VP Sales Analytics Dashboard - September 2025' (ID: 12FNoBmr07WhfIMMSMs6ylKTO42D-Px39RLJp4dVGfnU)
+   ✅ Success!
+
+[41/107] Processing: Josh (SOP's & Questions)
+Deleted 25 document chunks for file ID: 1mQjH830evC6dLOFoLHkBOwJENepTWnkw9G6bvNmOyBU
+Deleted 0 document rows for file ID: 1mQjH830evC6dLOFoLHkBOwJENepTWnkw9G6bvNmOyBU
+Deleted metadata for file ID: 1mQjH830evC6dLOFoLHkBOwJENepTWnkw9G6bvNmOyBU
+Inserted metadata for file 'Josh (SOP's & Questions)' (ID: 1mQjH830evC6dLOFoLHkBOwJENepTWnkw9G6bvNmOyBU)
+Successfully processed file 'Josh (SOP's & Questions)' (ID: 1mQjH830evC6dLOFoLHkBOwJENepTWnkw9G6bvNmOyBU)
+   ✅ Success!
+
+[42/107] Processing: Hume Body Pod Troubleshooting & FAQ.mp4
+   ⏭️  Skipped (unsupported type: video/mp4)
+[43/107] Processing: Hume Manager Dashboard 
+Deleted 4 document chunks for file ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg
+Deleted 28 document rows for file ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg
+Deleted metadata for file ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg
+Inserted metadata for file 'Hume Manager Dashboard ' (ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg)
+Deleted existing rows for file ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg
+Inserted 28 rows for file ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg
+Successfully processed file 'Hume Manager Dashboard ' (ID: 1q3QdRRi8pwDzvGdvQtuk4rctqBRd43IzlyH_4l8BzNg)
+   ✅ Success!
+
+[44/107] Processing: Tony Zanlungo
+Deleted 11 document chunks for file ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU
+Deleted 33 document rows for file ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU
+Deleted metadata for file ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU
+Inserted metadata for file 'Tony Zanlungo' (ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU)
+Deleted existing rows for file ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU
+Inserted 33 rows for file ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU
+Successfully processed file 'Tony Zanlungo' (ID: 1vKFy_figH_NVluiT0GF1GvPM9zywXZWvk-fIqs-2-XU)
+   ✅ Success!
+
+[45/107] Processing: Partnerships
+Deleted 36 document chunks for file ID: 1uIq0fJ8HcGx0mYtID_F99jxCnuGOZbtjkr408FeQ750
+Deleted 0 document rows for file ID: 1uIq0fJ8HcGx0mYtID_F99jxCnuGOZbtjkr408FeQ750
+Deleted metadata for file ID: 1uIq0fJ8HcGx0mYtID_F99jxCnuGOZbtjkr408FeQ750
+Inserted metadata for file 'Partnerships' (ID: 1uIq0fJ8HcGx0mYtID_F99jxCnuGOZbtjkr408FeQ750)
+Successfully processed file 'Partnerships' (ID: 1uIq0fJ8HcGx0mYtID_F99jxCnuGOZbtjkr408FeQ750)
+   ✅ Success!
+
+[46/107] Processing: Sales Tracker 
+Deleted 4 document chunks for file ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg
+Deleted 27 document rows for file ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg
+Deleted metadata for file ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg
+Inserted metadata for file 'Sales Tracker ' (ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg)
+Deleted existing rows for file ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg
+Inserted 27 rows for file ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg
+Successfully processed file 'Sales Tracker ' (ID: 1rjbCLBnjPTBGNVQQz955JNEFndjP9K5B-YCKoVi6_dg)
+   ✅ Success!
+
+[47/107] Processing: August 1 - 15, 2025.xlsx
+Deleted 0 document chunks for file ID: 1sfjKjh-YKUYK-_4oDvfejHeiZSja71fs
+Deleted 0 document rows for file ID: 1sfjKjh-YKUYK-_4oDvfejHeiZSja71fs
+Deleted metadata for file ID: 1sfjKjh-YKUYK-_4oDvfejHeiZSja71fs
+Error extracting schema from CSV: new-line character seen in unquoted field - do you need to open the file with newline=''?
+Inserted metadata for file 'August 1 - 15, 2025.xlsx' (ID: 1sfjKjh-YKUYK-_4oDvfejHeiZSja71fs)
+Error extracting rows from CSV: new-line character seen in unquoted field - do you need to open the file with newline=''?
+Error inserting/updating document chunks: {'message': 'unsupported Unicode escape sequence', 'code': '22P05', 'hint': None, 'details': '\\u0000 cannot be converted to text.'}
+Successfully processed file 'August 1 - 15, 2025.xlsx' (ID: 1sfjKjh-YKUYK-_4oDvfejHeiZSja71fs)
+   ✅ Success!
+
+[48/107] Processing: Ai test
+Deleted 10 document chunks for file ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs
+Deleted 78 document rows for file ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs
+Deleted metadata for file ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs
+Inserted metadata for file 'Ai test' (ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs)
+Deleted existing rows for file ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs
+Inserted 78 rows for file ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs
+Successfully processed file 'Ai test' (ID: 1fSNaQXBIRVER4Go7TpzyXlIUBoOMJb2pVecxXXpKDTs)
+   ✅ Success!
+
+[49/107] Processing: VIDEO DRAFT
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[50/107] Processing: Follow up Emails
+Deleted 759 document chunks for file ID: 13T72j9lhZFHTygxKfrFbmjcGqFgZR5Ca17sJjMqX_aw
+Deleted 0 document rows for file ID: 13T72j9lhZFHTygxKfrFbmjcGqFgZR5Ca17sJjMqX_aw
+Deleted metadata for file ID: 13T72j9lhZFHTygxKfrFbmjcGqFgZR5Ca17sJjMqX_aw
+Inserted metadata for file 'Follow up Emails' (ID: 13T72j9lhZFHTygxKfrFbmjcGqFgZR5Ca17sJjMqX_aw)
+Successfully processed file 'Follow up Emails' (ID: 13T72j9lhZFHTygxKfrFbmjcGqFgZR5Ca17sJjMqX_aw)
+   ✅ Success!
+
+[51/107] Processing: Body_Pod__Troubleshooting_&_FAQ.mp4
+   ⏭️  Skipped (unsupported type: video/mp4)
+[52/107] Processing: Comprehensive Hume Band Metrics Catalog
+Deleted 21 document chunks for file ID: 1dxfKDj93bd29PdHpXPIR9w00qnVCRO7dfOfbhoyfG0o
+Deleted 0 document rows for file ID: 1dxfKDj93bd29PdHpXPIR9w00qnVCRO7dfOfbhoyfG0o
+Deleted metadata for file ID: 1dxfKDj93bd29PdHpXPIR9w00qnVCRO7dfOfbhoyfG0o
+Inserted metadata for file 'Comprehensive Hume Band Metrics Catalog' (ID: 1dxfKDj93bd29PdHpXPIR9w00qnVCRO7dfOfbhoyfG0o)
+Successfully processed file 'Comprehensive Hume Band Metrics Catalog' (ID: 1dxfKDj93bd29PdHpXPIR9w00qnVCRO7dfOfbhoyfG0o)
+   ✅ Success!
+
+[53/107] Processing: Closer Recordings and email
+Deleted 10 document chunks for file ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew
+Deleted 4 document rows for file ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew
+Deleted metadata for file ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew
+Inserted metadata for file 'Closer Recordings and email' (ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew)
+Deleted existing rows for file ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew
+Inserted 4 rows for file ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew
+Successfully processed file 'Closer Recordings and email' (ID: 1Ufdc_pFwUpIzrMZGZHjhjSMOTGSMw71hcq2SX_FDFew)
+   ✅ Success!
+
+[54/107] Processing: 21 - 70% Show Rate Booking Process
+Deleted 9 document chunks for file ID: 1-O-2xv2uXhSdAG3YoL3Jw5Z3_N_3Ql8LWBSIH0IzkV8
+Deleted 0 document rows for file ID: 1-O-2xv2uXhSdAG3YoL3Jw5Z3_N_3Ql8LWBSIH0IzkV8
+Deleted metadata for file ID: 1-O-2xv2uXhSdAG3YoL3Jw5Z3_N_3Ql8LWBSIH0IzkV8
+Inserted metadata for file '21 - 70% Show Rate Booking Process' (ID: 1-O-2xv2uXhSdAG3YoL3Jw5Z3_N_3Ql8LWBSIH0IzkV8)
+Successfully processed file '21 - 70% Show Rate Booking Process' (ID: 1-O-2xv2uXhSdAG3YoL3Jw5Z3_N_3Ql8LWBSIH0IzkV8)
+   ✅ Success!
+
+[55/107] Processing: Josh Student Implementation Plan
+Deleted 16 document chunks for file ID: 1DHXvPnlkc_yLSppBWkHvb4sW9pt71PUIswnNkeUS7VI
+Deleted 0 document rows for file ID: 1DHXvPnlkc_yLSppBWkHvb4sW9pt71PUIswnNkeUS7VI
+Deleted metadata for file ID: 1DHXvPnlkc_yLSppBWkHvb4sW9pt71PUIswnNkeUS7VI
+Inserted metadata for file 'Josh Student Implementation Plan' (ID: 1DHXvPnlkc_yLSppBWkHvb4sW9pt71PUIswnNkeUS7VI)
+Successfully processed file 'Josh Student Implementation Plan' (ID: 1DHXvPnlkc_yLSppBWkHvb4sW9pt71PUIswnNkeUS7VI)
+   ✅ Success!
+
+[56/107] Processing: Question for Josh
+Deleted 8 document chunks for file ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w
+Deleted 3 document rows for file ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w
+Deleted metadata for file ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w
+Inserted metadata for file 'Question for Josh' (ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w)
+Deleted existing rows for file ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w
+Inserted 3 rows for file ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w
+Successfully processed file 'Question for Josh' (ID: 1Rh60xw8yUJ9Dl78rrkFCy3l06Z5S5PoYPJaZsgDN03w)
+   ✅ Success!
+
+[57/107] Processing: Gantt chart
+Deleted 10 document chunks for file ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8
+Deleted 34 document rows for file ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8
+Deleted metadata for file ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8
+Inserted metadata for file 'Gantt chart' (ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8)
+Deleted existing rows for file ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8
+Inserted 34 rows for file ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8
+Successfully processed file 'Gantt chart' (ID: 1-oWt5rSD8Be6VVw_3ko8FefwBRsxSAUlPYrG79T21P8)
+   ✅ Success!
+
+[58/107] Processing: Hume Payment Links
+Deleted 2 document chunks for file ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M
+Deleted 26 document rows for file ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M
+Deleted metadata for file ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M
+Inserted metadata for file 'Hume Payment Links' (ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M)
+Deleted existing rows for file ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M
+Inserted 26 rows for file ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M
+Successfully processed file 'Hume Payment Links' (ID: 1JYEPrWJk_jdoUvG5jSoV4ExiKGcrDUA8kEbJuahOV0M)
+   ✅ Success!
+
+[59/107] Processing: Hume Health- Hardware Fulfillment SOP
+Deleted 9 document chunks for file ID: 1vYhPtPDVE9oS6kW0ndFzLvP4_npfpTLND-GiLhzlIuI
+Deleted 0 document rows for file ID: 1vYhPtPDVE9oS6kW0ndFzLvP4_npfpTLND-GiLhzlIuI
+Deleted metadata for file ID: 1vYhPtPDVE9oS6kW0ndFzLvP4_npfpTLND-GiLhzlIuI
+Inserted metadata for file 'Hume Health- Hardware Fulfillment SOP' (ID: 1vYhPtPDVE9oS6kW0ndFzLvP4_npfpTLND-GiLhzlIuI)
+Successfully processed file 'Hume Health- Hardware Fulfillment SOP' (ID: 1vYhPtPDVE9oS6kW0ndFzLvP4_npfpTLND-GiLhzlIuI)
+   ✅ Success!
+
+[60/107] Processing: SOP overview
+Deleted 7 document chunks for file ID: 1sWpxvzUdC9Kt6ZC-FBlEgLGsg7TkQ2bmEM2jldX20B0
+Deleted 0 document rows for file ID: 1sWpxvzUdC9Kt6ZC-FBlEgLGsg7TkQ2bmEM2jldX20B0
+Deleted metadata for file ID: 1sWpxvzUdC9Kt6ZC-FBlEgLGsg7TkQ2bmEM2jldX20B0
+Inserted metadata for file 'SOP overview' (ID: 1sWpxvzUdC9Kt6ZC-FBlEgLGsg7TkQ2bmEM2jldX20B0)
+Successfully processed file 'SOP overview' (ID: 1sWpxvzUdC9Kt6ZC-FBlEgLGsg7TkQ2bmEM2jldX20B0)
+   ✅ Success!
+
+[61/107] Processing: Transcript
+Deleted 24 document chunks for file ID: 16iSflxH_3DBbyBblhUn7AaSZhDISjCKh_XVFnvCC-yw
+Deleted 0 document rows for file ID: 16iSflxH_3DBbyBblhUn7AaSZhDISjCKh_XVFnvCC-yw
+Deleted metadata for file ID: 16iSflxH_3DBbyBblhUn7AaSZhDISjCKh_XVFnvCC-yw
+Inserted metadata for file 'Transcript' (ID: 16iSflxH_3DBbyBblhUn7AaSZhDISjCKh_XVFnvCC-yw)
+Successfully processed file 'Transcript' (ID: 16iSflxH_3DBbyBblhUn7AaSZhDISjCKh_XVFnvCC-yw)
+   ✅ Success!
+
+[62/107] Processing: Dear Nina,
+Deleted 14 document chunks for file ID: 1gmCiZUdm4yiA6tYmTRtT712jsgw2tkFG-8k-wnTaERc
+Deleted 0 document rows for file ID: 1gmCiZUdm4yiA6tYmTRtT712jsgw2tkFG-8k-wnTaERc
+Deleted metadata for file ID: 1gmCiZUdm4yiA6tYmTRtT712jsgw2tkFG-8k-wnTaERc
+Inserted metadata for file 'Dear Nina,' (ID: 1gmCiZUdm4yiA6tYmTRtT712jsgw2tkFG-8k-wnTaERc)
+Successfully processed file 'Dear Nina,' (ID: 1gmCiZUdm4yiA6tYmTRtT712jsgw2tkFG-8k-wnTaERc)
+   ✅ Success!
+
+[63/107] Processing: Tracker
+Deleted 8 document chunks for file ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto
+Deleted 23 document rows for file ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto
+Deleted metadata for file ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto
+Inserted metadata for file 'Tracker' (ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto)
+Deleted existing rows for file ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto
+Inserted 23 rows for file ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto
+Successfully processed file 'Tracker' (ID: 1HSH8V0XCTN3SFM9h45yU-UCBI-wQJZRrlVk9NgFypto)
+   ✅ Success!
+
+[64/107] Processing: Partnership Agreement HumeHealth June 2025.docx
+   ⏭️  Skipped (unsupported type: application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+[65/107] Processing: Untitled document
+Deleted 1455 document chunks for file ID: 1RyIY3B385UTX7TabGmc9jQ-1tQ_DEWlPwwJF7mcsPLk
+Deleted 0 document rows for file ID: 1RyIY3B385UTX7TabGmc9jQ-1tQ_DEWlPwwJF7mcsPLk
+Deleted metadata for file ID: 1RyIY3B385UTX7TabGmc9jQ-1tQ_DEWlPwwJF7mcsPLk
+Inserted metadata for file 'Untitled document' (ID: 1RyIY3B385UTX7TabGmc9jQ-1tQ_DEWlPwwJF7mcsPLk)
+Successfully processed file 'Untitled document' (ID: 1RyIY3B385UTX7TabGmc9jQ-1tQ_DEWlPwwJF7mcsPLk)
+   ✅ Success!
+
+[66/107] Processing: OKR
+Deleted 1 document chunks for file ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194
+Deleted 12 document rows for file ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194
+Deleted metadata for file ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194
+Inserted metadata for file 'OKR' (ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194)
+Deleted existing rows for file ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194
+Inserted 12 rows for file ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194
+Successfully processed file 'OKR' (ID: 12InOJ-ZYwf7lnNauGSBta1LSD3jmOPEnEferaf0B194)
+   ✅ Success!
+
+[67/107] Processing: By Hume health 
+Deleted 9 document chunks for file ID: 1lSfMVcmuQLw-aIMfxLUv5Vk6T-MPISHe1Mr_CBxz-QE
+Deleted 0 document rows for file ID: 1lSfMVcmuQLw-aIMfxLUv5Vk6T-MPISHe1Mr_CBxz-QE
+Deleted metadata for file ID: 1lSfMVcmuQLw-aIMfxLUv5Vk6T-MPISHe1Mr_CBxz-QE
+Inserted metadata for file 'By Hume health ' (ID: 1lSfMVcmuQLw-aIMfxLUv5Vk6T-MPISHe1Mr_CBxz-QE)
+Successfully processed file 'By Hume health ' (ID: 1lSfMVcmuQLw-aIMfxLUv5Vk6T-MPISHe1Mr_CBxz-QE)
+   ✅ Success!
+
+[68/107] Processing: Meeting 
+Deleted 159 document chunks for file ID: 1MYM8kyejYgpvpQvFgjqoRl_6_vDAJu-zuJIFP4UBeJc
+Deleted 0 document rows for file ID: 1MYM8kyejYgpvpQvFgjqoRl_6_vDAJu-zuJIFP4UBeJc
+Deleted metadata for file ID: 1MYM8kyejYgpvpQvFgjqoRl_6_vDAJu-zuJIFP4UBeJc
+Inserted metadata for file 'Meeting ' (ID: 1MYM8kyejYgpvpQvFgjqoRl_6_vDAJu-zuJIFP4UBeJc)
+Successfully processed file 'Meeting ' (ID: 1MYM8kyejYgpvpQvFgjqoRl_6_vDAJu-zuJIFP4UBeJc)
+   ✅ Success!
+
+[69/107] Processing: Josh & Julian 
+Deleted 260 document chunks for file ID: 1_jcJgwloMfX_khkmIHNUUsTgwiDhVkn60PK3JwjLfZE
+Deleted 0 document rows for file ID: 1_jcJgwloMfX_khkmIHNUUsTgwiDhVkn60PK3JwjLfZE
+Deleted metadata for file ID: 1_jcJgwloMfX_khkmIHNUUsTgwiDhVkn60PK3JwjLfZE
+Inserted metadata for file 'Josh & Julian ' (ID: 1_jcJgwloMfX_khkmIHNUUsTgwiDhVkn60PK3JwjLfZE)
+Successfully processed file 'Josh & Julian ' (ID: 1_jcJgwloMfX_khkmIHNUUsTgwiDhVkn60PK3JwjLfZE)
+   ✅ Success!
+
+[70/107] Processing: Call
+Deleted 119 document chunks for file ID: 1tM_1KKm-gbq8SFFfMSbJCgfo870enLX_qOC3kuu2JFQ
+Deleted 0 document rows for file ID: 1tM_1KKm-gbq8SFFfMSbJCgfo870enLX_qOC3kuu2JFQ
+Deleted metadata for file ID: 1tM_1KKm-gbq8SFFfMSbJCgfo870enLX_qOC3kuu2JFQ
+Inserted metadata for file 'Call' (ID: 1tM_1KKm-gbq8SFFfMSbJCgfo870enLX_qOC3kuu2JFQ)
+Successfully processed file 'Call' (ID: 1tM_1KKm-gbq8SFFfMSbJCgfo870enLX_qOC3kuu2JFQ)
+   ✅ Success!
+
+[71/107] Processing: Alexander x Hume Health
+Deleted 2 document chunks for file ID: 1vBP31vQdaOImK53dPgUMvn6erhtwBUoA9K7iS0ADh04
+Deleted 0 document rows for file ID: 1vBP31vQdaOImK53dPgUMvn6erhtwBUoA9K7iS0ADh04
+Deleted metadata for file ID: 1vBP31vQdaOImK53dPgUMvn6erhtwBUoA9K7iS0ADh04
+Inserted metadata for file 'Alexander x Hume Health' (ID: 1vBP31vQdaOImK53dPgUMvn6erhtwBUoA9K7iS0ADh04)
+Successfully processed file 'Alexander x Hume Health' (ID: 1vBP31vQdaOImK53dPgUMvn6erhtwBUoA9K7iS0ADh04)
+   ✅ Success!
+
+[72/107] Processing: B2B
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[73/107] Processing: John Timesheet
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[74/107] Processing: Untitled document
+Deleted 1 document chunks for file ID: 1j5ARXzkPaLaUkBVx01rlXT2YDSiszKbsme0Xep-JVfY
+Deleted 0 document rows for file ID: 1j5ARXzkPaLaUkBVx01rlXT2YDSiszKbsme0Xep-JVfY
+Deleted metadata for file ID: 1j5ARXzkPaLaUkBVx01rlXT2YDSiszKbsme0Xep-JVfY
+Inserted metadata for file 'Untitled document' (ID: 1j5ARXzkPaLaUkBVx01rlXT2YDSiszKbsme0Xep-JVfY)
+Successfully processed file 'Untitled document' (ID: 1j5ARXzkPaLaUkBVx01rlXT2YDSiszKbsme0Xep-JVfY)
+   ✅ Success!
+
+[75/107] Processing: Request for Josh
+Deleted 3 document chunks for file ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0
+Deleted 8 document rows for file ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0
+Deleted metadata for file ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0
+Inserted metadata for file 'Request for Josh' (ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0)
+Deleted existing rows for file ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0
+Inserted 8 rows for file ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0
+Successfully processed file 'Request for Josh' (ID: 1-syVbynSTW1mkjL9mrsc_posQSXFDwsLbeoW9jUNxC0)
+   ✅ Success!
+
+[76/107] Processing: Onboarding Concerns Leads - July 2025 (Final)
+Deleted 2 document chunks for file ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk
+Deleted 1 document rows for file ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk
+Deleted metadata for file ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk
+Inserted metadata for file 'Onboarding Concerns Leads - July 2025 (Final)' (ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk)
+Deleted existing rows for file ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk
+Inserted 1 rows for file ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk
+Successfully processed file 'Onboarding Concerns Leads - July 2025 (Final)' (ID: 1ureOzPzddXnKFPor7l4BSQhk6icIEZikWWyYkxG57Vk)
+   ✅ Success!
+
+[77/107] Processing: 2025-07-07 20-01-40.mp4
+   ⏭️  Skipped (unsupported type: video/mp4)
+[78/107] Processing: Test sheet
+Failed to download file 'Test sheet' (ID: 19NtaMevdp6uV0_D3z_1z2lNJjp6GXdJSnu4cHZp2Cr8)
+   ✅ Success!
+
+[79/107] Processing: Hume Health Julian Call 1
+Deleted 116 document chunks for file ID: 1FgS8FpTYT_V8j4DIVBtttcH0CfCxRs87WWzR_GUd0jo
+Deleted 0 document rows for file ID: 1FgS8FpTYT_V8j4DIVBtttcH0CfCxRs87WWzR_GUd0jo
+Deleted metadata for file ID: 1FgS8FpTYT_V8j4DIVBtttcH0CfCxRs87WWzR_GUd0jo
+Inserted metadata for file 'Hume Health Julian Call 1' (ID: 1FgS8FpTYT_V8j4DIVBtttcH0CfCxRs87WWzR_GUd0jo)
+Successfully processed file 'Hume Health Julian Call 1' (ID: 1FgS8FpTYT_V8j4DIVBtttcH0CfCxRs87WWzR_GUd0jo)
+   ✅ Success!
+
+[80/107] Processing: Jace & Josh Call 
+Deleted 60 document chunks for file ID: 13GUgAWUjjZDVOa0cNFPGSfhT9MYB_6PwDWpUz28XKzE
+Deleted 0 document rows for file ID: 13GUgAWUjjZDVOa0cNFPGSfhT9MYB_6PwDWpUz28XKzE
+Deleted metadata for file ID: 13GUgAWUjjZDVOa0cNFPGSfhT9MYB_6PwDWpUz28XKzE
+Inserted metadata for file 'Jace & Josh Call ' (ID: 13GUgAWUjjZDVOa0cNFPGSfhT9MYB_6PwDWpUz28XKzE)
+Successfully processed file 'Jace & Josh Call ' (ID: 13GUgAWUjjZDVOa0cNFPGSfhT9MYB_6PwDWpUz28XKzE)
+   ✅ Success!
+
+[81/107] Processing: Sales Recordings
+Deleted 3271 document chunks for file ID: 1YThpmINom1AhmMlJz05-UrDunoWN7X0uQtSvdrQKNY4
+Deleted 0 document rows for file ID: 1YThpmINom1AhmMlJz05-UrDunoWN7X0uQtSvdrQKNY4
+Deleted metadata for file ID: 1YThpmINom1AhmMlJz05-UrDunoWN7X0uQtSvdrQKNY4
+Inserted metadata for file 'Sales Recordings' (ID: 1YThpmINom1AhmMlJz05-UrDunoWN7X0uQtSvdrQKNY4)
+Successfully processed file 'Sales Recordings' (ID: 1YThpmINom1AhmMlJz05-UrDunoWN7X0uQtSvdrQKNY4)
+   ✅ Success!
+
+[82/107] Processing: Screenshot 2025-07-04 at 21.09.09.png
+Deleted 1 document chunks for file ID: 1SzKfUTCWOLT4bzeyYz5dS7aqRiMMefF-
+Deleted 0 document rows for file ID: 1SzKfUTCWOLT4bzeyYz5dS7aqRiMMefF-
+Deleted metadata for file ID: 1SzKfUTCWOLT4bzeyYz5dS7aqRiMMefF-
+Inserted metadata for file 'Screenshot 2025-07-04 at 21.09.09.png' (ID: 1SzKfUTCWOLT4bzeyYz5dS7aqRiMMefF-)
+Successfully processed file 'Screenshot 2025-07-04 at 21.09.09.png' (ID: 1SzKfUTCWOLT4bzeyYz5dS7aqRiMMefF-)
+   ✅ Success!
+
+[83/107] Processing: MCP
+Deleted 8 document chunks for file ID: 1cLSJZ3-9W8s-F7jFBkEmTqsypqSOiZFZYN6lGEfoO2s
+Deleted 0 document rows for file ID: 1cLSJZ3-9W8s-F7jFBkEmTqsypqSOiZFZYN6lGEfoO2s
+Deleted metadata for file ID: 1cLSJZ3-9W8s-F7jFBkEmTqsypqSOiZFZYN6lGEfoO2s
+Inserted metadata for file 'MCP' (ID: 1cLSJZ3-9W8s-F7jFBkEmTqsypqSOiZFZYN6lGEfoO2s)
+Successfully processed file 'MCP' (ID: 1cLSJZ3-9W8s-F7jFBkEmTqsypqSOiZFZYN6lGEfoO2s)
+   ✅ Success!
+
+[84/107] Processing: Untitled document
+Deleted 23 document chunks for file ID: 1ODpLILE3IvhAEROdtFU-K8XrULAmBpoBfr1D-yYkUhY
+Deleted 0 document rows for file ID: 1ODpLILE3IvhAEROdtFU-K8XrULAmBpoBfr1D-yYkUhY
+Deleted metadata for file ID: 1ODpLILE3IvhAEROdtFU-K8XrULAmBpoBfr1D-yYkUhY
+Inserted metadata for file 'Untitled document' (ID: 1ODpLILE3IvhAEROdtFU-K8XrULAmBpoBfr1D-yYkUhY)
+Successfully processed file 'Untitled document' (ID: 1ODpLILE3IvhAEROdtFU-K8XrULAmBpoBfr1D-yYkUhY)
+   ✅ Success!
+
+[85/107] Processing: Josh& jeff 
+Deleted 213 document chunks for file ID: 1zcsNf9CmsLMDWWmVd0to4APjB_znlRkwJCFCbyDMkzs
+Deleted 0 document rows for file ID: 1zcsNf9CmsLMDWWmVd0to4APjB_znlRkwJCFCbyDMkzs
+Deleted metadata for file ID: 1zcsNf9CmsLMDWWmVd0to4APjB_znlRkwJCFCbyDMkzs
+Inserted metadata for file 'Josh& jeff ' (ID: 1zcsNf9CmsLMDWWmVd0to4APjB_znlRkwJCFCbyDMkzs)
+Successfully processed file 'Josh& jeff ' (ID: 1zcsNf9CmsLMDWWmVd0to4APjB_znlRkwJCFCbyDMkzs)
+   ✅ Success!
+
+[86/107] Processing: ADS 
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[87/107] Processing: Sales
+Deleted 1 document chunks for file ID: 1SQ-7tzSyvsmiYfjzmMKF5Uqr9CYqmxFj2eGDeTreSdk
+Deleted 0 document rows for file ID: 1SQ-7tzSyvsmiYfjzmMKF5Uqr9CYqmxFj2eGDeTreSdk
+Deleted metadata for file ID: 1SQ-7tzSyvsmiYfjzmMKF5Uqr9CYqmxFj2eGDeTreSdk
+Inserted metadata for file 'Sales' (ID: 1SQ-7tzSyvsmiYfjzmMKF5Uqr9CYqmxFj2eGDeTreSdk)
+Successfully processed file 'Sales' (ID: 1SQ-7tzSyvsmiYfjzmMKF5Uqr9CYqmxFj2eGDeTreSdk)
+   ✅ Success!
+
+[88/107] Processing: Untitled document
+Deleted 1 document chunks for file ID: 1M_Ikqya6ulbdiMUvWEkijjb3uxJpgcFoniYN9hxbLJw
+Deleted 0 document rows for file ID: 1M_Ikqya6ulbdiMUvWEkijjb3uxJpgcFoniYN9hxbLJw
+Deleted metadata for file ID: 1M_Ikqya6ulbdiMUvWEkijjb3uxJpgcFoniYN9hxbLJw
+Inserted metadata for file 'Untitled document' (ID: 1M_Ikqya6ulbdiMUvWEkijjb3uxJpgcFoniYN9hxbLJw)
+Successfully processed file 'Untitled document' (ID: 1M_Ikqya6ulbdiMUvWEkijjb3uxJpgcFoniYN9hxbLJw)
+   ✅ Success!
+
+[89/107] Processing: Untitled document
+Deleted 2 document chunks for file ID: 1hY7egZrg1qTtRvUquj2UoaKXnfsqVmcvECLFKoTKw88
+Deleted 0 document rows for file ID: 1hY7egZrg1qTtRvUquj2UoaKXnfsqVmcvECLFKoTKw88
+Deleted metadata for file ID: 1hY7egZrg1qTtRvUquj2UoaKXnfsqVmcvECLFKoTKw88
+Inserted metadata for file 'Untitled document' (ID: 1hY7egZrg1qTtRvUquj2UoaKXnfsqVmcvECLFKoTKw88)
+Successfully processed file 'Untitled document' (ID: 1hY7egZrg1qTtRvUquj2UoaKXnfsqVmcvECLFKoTKw88)
+   ✅ Success!
+
+[90/107] Processing: Untitled document
+Deleted 1 document chunks for file ID: 1vWOFu7aA281Yi2Pg3FwXmIkoTmv2ad94itanQqAuSkM
+Deleted 0 document rows for file ID: 1vWOFu7aA281Yi2Pg3FwXmIkoTmv2ad94itanQqAuSkM
+Deleted metadata for file ID: 1vWOFu7aA281Yi2Pg3FwXmIkoTmv2ad94itanQqAuSkM
+Inserted metadata for file 'Untitled document' (ID: 1vWOFu7aA281Yi2Pg3FwXmIkoTmv2ad94itanQqAuSkM)
+Successfully processed file 'Untitled document' (ID: 1vWOFu7aA281Yi2Pg3FwXmIkoTmv2ad94itanQqAuSkM)
+   ✅ Success!
+
+[91/107] Processing: Aristides'
+Deleted 58 document chunks for file ID: 1f00akilNTuqoGMy1iUrr-oj-68tlh44QYnlGBxmf78Q
+Deleted 0 document rows for file ID: 1f00akilNTuqoGMy1iUrr-oj-68tlh44QYnlGBxmf78Q
+Deleted metadata for file ID: 1f00akilNTuqoGMy1iUrr-oj-68tlh44QYnlGBxmf78Q
+Inserted metadata for file 'Aristides'' (ID: 1f00akilNTuqoGMy1iUrr-oj-68tlh44QYnlGBxmf78Q)
+Successfully processed file 'Aristides'' (ID: 1f00akilNTuqoGMy1iUrr-oj-68tlh44QYnlGBxmf78Q)
+   ✅ Success!
+
+[92/107] Processing: Untitled document
+Deleted 1 document chunks for file ID: 1XHUSuIBk41GEfjNjX6dapgeUlx3oKbUWnYxwpKFbFRw
+Deleted 0 document rows for file ID: 1XHUSuIBk41GEfjNjX6dapgeUlx3oKbUWnYxwpKFbFRw
+Deleted metadata for file ID: 1XHUSuIBk41GEfjNjX6dapgeUlx3oKbUWnYxwpKFbFRw
+Inserted metadata for file 'Untitled document' (ID: 1XHUSuIBk41GEfjNjX6dapgeUlx3oKbUWnYxwpKFbFRw)
+Successfully processed file 'Untitled document' (ID: 1XHUSuIBk41GEfjNjX6dapgeUlx3oKbUWnYxwpKFbFRw)
+   ✅ Success!
+
+[93/107] Processing: Dr deb
+Deleted 66 document chunks for file ID: 1NFeIbZnCJjtuevIWDnx6_mo-O-kSTReJMveXxuosDy8
+Deleted 0 document rows for file ID: 1NFeIbZnCJjtuevIWDnx6_mo-O-kSTReJMveXxuosDy8
+Deleted metadata for file ID: 1NFeIbZnCJjtuevIWDnx6_mo-O-kSTReJMveXxuosDy8
+Inserted metadata for file 'Dr deb' (ID: 1NFeIbZnCJjtuevIWDnx6_mo-O-kSTReJMveXxuosDy8)
+Successfully processed file 'Dr deb' (ID: 1NFeIbZnCJjtuevIWDnx6_mo-O-kSTReJMveXxuosDy8)
+   ✅ Success!
+
+[94/107] Processing: Untitled document
+Deleted 49 document chunks for file ID: 16hoCSmbKeCbK2ilFpDWu8JrvsiluSl1Fitd1A-Prf1U
+Deleted 0 document rows for file ID: 16hoCSmbKeCbK2ilFpDWu8JrvsiluSl1Fitd1A-Prf1U
+Deleted metadata for file ID: 16hoCSmbKeCbK2ilFpDWu8JrvsiluSl1Fitd1A-Prf1U
+Inserted metadata for file 'Untitled document' (ID: 16hoCSmbKeCbK2ilFpDWu8JrvsiluSl1Fitd1A-Prf1U)
+Successfully processed file 'Untitled document' (ID: 16hoCSmbKeCbK2ilFpDWu8JrvsiluSl1Fitd1A-Prf1U)
+   ✅ Success!
+
+[95/107] Processing: Ai voice agent ideation context 
+Deleted 172 document chunks for file ID: 1dxJJK10p7e7lYrFbFOxB_Qf8BGti9O2HS6J6dx9Bh_8
+Deleted 0 document rows for file ID: 1dxJJK10p7e7lYrFbFOxB_Qf8BGti9O2HS6J6dx9Bh_8
+Deleted metadata for file ID: 1dxJJK10p7e7lYrFbFOxB_Qf8BGti9O2HS6J6dx9Bh_8
+Inserted metadata for file 'Ai voice agent ideation context ' (ID: 1dxJJK10p7e7lYrFbFOxB_Qf8BGti9O2HS6J6dx9Bh_8)
+Successfully processed file 'Ai voice agent ideation context ' (ID: 1dxJJK10p7e7lYrFbFOxB_Qf8BGti9O2HS6J6dx9Bh_8)
+   ✅ Success!
+
+[96/107] Processing: julian talk tracks
+Deleted 230 document chunks for file ID: 1Lc7uX905GcvNvKj4_x44xYs5WGrJs8LPJwe1HmnsRGo
+Deleted 0 document rows for file ID: 1Lc7uX905GcvNvKj4_x44xYs5WGrJs8LPJwe1HmnsRGo
+Deleted metadata for file ID: 1Lc7uX905GcvNvKj4_x44xYs5WGrJs8LPJwe1HmnsRGo
+Inserted metadata for file 'julian talk tracks' (ID: 1Lc7uX905GcvNvKj4_x44xYs5WGrJs8LPJwe1HmnsRGo)
+Successfully processed file 'julian talk tracks' (ID: 1Lc7uX905GcvNvKj4_x44xYs5WGrJs8LPJwe1HmnsRGo)
+   ✅ Success!
+
+[97/107] Processing: Sean Solano Remote Setter Job Role
+Deleted 8 document chunks for file ID: 1zeXwq9SR169d_Era0tlBVzD5-pEk1wbLcm87rTXJHyU
+Deleted 0 document rows for file ID: 1zeXwq9SR169d_Era0tlBVzD5-pEk1wbLcm87rTXJHyU
+Deleted metadata for file ID: 1zeXwq9SR169d_Era0tlBVzD5-pEk1wbLcm87rTXJHyU
+Inserted metadata for file 'Sean Solano Remote Setter Job Role' (ID: 1zeXwq9SR169d_Era0tlBVzD5-pEk1wbLcm87rTXJHyU)
+Successfully processed file 'Sean Solano Remote Setter Job Role' (ID: 1zeXwq9SR169d_Era0tlBVzD5-pEk1wbLcm87rTXJHyU)
+   ✅ Success!
+
+[98/107] Processing: 25 - Payment Links
+Deleted 2 document chunks for file ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE
+Deleted 51 document rows for file ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE
+Deleted metadata for file ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE
+Inserted metadata for file '25 - Payment Links' (ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE)
+Deleted existing rows for file ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE
+Inserted 51 rows for file ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE
+Successfully processed file '25 - Payment Links' (ID: 1dUd8ZSCe0adF4ZlLmVjSlUmX2pwVdG_ZSCD25CZTYsE)
+   ✅ Success!
+
+[99/107] Processing: Body Pod Articles - Zyra
+Deleted 102 document chunks for file ID: 1eZLhkpeHfp3lY1LDMxncoGrn-Qips574rAI7vv5GfSM
+Deleted 0 document rows for file ID: 1eZLhkpeHfp3lY1LDMxncoGrn-Qips574rAI7vv5GfSM
+Deleted metadata for file ID: 1eZLhkpeHfp3lY1LDMxncoGrn-Qips574rAI7vv5GfSM
+Inserted metadata for file 'Body Pod Articles - Zyra' (ID: 1eZLhkpeHfp3lY1LDMxncoGrn-Qips574rAI7vv5GfSM)
+Successfully processed file 'Body Pod Articles - Zyra' (ID: 1eZLhkpeHfp3lY1LDMxncoGrn-Qips574rAI7vv5GfSM)
+   ✅ Success!
+
+[100/107] Processing: 24 - Sales Email Templates
+Deleted 5 document chunks for file ID: 1SCLL13IZgExMhbGBbrbr1bPGBawdiD_oWAJiT8R9c1M
+Deleted 0 document rows for file ID: 1SCLL13IZgExMhbGBbrbr1bPGBawdiD_oWAJiT8R9c1M
+Deleted metadata for file ID: 1SCLL13IZgExMhbGBbrbr1bPGBawdiD_oWAJiT8R9c1M
+Inserted metadata for file '24 - Sales Email Templates' (ID: 1SCLL13IZgExMhbGBbrbr1bPGBawdiD_oWAJiT8R9c1M)
+Successfully processed file '24 - Sales Email Templates' (ID: 1SCLL13IZgExMhbGBbrbr1bPGBawdiD_oWAJiT8R9c1M)
+   ✅ Success!
+
+[101/107] Processing: 22 - Ads KPI Tracker Sheet *FINISH*
+Deleted 14 document chunks for file ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE
+Deleted 65 document rows for file ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE
+Deleted metadata for file ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE
+Inserted metadata for file '22 - Ads KPI Tracker Sheet *FINISH*' (ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE)
+Deleted existing rows for file ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE
+Inserted 65 rows for file ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE
+Successfully processed file '22 - Ads KPI Tracker Sheet *FINISH*' (ID: 1xHIsPeB0KOx1_LafGt3-TGYAL0vXwv_ZvUupPvG0moE)
+   ✅ Success!
+
+[102/107] Processing: Bonus Assets (not crucial)
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[103/107] Processing: 14 - Three Types Of Objections
+Deleted 11 document chunks for file ID: 1gPhidHN8RsOXkECnWssrJmwXC9-WQARzi-JVkY-4Agk
+Deleted 0 document rows for file ID: 1gPhidHN8RsOXkECnWssrJmwXC9-WQARzi-JVkY-4Agk
+Deleted metadata for file ID: 1gPhidHN8RsOXkECnWssrJmwXC9-WQARzi-JVkY-4Agk
+Inserted metadata for file '14 - Three Types Of Objections' (ID: 1gPhidHN8RsOXkECnWssrJmwXC9-WQARzi-JVkY-4Agk)
+Successfully processed file '14 - Three Types Of Objections' (ID: 1gPhidHN8RsOXkECnWssrJmwXC9-WQARzi-JVkY-4Agk)
+   ✅ Success!
+
+[104/107] Processing: 4 (Sales Function Assets)
+   ⏭️  Skipped (unsupported type: application/vnd.google-apps.folder)
+[105/107] Processing: AIEcom Closer Call script 
+Deleted 57 document chunks for file ID: 1r1m1FaGCXaioCpMMbNVB-tTKUFWTdQFxNXQzS4kdKXE
+Deleted 0 document rows for file ID: 1r1m1FaGCXaioCpMMbNVB-tTKUFWTdQFxNXQzS4kdKXE
+Deleted metadata for file ID: 1r1m1FaGCXaioCpMMbNVB-tTKUFWTdQFxNXQzS4kdKXE
+Inserted metadata for file 'AIEcom Closer Call script ' (ID: 1r1m1FaGCXaioCpMMbNVB-tTKUFWTdQFxNXQzS4kdKXE)
+Successfully processed file 'AIEcom Closer Call script ' (ID: 1r1m1FaGCXaioCpMMbNVB-tTKUFWTdQFxNXQzS4kdKXE)
+   ✅ Success!
+
+[106/107] Processing: 16 - Model Math
+Deleted 3 document chunks for file ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4
+Deleted 29 document rows for file ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4
+Deleted metadata for file ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4
+Inserted metadata for file '16 - Model Math' (ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4)
+Deleted existing rows for file ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4
+Inserted 29 rows for file ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4
+Successfully processed file '16 - Model Math' (ID: 1oUGAQNr0m526ffKsg9sM6z3EU18Epr_3FwijHKtMfX4)
+   ✅ Success!
+
+[107/107] Processing: 4 - Making Sense Of The Data
+Deleted 34 document chunks for file ID: 19YjyLWHebHr_UP7exOiqKLbMuNetmQNjBxxHh5BeYPU
+Deleted 0 document rows for file ID: 19YjyLWHebHr_UP7exOiqKLbMuNetmQNjBxxHh5BeYPU
+Deleted metadata for file ID: 19YjyLWHebHr_UP7exOiqKLbMuNetmQNjBxxHh5BeYPU
+Inserted metadata for file '4 - Making Sense Of The Data' (ID: 19YjyLWHebHr_UP7exOiqKLbMuNetmQNjBxxHh5BeYPU)
+Successfully processed file '4 - Making Sense Of The Data' (ID: 19YjyLWHebHr_UP7exOiqKLbMuNetmQNjBxxHh5BeYPU)
+   ✅ Success!
+
+================================================================================
+📊 BATCH PROCESSING COMPLETE!
+================================================================================
+✅ Processed: 90 files
+⏭️  Skipped: 17 files (unsupported types)
+❌ Errors: 0 files
+📁 Total: 107 files scanned
+
+🎉 Knowledge base is ready!
+
