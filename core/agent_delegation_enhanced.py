@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 
 PROFILE_TOOL_MAP = {
     "document_analyst": [
-        "google_drive_list_files",
+        "google_drive_retrieve_files_from_google_drive",
         "google_sheets_get_rows",
         "google_docs_get_content",
-        "google_drive_search",
+        "google_drive_find_a_file",
         "perplexity_research"
     ],
     "competitor_analyst": [
@@ -391,10 +391,10 @@ You are a document analysis and organization specialist.
 5. **Report**: Provide organized, actionable findings
 
 **Available Tools:**
-- google_drive_list_files: List files and folders in Drive
+- google_drive_retrieve_files_from_google_drive: List files and folders in Drive
 - google_sheets_get_rows: Read spreadsheet data
 - google_docs_get_content: Read document text
-- google_drive_search: Search for specific files
+- google_drive_find_a_file: Search for specific files
 - perplexity_research: Research unfamiliar concepts
 
 **Remember:**
