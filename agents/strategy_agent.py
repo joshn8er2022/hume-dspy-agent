@@ -676,7 +676,108 @@ class StrategyAgent(dspy.Module):
                 logger.error(f"❌ Refinement of {profile} failed: {e}")
                 return json.dumps({"error": str(e), "profile": profile})
         
-        # Return list of tools (existing + MCP + delegation + communication + refinement)
+        # NEW: Phase 2.0 - RAG Knowledge Base Tools
+        def search_knowledge_base(query: str, limit: int = 5) -> str:
+            """
+            Search the RAG knowledge base (87 indexed files, 11,325 chunks).
+            
+            Search across all indexed Google Drive documents including:
+            - Strategy documents & meeting notes
+            - KPI trackers & performance data
+            - Operations & process docs
+            - Product specs & technical docs
+            
+            Args:
+                query: What to search for
+                limit: Max results (default: 5)
+                
+            Returns:
+                Relevant document excerpts with sources
+                
+            Example:
+                search_knowledge_base("What did Julian say about Q1 strategy?")
+            """
+            try:
+                from tools.strategy_tools import search_knowledge_base as _search
+                logger.info(f"🔍 RAG search: {query}")
+                result = run_async_in_thread(_search(query, limit))
+                logger.info(f"✅ RAG search complete")
+                return result
+            except Exception as e:
+                logger.error(f"❌ RAG search failed: {e}")
+                return json.dumps({"error": str(e), "tool": "search_knowledge_base"})
+        
+        def list_indexed_documents() -> str:
+            """
+            List all 87 documents in the knowledge base.
+            
+            Shows what files have been indexed and are searchable.
+            
+            Returns:
+                List of all indexed documents with metadata
+            """
+            try:
+                from tools.strategy_tools import list_indexed_documents as _list
+                logger.info("📚 Listing knowledge base...")
+                result = run_async_in_thread(_list())
+                logger.info("✅ Knowledge base listed")
+                return result
+            except Exception as e:
+                logger.error(f"❌ List failed: {e}")
+                return json.dumps({"error": str(e), "tool": "list_indexed_documents"})
+        
+        def query_spreadsheet_data(file_name: str, query_description: str) -> str:
+            """
+            Query data from indexed spreadsheets.
+            
+            Works with KPI trackers, appointment logs, order data, etc.
+            
+            Args:
+                file_name: Spreadsheet name (e.g., "KPI Tracker")
+                query_description: What to find
+                
+            Returns:
+                Query results from spreadsheet
+                
+            Example:
+                query_spreadsheet_data("Steven Closer KPI Tracker", "conversion rate this month")
+            """
+            try:
+                from tools.strategy_tools import query_spreadsheet_data as _query
+                logger.info(f"📊 Querying spreadsheet: {file_name}")
+                result = run_async_in_thread(_query(file_name, query_description))
+                logger.info("✅ Spreadsheet query complete")
+                return result
+            except Exception as e:
+                logger.error(f"❌ Spreadsheet query failed: {e}")
+                return json.dumps({"error": str(e), "tool": "query_spreadsheet_data"})
+        
+        def wolfram_market_insight(query: str) -> str:
+            """
+            Get strategic market intelligence from Wolfram Alpha.
+            
+            Use for market analysis, economic indicators, demographics, etc.
+            
+            Args:
+                query: Strategic question
+                
+            Returns:
+                Computational analysis from Wolfram Alpha
+                
+            Example:
+                wolfram_market_insight("healthcare spending US vs Europe")
+            """
+            try:
+                from tools.strategy_tools import wolfram_market_insight as _wolfram
+                logger.info(f"🔬 Wolfram query: {query}")
+                result = run_async_in_thread(_wolfram(query))
+                logger.info("✅ Wolfram query complete")
+                return result
+            except Exception as e:
+                logger.error(f"❌ Wolfram query failed: {e}")
+                return json.dumps({"error": str(e), "tool": "wolfram_market_insight"})
+        
+        # Return list of tools (existing + MCP + delegation + communication + refinement + RAG + Wolfram)
         tools = [
             # Existing audit/query tools
             audit_lead_flow,
@@ -690,12 +791,18 @@ class StrategyAgent(dspy.Module):
             # NEW: Phase 1.5 - Agent collaboration tools
             delegate_to_subordinate,  # Spawn specialized subordinates
             ask_other_agent,  # Ask other agents for help
-            refine_subordinate_work  # Iterative refinement
+            refine_subordinate_work,  # Iterative refinement
+            # NEW: Phase 2.0 - RAG Knowledge Base + Strategic Intelligence
+            search_knowledge_base,  # Search 87 indexed docs (11,325 chunks)
+            list_indexed_documents,  # List all indexed files
+            query_spreadsheet_data,  # Query KPI trackers, logs, etc.
+            wolfram_market_insight  # Strategic market intelligence
         ]
-        logger.info(f"   Initialized {len(tools)} ReAct tools (including enhanced delegation)")
+        logger.info(f"   Initialized {len(tools)} ReAct tools (RAG + Wolfram Alpha enabled!)")
         logger.info(f"   - 3 core tools (audit, query, stats)")
         logger.info(f"   - 4 MCP tools (Close CRM, Perplexity, Apify, List)")
         logger.info(f"   - 3 Phase 1.5 tools (delegate, ask_agent, refine)")
+        logger.info(f"   - 4 Phase 2.0 tools (RAG search, list docs, query sheets, Wolfram)")
         return tools
     
     def _register_instruments(self):
