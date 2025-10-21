@@ -1,14 +1,43 @@
 import os
 import argparse
 import sys
+import base64
 from pathlib import Path
 
 from drive_watcher import GoogleDriveWatcher
+
+def setup_credentials():
+    """
+    Setup Google Drive credentials from environment variables (for Railway deployment).
+    If running locally, this will skip if files already exist.
+    """
+    script_dir = Path(__file__).resolve().parent
+    credentials_path = script_dir / 'credentials.json'
+    token_path = script_dir / 'token.json'
+    
+    # Check if we have base64-encoded credentials in environment
+    creds_base64 = os.getenv('GOOGLE_DRIVE_CREDENTIALS_BASE64')
+    token_base64 = os.getenv('GOOGLE_DRIVE_TOKEN_BASE64')
+    
+    if creds_base64 and not credentials_path.exists():
+        print("📝 Setting up credentials.json from environment variable...")
+        with open(credentials_path, 'wb') as f:
+            f.write(base64.b64decode(creds_base64))
+        print("✅ credentials.json created")
+    
+    if token_base64 and not token_path.exists():
+        print("📝 Setting up token.json from environment variable...")
+        with open(token_path, 'wb') as f:
+            f.write(base64.b64decode(token_base64))
+        print("✅ token.json created")
 
 def main():
     """
     Main entry point for the RAG pipeline.
     """
+    # Setup credentials from environment (for Railway)
+    setup_credentials()
+    
     # Get the directory where the script is located
     script_dir = Path(__file__).resolve().parent
     
