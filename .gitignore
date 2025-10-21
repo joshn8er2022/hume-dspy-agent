@@ -72,3 +72,6 @@ htmlcov/
 
 # RAG pipeline config (exception to *.json rule)
 !rag_pipeline/config.json
+
+# Note: credentials.json and token.json should NOT be committed
+# They contain sensitive OAuth tokens and must stay gitignored

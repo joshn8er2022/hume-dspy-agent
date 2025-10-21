@@ -15,10 +15,19 @@ from text_processor import chunk_text, create_embeddings, is_tabular_file, extra
 # Load environment variables
 load_dotenv()
 
-# Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
-supabase: Client = create_client(supabase_url, supabase_key)
+# Lazy initialization of Supabase client
+_supabase_client = None
+
+def get_supabase() -> Client:
+    """Get or create Supabase client (lazy initialization)"""
+    global _supabase_client
+    if _supabase_client is None:
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+        if not supabase_url or not supabase_key:
+            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment")
+        _supabase_client = create_client(supabase_url, supabase_key)
+    return _supabase_client
 
 def delete_document_by_file_id(file_id: str) -> None:
     """
@@ -28,6 +37,7 @@ def delete_document_by_file_id(file_id: str) -> None:
         file_id: The Google Drive file ID
     """
     try:
+        supabase = get_supabase()
         # Delete all documents with the specified file_id in metadata
         response = supabase.table("documents").delete().eq("metadata->>file_id", file_id).execute()
         print(f"Deleted {len(response.data)} document chunks for file ID: {file_id}")
@@ -86,6 +96,7 @@ def insert_document_chunks(chunks: List[str], embeddings: List[List[float]], fil
             })
         
         # Insert the data into the documents table
+        supabase = get_supabase()
         for item in data:
             supabase.table("documents").insert(item).execute()
     except Exception as e:
@@ -102,6 +113,7 @@ def insert_or_update_document_metadata(file_id: str, file_title: str, file_url: 
         schema: Optional schema for tabular files (column names)
     """
     try:
+        supabase = get_supabase()
         # Check if the record already exists
         response = supabase.table("document_metadata").select("*").eq("file_id", file_id).execute()
         
@@ -136,6 +148,7 @@ def insert_document_rows(file_id: str, rows: List[Dict[str, Any]]) -> None:
         rows: List of row data as dictionaries
     """
     try:
+        supabase = get_supabase()
         # First, delete any existing rows for this file
         supabase.table("document_rows").delete().eq("file_id", file_id).execute()
         print(f"Deleted existing rows for file ID: {file_id}")
