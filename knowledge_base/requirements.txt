@@ -1,0 +1,20 @@
+# Knowledge Base Loading Dependencies
+# Install with: pip install -r knowledge_base/requirements.txt
+
+# Core RAG dependencies
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.20
+
+# Vector database
+supabase>=2.0.0
+
+# Document loaders
+pypdf>=3.17.0          # PDF support
+docx2txt>=0.8          # Word doc support
+unstructured>=0.11.0   # Markdown and general text
+python-magic>=0.4.27   # File type detection
+
+# Optional: For advanced features
+openpyxl>=3.1.0       # Excel support (optional)
+pandas>=2.0.0         # CSV/data processing (optional)
