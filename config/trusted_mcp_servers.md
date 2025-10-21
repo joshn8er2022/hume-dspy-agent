@@ -15,6 +15,11 @@
 - GMass email automation
 - Calendar management
 - Data sync across platforms
+- **Google Workspace (68 tools)**: Drive, Docs, Sheets, Gmail, Slides, Calendar
+  - File/folder operations (list, search, create, update, delete)
+  - Document reading, creation, editing
+  - Spreadsheet operations
+  - Email management
 
 **When to USE**:
 - Creating or updating leads in Close CRM
@@ -22,12 +27,14 @@
 - Scheduling meetings or calendar operations
 - Cross-platform data synchronization
 - Business workflow automation
+- **Google Drive/Docs/Sheets operations** (reading, listing, searching, editing files)
+- **Document audits and analysis** (inventory, content extraction)
+- **Email operations** (Gmail read, send, search)
 
 **When NOT to use**:
-- Simple data queries (use Supabase directly instead)
-- Research tasks (use Perplexity instead)
-- Read-only database operations (too expensive)
-- Testing or development work (use mock data)
+- Simple Supabase queries (use query_supabase instead)
+- Web research tasks (use Perplexity instead)
+- Supabase read-only operations (too expensive vs direct queries)
 
 **Cost**: ⚠️ **HIGH**
 - API calls to Zapier ($)
@@ -175,24 +182,29 @@ These tools are always loaded - no MCP server needed. Use these FIRST before con
 Use this to decide which tools to load:
 
 ```
-1. Do we need to CREATE/UPDATE data externally?
+1. Do we need GOOGLE WORKSPACE operations?
+   YES → Use Zapier (Google Drive, Docs, Sheets, Gmail)
+         Examples: List files, read docs, search emails, create spreadsheets
+   NO → Continue
+
+2. Do we need to CREATE/UPDATE external data?
    YES → Consider Zapier (Close CRM, GMass, etc.)
    NO → Continue
 
-2. Do we need RESEARCH on a company?
+3. Do we need RESEARCH on a company?
    YES → Check Supabase first
          Data exists? → Use query_supabase
          Data missing? → Use Perplexity
    NO → Continue
 
-3. Do we need to SCRAPE multiple websites?
+4. Do we need to SCRAPE multiple websites?
    YES → Use Apify (for batch operations)
    NO → Continue
 
-4. Do we need INTERNAL DATA?
+5. Do we need INTERNAL DATA?
    YES → Use query_supabase (fastest)
    
-5. Do we need PIPELINE METRICS?
+6. Do we need PIPELINE METRICS?
    YES → Use get_pipeline_stats
 ```
 
