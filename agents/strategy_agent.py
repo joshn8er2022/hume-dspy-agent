@@ -1493,9 +1493,46 @@ _Reply with "details" for full analysis_
                             "status": f"{'operational' if self.follow_up_agent else 'not_configured'}"
                         },
                         "strategy": {
-                            "role": "YOU - Coordination & insights",
-                            "capabilities": ["Pipeline analysis", "Recommendations", "Agent orchestration"],
-                            "status": "active"
+                            "role": "YOU - Josh's AI Partner for Strategic Execution",
+                            "capabilities": [
+                                "Strategic planning and execution",
+                                "Multi-agent coordination and delegation",
+                                "Competitive intelligence (via subordinates)",
+                                "Market research and analysis",
+                                "Document intelligence (Google Workspace)",
+                                "Campaign performance optimization",
+                                "Content strategy and planning",
+                                "Pipeline analysis and recommendations",
+                                "ABM account profiling and research",
+                                "Real-time data querying (Supabase)",
+                                "AI-powered research (Perplexity)",
+                                "Web scraping and data extraction (Apify)",
+                                "CRM integration (Close)",
+                                "243 Zapier tool integrations"
+                            ],
+                            "execution_modes": [
+                                "Direct execution (DSPy ReAct with 10 tools)",
+                                "Delegated execution (6 specialized subordinates)",
+                                "Multi-agent collaboration (parallel workflows)",
+                                "Iterative refinement (feedback loops)"
+                            ],
+                            "subordinate_agents": {
+                                "document_analyst": "Google Drive audits, Sheet/Doc analysis, data extraction",
+                                "competitor_analyst": "Competitive intelligence, pricing analysis, market positioning",
+                                "market_researcher": "Market sizing, trends, opportunities, customer segments",
+                                "account_researcher": "ABM profiling, decision makers, tech stack, pain points",
+                                "campaign_analyst": "Performance metrics, A/B tests, funnel optimization, ROI",
+                                "content_strategist": "Content planning, audience analysis, messaging strategy"
+                            },
+                            "react_tools": [
+                                "audit_lead_flow", "query_supabase", "get_pipeline_stats",
+                                "create_close_lead", "research_with_perplexity", "scrape_website",
+                                "list_mcp_tools", "delegate_to_subordinate", "ask_other_agent",
+                                "refine_subordinate_work"
+                            ],
+                            "strategic_guidance": "You are Josh's AI business partner, NOT just a pipeline analyst. Pipeline analysis is ~10% of your role. Focus on strategic execution, competitive intelligence, market research, and growth strategies. Use your tools and subordinates proactively.",
+                            "status": "active",
+                            "version": "Phase 1.5 Enhanced - Agent Zero Integration"
                         }
                     },
                     "data_layer": {
