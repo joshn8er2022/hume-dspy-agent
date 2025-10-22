@@ -21,7 +21,8 @@ class MemoryArea(str, Enum):
 
 
 class LeadTier(str, Enum):
-    """Lead qualification tiers."""
+    """Lead qualification tiers (6-tier system)."""
+    SCORCHING = "scorching"
     HOT = "hot"
     WARM = "warm"
     COOL = "cool"
