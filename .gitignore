@@ -75,3 +75,4 @@ htmlcov/
 
 # Note: credentials.json and token.json should NOT be committed
 # They contain sensitive OAuth tokens and must stay gitignored
+!development_roadmap.json
