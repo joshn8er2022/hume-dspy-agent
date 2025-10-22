@@ -3,6 +3,10 @@ import dspy
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import time
+import asyncio
+
+# Agent Zero Memory Integration
+from memory import get_agent_memory, LeadMemory, LeadTier as MemoryLeadTier
 
 from models import (
     Lead,
@@ -49,6 +53,10 @@ class InboundAgent(dspy.Module):
         self.WARM_THRESHOLD = settings.WARM_THRESHOLD
         self.COOL_THRESHOLD = settings.COOL_THRESHOLD
         self.COLD_THRESHOLD = settings.COLD_THRESHOLD
+
+        # Agent Zero Memory System
+        self.memory = get_agent_memory("inbound_agent")
+
 
     def forward(self, lead: Lead) -> QualificationResult:
         """Process and qualify a lead.
@@ -146,6 +154,39 @@ class InboundAgent(dspy.Module):
             model_used=core_settings.dspy_model,
             processing_time_ms=processing_time,
         )
+
+        # AGENT ZERO MEMORY: Save this lead for future learning
+        try:
+            # Convert LeadTier to MemoryLeadTier
+            memory_tier_map = {
+                LeadTier.SCORCHING: MemoryLeadTier.SCORCHING,
+                LeadTier.HOT: MemoryLeadTier.HOT,
+                LeadTier.WARM: MemoryLeadTier.WARM,
+                LeadTier.COOL: MemoryLeadTier.COOL,
+                LeadTier.COLD: MemoryLeadTier.COLD,
+                LeadTier.UNQUALIFIED: MemoryLeadTier.UNQUALIFIED,
+            }
+
+            lead_memory = LeadMemory(
+                lead_id=lead.id,
+                email=lead.email,
+                company=lead.get_field('company'),
+                qualification_score=total_score,
+                tier=memory_tier_map.get(tier, MemoryLeadTier.UNQUALIFIED),
+                practice_size=lead.get_field('business_size'),
+                patient_volume=lead.get_field('patient_volume'),
+                industry=lead.get_field('industry') or 'Healthcare',
+                strategy_used=actions_result.primary_action.action_type if actions_result.primary_action else None,
+                converted=None,  # Will be updated later when we know conversion
+                key_insights=reasoning[:500] if reasoning else None,
+            )
+
+            # Save to memory (async)
+            memory_id = asyncio.run(self.memory.save_lead_memory(lead_memory))
+            print(f"💾 Saved lead to memory: {lead.email} (ID: {memory_id})")
+        except Exception as e:
+            # Graceful degradation - continue even if memory save fails
+            print(f"⚠️ Memory save failed (non-critical): {e}")
 
         return result
 

@@ -14,7 +14,7 @@ from pathlib import Path
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_community.docstore.in_memory import InMemoryDocstore
-from sentence_transformers import SentenceTransformer
+from langchain_community.embeddings import HuggingFaceEmbeddings
 import faiss
 import numpy as np
 
@@ -24,21 +24,6 @@ from memory.models import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class SentenceTransformerEmbeddings:
-    """Embeddings using sentence-transformers (free, no API key)."""
-
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        logger.info(f"Loading embedding model: {model_name}...")
-        self.model = SentenceTransformer(model_name)
-        logger.info(f"✅ Embedding model loaded")
-
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self.model.encode(texts).tolist()
-
-    def embed_query(self, text: str) -> List[float]:
-        return self.model.encode([text])[0].tolist()
 
 
 class AgentMemory:
@@ -58,7 +43,7 @@ class AgentMemory:
         self.db_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize embeddings
-        self.embeddings = SentenceTransformerEmbeddings(embedding_model)
+        self.embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
 
         # Load or create FAISS index
         self.vectorstore = self._load_or_create_vectorstore()
