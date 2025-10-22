@@ -14,6 +14,7 @@ langchain-community>=0.3.0  # Community integrations
 
 # Vector Memory (Phase 0.5)
 faiss-cpu>=1.7.4  # FAISS for semantic search
+sentence-transformers>=2.2.0  # Required for memory embeddings
 numpy>=1.24.0  # Required by FAISS
 
 # Task Queue for Scheduled Follow-ups
