@@ -110,12 +110,13 @@ class ContextBuilder:
 
         try:
             # Query leads by tier
-            response = self.supabase.table("leads").select("tier").execute()
+            response = self.supabase.table("leads").select("qualification_tier").execute()
 
             if response.data:
                 # Count by tier
                 tier_counts = {"HOT": 0, "WARM": 0, "COOL": 0, "COLD": 0, "UNQUALIFIED": 0}
                 for lead in response.data:
+                    tier = lead.get("qualification_tier", "UNQUALIFIED").upper()
                     tier = lead.get("tier", "UNQUALIFIED").upper()
                     if tier in tier_counts:
                         tier_counts[tier] += 1
