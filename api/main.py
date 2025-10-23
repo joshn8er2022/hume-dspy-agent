@@ -358,6 +358,94 @@ async def a2a_introspection(
         )
 
 
+
+# ============================================================================
+# ============================================================================
+
+@app.get("/.well-known/agent.json")
+async def agent_card():
+    """FastA2A agent card endpoint - provides agent metadata."""
+    return {
+        "name": "Hume DSPy Agent",
+        "description": "ABM-powered lead engagement system with multi-agent orchestration",
+        "version": "2.1.0-full-pipeline",
+        "capabilities": [
+            "conversation",
+            "research", 
+            "qualification",
+            "account_orchestration",
+            "follow_up_automation"
+        ],
+        "endpoints": {
+            "a2a": "/a2a",
+            "introspection": "/a2a/introspect"
+        },
+        "agents": [
+            "StrategyAgent",
+            "AccountOrchestrator",
+            "ResearchAgent",
+            "FollowUpAgent",
+            "InboundAgent"
+        ]
+    }
+
+@app.post("/a2a")
+async def a2a_conversation(request: Request):
+    """FastA2A conversational endpoint - handles agent-to-agent chat."""
+    try:
+        payload = await request.json()
+        message_content = payload.get("message", "")
+
+        if not message_content:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No message provided"}
+            )
+
+        logger.info(f"📨 A2A Message received: {message_content[:100]}...")
+
+        # Import StrategyAgent for conversational processing
+        from agents.strategy_agent import StrategyAgent
+
+        # Initialize StrategyAgent (singleton pattern)
+        if not hasattr(app.state, 'strategy_agent'):
+            app.state.strategy_agent = StrategyAgent()
+
+        strategy_agent = app.state.strategy_agent
+
+        # Process message through StrategyAgent
+        import asyncio
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            strategy_agent.forward,
+            message_content
+        )
+
+        logger.info(f"✅ A2A Response generated: {str(response)[:100]}...")
+
+        return JSONResponse(content={
+            "status": "success",
+            "response": str(response),
+            "agent": "StrategyAgent"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ A2A conversation failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+
+
+# ============================================================================
+# ============================================================================
+# FastA2A Protocol Endpoints
+# ============================================================================
+
 @app.post("/webhooks/typeform")
 async def typeform_webhook_receiver(
     request: Request,
