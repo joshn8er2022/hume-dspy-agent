@@ -298,23 +298,61 @@ class StrategyAgent(dspy.Module):
     
     # ===== ReAct Tools =====
     
+    def detect_action_intent(self, message: str) -> bool:
+        """Detect if message requires tool execution (ReAct).
+
+        Action keywords indicate the user wants the agent to DO something,
+        not just talk about it. These queries should use ReAct for tool calling.
+
+        Args:
+            message: User's message
+
+        Returns:
+            True if message requires action/tool execution
+        """
+        action_keywords = [
+            "show me", "get", "find", "search", "analyze", "query",
+            "check", "audit", "pull", "fetch", "retrieve", "calculate",
+            "send", "create", "update", "delete", "execute", "run",
+            "list", "count", "measure", "track", "monitor"
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in action_keywords)
+
     def respond_optimized(self, message: str, user_id: str = "josh", force_complex: bool = False) -> str:
-        """Optimized response (Phoenix: 3-6x faster, 12x cheaper)."""
+        """Optimized response with ReAct routing (Phoenix: 3-6x faster, 12x cheaper)."""
         import time
         start = time.time()
         try:
-            complexity = "complex" if force_complex else classify_message(message)
-            context = build_context(message, self.supabase, force_complex)
-            history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
-            if complexity == "simple":
-                with dspy.context(lm=self.haiku_lm):
-                    result = self.simple_conversation(context=context, user_message=message, conversation_history=history_str)
-                model, cost = "Haiku", 0.0006
+            # NEW: Check for action intent FIRST (enables tool calling via ReAct)
+            if self.detect_action_intent(message):
+                logger.info("🎯 Action intent detected - using ReAct for tool calling")
+                context = build_context(message, self.supabase, True)  # Force complex context for actions
+                history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
+
+                with dspy.context(lm=self.sonnet_lm):  # ReAct needs powerful model
+                    result = self.action_agent(
+                        context=context,
+                        user_message=message,
+                        conversation_history=history_str
+                    )
+                model, cost = "Sonnet+ReAct", 0.0072
+                response = result.response
             else:
-                with dspy.context(lm=self.sonnet_lm):
-                    result = self.complex_conversation(context=context, user_message=message, conversation_history=history_str)
-                model, cost = "Sonnet", 0.0072
-            response = result.response
+                # Existing simple/complex routing for conversational queries
+                complexity = "complex" if force_complex else classify_message(message)
+                context = build_context(message, self.supabase, force_complex)
+                history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
+
+                if complexity == "simple":
+                    with dspy.context(lm=self.haiku_lm):
+                        result = self.simple_conversation(context=context, user_message=message, conversation_history=history_str)
+                    model, cost = "Haiku", 0.0006
+                else:
+                    with dspy.context(lm=self.sonnet_lm):
+                        result = self.complex_conversation(context=context, user_message=message, conversation_history=history_str)
+                    model, cost = "Sonnet", 0.0072
+                response = result.response
             if user_id not in self.conversation_history:
                 self.conversation_history[user_id] = []
             self.conversation_history[user_id].append({"role": "user", "content": message})
