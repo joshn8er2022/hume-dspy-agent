@@ -141,10 +141,10 @@
   <text x="430" y="1020" class="label" text-anchor="middle">✅ InboundAgent → FollowUpAgent</text>
   <text x="430" y="1040" class="label" text-anchor="middle">❌ ResearchAgent → ContentAgent → ExecutionAgent</text>
 
-  <!-- Layer 4: Memory & Intelligence -->
+  <!-- Layer 4: Memory &amp; Intelligence -->
   <line x1="430" y1="1055" x2="430" y2="1090" class="arrow"/>
 
-  <text x="100" y="1085" class="label" font-weight="bold">MEMORY & INTELLIGENCE</text>
+  <text x="100" y="1085" class="label" font-weight="bold">MEMORY &amp; INTELLIGENCE</text>
   <rect x="100" y="1090" width="320" height="70" class="complete" rx="5"/>
   <text x="260" y="1115" class="label" text-anchor="middle" font-weight="bold">FAISS Vector Store</text>
   <text x="260" y="1135" class="label" text-anchor="middle">✅ Lead Memory + Strategy Learning</text>
@@ -175,9 +175,9 @@
   <rect x="660" y="1195" width="120" height="50" class="planned" rx="5"/>
   <text x="720" y="1225" class="label" text-anchor="middle">Direct Mail</text>
 
-  <!-- Right side: Monitoring & Optimization -->
+  <!-- Right side: Monitoring &amp; Optimization -->
   <rect x="820" y="795" width="500" height="450" class="box" rx="5"/>
-  <text x="1070" y="825" class="subtitle" text-anchor="middle">📊 MONITORING & OPTIMIZATION</text>
+  <text x="1070" y="825" class="subtitle" text-anchor="middle">📊 MONITORING &amp; OPTIMIZATION</text>
 
   <rect x="850" y="845" width="440" height="70" class="complete" rx="5"/>
   <text x="1070" y="870" class="label" text-anchor="middle" font-weight="bold">Phoenix Observability</text>
