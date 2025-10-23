@@ -222,7 +222,7 @@
   <text x="710" y="1360" class="label" text-anchor="middle">Lead Qualification: 15-25%</text>
   <text x="710" y="1385" class="label" text-anchor="middle">Multi-touch Engagement: 3-5x</text>
   <text x="710" y="1410" class="label" text-anchor="middle">Research Integration: 100%</text>
-  <text x="710" y="1435" class="label" text-anchor="middle">Response Time: <30s</text>
+  <text x="710" y="1435" class="label" text-anchor="middle">Response Time: &lt;30s</text>
   <text x="710" y="1460" class="label" text-anchor="middle">Revenue: $5M/year</text>
   <text x="710" y="1485" class="label" text-anchor="middle">Channels: 3 (Email+SMS+Calls)</text>
 
@@ -232,7 +232,7 @@
   <text x="1130" y="1360" class="label" text-anchor="middle">Lead Qualification: 30-40%</text>
   <text x="1130" y="1385" class="label" text-anchor="middle">Autonomous Optimization: 100%</text>
   <text x="1130" y="1410" class="label" text-anchor="middle">Account-Based Marketing: Full</text>
-  <text x="1130" y="1435" class="label" text-anchor="middle">Response Time: <10s</text>
+  <text x="1130" y="1435" class="label" text-anchor="middle">Response Time: &lt;10s</text>
   <text x="1130" y="1460" class="label" text-anchor="middle">Revenue: $90M/year</text>
   <text x="1130" y="1485" class="label" text-anchor="middle">Channels: 5 (Full omnichannel)</text>
 
