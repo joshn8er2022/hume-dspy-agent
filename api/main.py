@@ -10,6 +10,9 @@ Slow Path (12-15s, background):
 
 Key Principle: Webhook is a PURE LISTENER - never fails!
 """
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file BEFORE any other imports
+
 
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
@@ -129,6 +132,8 @@ if not SUPABASE_KEY:
     logger.error("   Set one of: SUPABASE_SERVICE_KEY, SUPABASE_KEY, or SUPABASE_ANON_KEY")
     logger.error("   Application cannot start without Supabase credentials")
     raise ValueError("Supabase credentials required but not found in environment variables")
+
+
 
 # Initialize Supabase client
 supabase = None
@@ -381,6 +386,38 @@ async def typeform_webhook_receiver(
                 status_code=400,
                 content={"ok": False, "error": "Invalid JSON"}
             )
+        
+        # ============================================================================
+        # DEDUPLICATION: Check if this Typeform event was already processed
+        # ============================================================================
+        typeform_event_id = payload.get('event_id')
+        
+        if typeform_event_id and supabase:
+            try:
+                # Check if this event_id already exists in raw_events
+                existing = supabase.table('raw_events').select('id, received_at, status').eq('source', source).filter('raw_payload->>event_id', 'eq', typeform_event_id).execute()
+                
+                if existing.data:
+                    # This is a duplicate webhook delivery from Typeform
+                    first_event = existing.data[0]
+                    logger.warning(f"⚠️  DUPLICATE WEBHOOK DETECTED")
+                    logger.warning(f"   Typeform event_id: {typeform_event_id}")
+                    logger.warning(f"   First received: {first_event['received_at']}")
+                    logger.warning(f"   Status: {first_event['status']}")
+                    logger.warning(f"   Returning 200 OK (idempotent)")
+                    
+                    return {
+                        "ok": True,
+                        "duplicate": True,
+                        "event_id": first_event['id'],
+                        "message": "Duplicate webhook ignored (already processed)",
+                        "first_received_at": first_event['received_at']
+                    }
+            except Exception as e:
+                # If deduplication check fails, log but continue processing
+                # Better to process twice than lose an event
+                logger.error(f"⚠️  Deduplication check failed: {str(e)}")
+                logger.error(f"   Continuing with processing...")
         
         # Store raw event
         event_id = await store_raw_event(source, payload, headers)
