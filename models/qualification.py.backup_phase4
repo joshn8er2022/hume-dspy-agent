@@ -81,7 +81,6 @@ class QualificationResult(BaseModel):
     agent_version: str = Field(default="1.0.0")
     model_used: str = Field(default="gpt-4o")
     processing_time_ms: Optional[int] = None
-    campaign_id: Optional[str] = Field(None, description="ABM campaign ID if initiated")
 
     @classmethod
     def from_score(cls, score: int, **kwargs) -> "QualificationResult":

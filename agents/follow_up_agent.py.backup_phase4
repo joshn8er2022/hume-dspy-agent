@@ -5,7 +5,6 @@ This agent manages the entire lead journey autonomously:
 - Monitors for responses
 - Schedules and sends follow-ups
 - Updates Slack thread with progress
-import asyncio
 - Escalates hot leads
 """
 
@@ -24,8 +23,6 @@ from models import Lead, LeadTier, LeadStatus
 from utils.slack_client import SlackClient
 from utils.email_client import EmailClient
 from config.settings import settings
-from agents.account_orchestrator import AccountOrchestrator
-from core.company_graph import CompanyGraph
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +83,6 @@ class FollowUpAgent:
 
         # Build the state graph
         self.graph = self._build_graph()
-
-        # ABM Campaign Integration
-        self.orchestrator = AccountOrchestrator()
-        self.company_graph = CompanyGraph()
 
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state machine for lead journey."""
@@ -230,30 +223,6 @@ class FollowUpAgent:
 
     def send_follow_up(self, state: LeadJourneyState) -> LeadJourneyState:
         """Send a follow-up email."""
-        # ABM Campaign: Execute next campaign step if active campaign exists
-        try:
-            # Check if there's an active ABM campaign for this lead
-            campaign_context = asyncio.run(
-                self.company_graph.get_conversation_context(state['lead_id'])
-            )
-
-            if campaign_context and campaign_context.get('campaign_id'):
-                # Execute next campaign step (might contact colleagues)
-                campaign_result = asyncio.run(
-                    self.orchestrator.execute_campaign_step(campaign_context['campaign_id'])
-                )
-
-                if campaign_result.get('status') == 'completed':
-                    logger.info(f"🎯 ABM Campaign completed for {state['email']}")
-                    state['status'] = 'converted'
-                    return state
-                elif campaign_result.get('colleague_contacted'):
-                    logger.info(f"👥 ABM: Contacted colleague for {state['email']}")
-                    state['follow_up_count'] += 1
-                    return state
-        except Exception as e:
-            logger.warning(f"⚠️ ABM campaign check failed (non-critical): {e}")
-
         try:
             state['follow_up_count'] += 1
 

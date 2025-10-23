@@ -24,10 +24,9 @@ from dspy_modules import (
     GenerateEmailTemplate,
     GenerateSMSMessage,
 )
-# from core import settings as core_settings  # Not needed - using config.settings
+from core import settings as core_settings
 from core.company_context import get_company_context_for_qualification
 from config.settings import settings
-from agents.account_orchestrator import AccountOrchestrator
 
 
 class InboundAgent(dspy.Module):
@@ -57,9 +56,6 @@ class InboundAgent(dspy.Module):
 
         # Agent Zero Memory System
         self.memory = get_agent_memory("inbound_agent")
-
-        # ABM Campaign Orchestrator
-        self.orchestrator = AccountOrchestrator()
 
 
     def forward(self, lead: Lead) -> QualificationResult:
@@ -155,7 +151,7 @@ class InboundAgent(dspy.Module):
             suggested_email_template=email_template,
             suggested_sms_message=sms_template,
             agent_version="1.0.0",
-            model_used=settings.dspy_model,
+            model_used=core_settings.dspy_model,
             processing_time_ms=processing_time,
         )
 
@@ -191,31 +187,6 @@ class InboundAgent(dspy.Module):
         except Exception as e:
             # Graceful degradation - continue even if memory save fails
             print(f"⚠️ Memory save failed (non-critical): {e}")
-
-        
-        # ABM CAMPAIGN: Initiate multi-contact campaign for qualified leads
-        campaign_id = None
-        if is_qualified and tier in [LeadTier.SCORCHING, LeadTier.HOT, LeadTier.WARM]:
-            try:
-                campaign_data = {
-                    'company_name': lead.get_field('company') or 'Unknown Company',
-                    'contact_name': f"{lead.get_field('first_name', '')} {lead.get_field('last_name', '')}".strip() or 'Unknown',
-                    'contact_email': lead.email,
-                    'contact_phone': lead.get_field('phone'),
-                    'contact_title': lead.get_field('title') or 'Unknown',
-                    'inquiry_topic': lead.get_field('ai_summary') or lead.get_field('use_case') or 'our platform',
-                    'qualification_tier': tier.value,
-                    'qualification_score': total_score,
-                    'business_size': lead.get_field('business_size'),
-                    'patient_volume': lead.get_field('patient_volume'),
-                }
-                campaign_result = asyncio.run(self.orchestrator.process_new_lead(campaign_data))
-                campaign_id = campaign_result.get('campaign_id')
-                print(f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})")
-            except Exception as e:
-                print(f"⚠️ ABM campaign initiation failed (non-critical): {e}")
-        if campaign_id:
-            result.campaign_id = campaign_id
 
         return result
 
