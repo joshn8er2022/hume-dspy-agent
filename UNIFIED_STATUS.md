@@ -457,3 +457,123 @@ This phase is ALWAYS messy because:
 ---
 
 **Last Updated**: Oct 24, 2025, 1:01 PM PT
+
+---
+
+## 🧠 HRM-INSPIRED ARCHITECTURE (Strategic/Execution Separation)
+
+**Added**: Oct 24, 2025, 2:55 PM PT
+**Pattern**: Hierarchical Reasoning Model (brain-inspired)
+
+### Two-Tier System
+
+**Strategic Layer** (Slow, Expensive, High-Quality):
+- **StrategyAgent** = Brain's strategic cortex
+- GEPA optimization ($25-30, 3 hours)
+- GPT-4 or Claude Sonnet
+- Complex reasoning, multi-agent coordination
+- Low volume, high impact
+
+**Execution Layer** (Fast, Cheap, High-Volume):
+- **InboundAgent, ResearchAgent, FollowUpAgent, AuditAgent**
+- BootstrapFewShot optimization ($2-5, 30 min each)
+- Free models (Llama, Mixtral, Qwen)
+- Simple execution tasks
+- High volume, fast processing
+
+### Cost Optimization
+
+**Strategic Layer**: $50-100/month (GPT-4 for strategic decisions)
+**Execution Layer**: $0-20/month (free models for grunt work)
+**Total**: $50-120/month (vs $500+ with all GPT-4)
+**Savings**: 75-85% cost reduction ✅
+
+### Performance Impact
+
+**Strategic Layer** (GEPA):
+- 20-point improvement (proven in research)
+- Better strategic decisions
+- Improved task routing
+- **Multiplier effect on all execution**
+
+**Execution Layer** (BootstrapFewShot):
+- 10-15 point improvement
+- Good enough for execution
+- Fast, scalable
+
+---
+
+## 📋 UPDATED WEEK 1.5 PLAN (HRM Architecture)
+
+**Day 2** (Oct 25 - TOMORROW):
+1. 🎯 Enhance FollowUpAgent (add DSPy modules to LangGraph)
+2. 🎯 Fix async/await in agent_communication.py
+3. 🎯 Create natural language feedback metrics
+4. 🎯 Test hybrid pattern
+
+**Day 3** (Oct 26 - GEPA OPTIMIZATION):
+1. 🎯 Implement GEPA for StrategyAgent (Strategic Layer)
+2. 🎯 Run optimization (1.5-3 hours, $25-30)
+3. 🎯 Test strategic reasoning improvement
+
+**Day 4** (Oct 27 - EXECUTION LAYER):
+1. 🎯 Implement BootstrapFewShot for InboundAgent
+2. 🎯 Implement BootstrapFewShot for ResearchAgent
+3. 🎯 Deploy HRM-inspired architecture
+4. 🎯 Measure performance and cost savings
+
+---
+
+## 🎯 IMMEDIATE NEXT STEPS (Day 2 - Tomorrow)
+
+### Task 1: Enhance FollowUpAgent (2 hours)
+
+**Current Issue**: Uses LangChain ChatOpenAI, not DSPy
+
+**Fix**:
+```python
+class FollowUpAgent:
+    def __init__(self):
+        # Keep LangGraph ✅
+        self.graph = self._build_graph()
+        
+        # Add DSPy modules ✅
+        self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+        self.decide_next = dspy.ChainOfThought(DecideNextAction)
+```
+
+### Task 2: Fix Async/Await (30 min)
+
+**Current Issue**: DSPy calls block event loop
+
+**Fix**:
+```python
+import asyncio
+
+async def call_agent(self, ...) -> A2AResponse:
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None,
+        self.agent_tool_call,
+        agent_name, task, context
+    )
+    return A2AResponse(...)
+```
+
+### Task 3: Create Feedback Metrics (1 hour)
+
+**For GEPA optimization**:
+```python
+def strategy_quality_with_feedback(example, prediction, trace=None):
+    if prediction.success:
+        return 1.0, "Excellent strategic decision!"
+    else:
+        feedback = f"Strategic error: {prediction.error}. "
+        feedback += f"Expected: {example.expected_outcome}. "
+        feedback += f"Got: {prediction.actual_outcome}."
+        return 0.0, feedback
+```
+
+---
+
+**Last Updated**: Oct 24, 2025, 2:55 PM PT
