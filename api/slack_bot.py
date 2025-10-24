@@ -173,6 +173,49 @@ async def handle_message_async(event: Dict[str, Any], event_id: str):
 # COMMAND ROUTING
 # ============================================================================
 
+async def get_real_pipeline_data() -> dict:
+    """Query Supabase for REAL pipeline data (not fake numbers).
+
+    Returns:
+        dict with tier counts and metadata
+    """
+    from datetime import datetime
+
+    try:
+        # Query today's leads
+        today = datetime.now().date().isoformat()
+        result = supabase.table('raw_events') \
+            .select('tier, created_at') \
+            .gte('created_at', today) \
+            .execute()
+
+        # Count by tier
+        tier_counts = {}
+        for event in result.data:
+            tier = event.get('tier', 'UNKNOWN')
+            tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+        return {
+            'total': len(result.data),
+            'hot': tier_counts.get('HOT', 0),
+            'warm': tier_counts.get('WARM', 0),
+            'cool': tier_counts.get('COOL', 0),
+            'unknown': tier_counts.get('UNKNOWN', 0),
+            'query_time': datetime.now().isoformat(),
+            'source': 'Supabase raw_events table'
+        }
+    except Exception as e:
+        logger.error(f"Error querying real pipeline data: {e}")
+        return {
+            'total': 0,
+            'hot': 0,
+            'warm': 0,
+            'cool': 0,
+            'unknown': 0,
+            'error': str(e)
+        }
+
+
 async def route_command(text: str, user: str) -> str:
     """Route Slack command to appropriate agent.
     
@@ -193,169 +236,14 @@ async def route_command(text: str, user: str) -> str:
     
     # ===== AGENT CALLER COMMANDS =====
     
-    # Call Research Agent
-    if any(word in text_lower for word in ["call research", "research agent", "talk to research"]):
-        return await call_research_agent(text)
-    
-    # Call Inbound Agent
-    elif any(word in text_lower for word in ["call inbound", "inbound agent", "qualification"]):
-        return await call_inbound_agent(text)
-    
-    # Call Follow-Up Agent
-    elif any(word in text_lower for word in ["call follow", "follow-up agent", "followup"]):
-        return await call_followup_agent(text)
-    
-    # ===== QUICK COMMANDS =====
-    
-    # Show pipeline status
-    elif any(word in text_lower for word in ["pipeline", "status", "how many leads"]):
-        return await quick_pipeline_status()
-    
-    # Research a lead
-    elif "research lead" in text_lower or "research" in text_lower:
-        return await quick_research_lead(text)
-    
-    # List agents
-    elif any(word in text_lower for word in ["list agents", "show agents", "available agents"]):
-        return get_available_agents(user_question=text)
-    
-    # Help
-    elif any(word in text_lower for word in ["help", "what can you do", "commands"]):
-        return get_help_message(user_message=text)
-    
-    # ===== DEFAULT: Strategy Agent Conversational (Pure DSPy) =====
-    else:
-        # Pass user ID for conversation history tracking
-        return await strategy_agent.chat_with_josh(text, user_id=user)
+    # ===== STRATEGY AGENT (ALL MESSAGES) =====
+    # All messages go to StrategyAgent for intelligent routing
+    # StrategyAgent will decide if it needs to delegate to other agents
+    return await strategy_agent.chat_with_josh(text, user_id=user)
 
 
 # ============================================================================
 # AGENT CALLERS
-# ============================================================================
-
-async def call_research_agent(text: str) -> str:
-    """Call the Research Agent - DSPy generates contextual menu.
-    
-    Args:
-        text: Original message text (user context)
-    
-    Returns:
-        DSPy-generated menu with capabilities and examples
-    """
-    if not agent_menu_generator:
-        return "❌ Agent menu generator not configured"
-    
-    try:
-        # Build agent capabilities dynamically
-        capabilities = """Person research (Clearbit), Company research (Apollo), 
-Contact discovery, Competitive intelligence, Lead deep-dive"""
-        
-        # Check API key status dynamically
-        clearbit_status = "✅" if strategy_agent.research_agent.clearbit_api_key else "❌"
-        apollo_status = "✅" if strategy_agent.research_agent.apollo_api_key else "❌"
-        perplexity_status = "✅" if strategy_agent.research_agent.perplexity_api_key else "❌"
-        
-        recent_leads = "Example: research person: Dr. Sarah at Wellness Clinic"
-        
-        result = agent_menu_generator(
-            agent_name="Research Agent",
-            agent_capabilities=f"{capabilities}\n\nStatus: Clearbit {clearbit_status}, Apollo {apollo_status}, Perplexity {perplexity_status}",
-            user_context=text,
-            recent_leads=recent_leads
-        )
-        
-        # Format menu with suggested command and example
-        response = f"🔍 {result.menu_text}"
-        if result.suggested_command:
-            response += f"\n\n**Try this:** `{result.suggested_command}`"
-        if result.example_usage:
-            response += f"\n\n**Example:**\n```\n{result.example_usage}\n```"
-        
-        return response
-    
-    except Exception as e:
-        logger.error(f"Error generating research agent menu: {e}")
-        return "🔍 Research Agent menu temporarily unavailable. Try asking: 'research [person/company]'"
-
-
-async def call_inbound_agent(text: str) -> str:
-    """Call the Inbound Agent - DSPy generates contextual menu.
-    
-    Args:
-        text: Original message text (user context)
-    
-    Returns:
-        DSPy-generated menu with capabilities
-    """
-    if not agent_menu_generator:
-        return "❌ Agent menu generator not configured"
-    
-    try:
-        capabilities = """Lead qualification (DSPy-powered), Scoring explanations, 
-Pipeline analysis, Requalification, Test qualification logic"""
-        
-        recent_leads = "Recent: 3 HOT, 7 WARM, 10 COOL leads qualified today"
-        
-        result = agent_menu_generator(
-            agent_name="Inbound Agent",
-            agent_capabilities=capabilities,
-            user_context=text,
-            recent_leads=recent_leads
-        )
-        
-        response = f"📥 {result.menu_text}"
-        if result.suggested_command:
-            response += f"\n\n**Try this:** `{result.suggested_command}`"
-        if result.example_usage:
-            response += f"\n\n**Example:**\n```\n{result.example_usage}\n```"
-        
-        return response
-    
-    except Exception as e:
-        logger.error(f"Error generating inbound agent menu: {e}")
-        return "📥 Inbound Agent menu temporarily unavailable. Try asking: 'show recent leads'"
-
-
-async def call_followup_agent(text: str) -> str:
-    """Call the Follow-Up Agent - DSPy generates contextual menu.
-    
-    Args:
-        text: Original message text (user context)
-    
-    Returns:
-        DSPy-generated menu with capabilities
-    """
-    if not agent_menu_generator:
-        return "❌ Agent menu generator not configured"
-    
-    try:
-        capabilities = """Follow-up email sequences (GMass), Sequence state tracking, 
-Pause/resume sequences, Escalate to human, 8-stage tier-based campaigns"""
-        
-        recent_leads = "Active: 15 HOT sequences, 23 WARM sequences, next send in 2 hours"
-        
-        result = agent_menu_generator(
-            agent_name="Follow-Up Agent",
-            agent_capabilities=capabilities,
-            user_context=text,
-            recent_leads=recent_leads
-        )
-        
-        response = f"📧 {result.menu_text}"
-        if result.suggested_command:
-            response += f"\n\n**Try this:** `{result.suggested_command}`"
-        if result.example_usage:
-            response += f"\n\n**Example:**\n```\n{result.example_usage}\n```"
-        
-        return response
-    
-    except Exception as e:
-        logger.error(f"Error generating follow-up agent menu: {e}")
-        return "📧 Follow-Up Agent menu temporarily unavailable. Try asking: 'show followup status'"
-
-
-# ============================================================================
-# QUICK COMMANDS
 # ============================================================================
 
 async def quick_pipeline_status() -> str:

@@ -1166,34 +1166,65 @@ class StrategyAgent(dspy.Module):
             parameters={"days": days}
         )
         
-        # For now, return mock data (TODO: Implement real Supabase query)
-        return PipelineAnalysis(
-            period_days=days,
-            total_leads=42,
-            by_tier={
-                "SCORCHING": 3,
-                "HOT": 8,
-                "WARM": 15,
-                "COOL": 10,
-                "COLD": 6
-            },
-            by_source={
-                "typeform": 35,
-                "vapi": 7
-            },
-            conversion_rate=0.26,  # 26% HOT+SCORCHING
-            avg_qualification_score=62.5,
-            top_industries=[
-                "Weight Loss Clinics",
-                "Functional Medicine",
-                "Corporate Wellness"
-            ],
-            insights=[
-                "HOT leads increased 40% vs previous week",
-                "Functional medicine segment shows 80% qualification rate",
-                "3 leads awaiting Calendly booking - follow up recommended"
-            ]
-        )
+        # Query Supabase for REAL pipeline data
+        from datetime import datetime, timedelta
+
+        try:
+            start_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+            result = self.supabase.table('raw_events') \
+                .select('*') \
+                .gte('created_at', start_date) \
+                .execute()
+
+            # Count by tier and source
+            tier_counts = {}
+            source_counts = {}
+
+            for event in result.data:
+                tier = event.get('tier', 'UNKNOWN')
+                source = event.get('source', 'unknown')
+                tier_counts[tier] = tier_counts.get(tier, 0) + 1
+                source_counts[source] = source_counts.get(source, 0) + 1
+
+            total_leads = len(result.data)
+            hot_leads = tier_counts.get('HOT', 0) + tier_counts.get('SCORCHING', 0)
+            conversion_rate = hot_leads / total_leads if total_leads > 0 else 0
+
+            # Generate REAL insights based on actual data
+            insights = []
+            if tier_counts.get('UNKNOWN', 0) == total_leads and total_leads > 0:
+                insights.append(f"⚠️ All {total_leads} leads are unclassified (tier: UNKNOWN) - qualification system may not be running")
+            if total_leads == 0:
+                insights.append(f"No leads in last {days} days - check data pipeline")
+            if hot_leads > 0:
+                insights.append(f"{hot_leads} HOT/SCORCHING leads require immediate follow-up")
+
+            logger.info(f"📊 Real pipeline data: {total_leads} total, {tier_counts}")
+
+            return PipelineAnalysis(
+                period_days=days,
+                total_leads=total_leads,
+                by_tier=tier_counts,
+                by_source=source_counts,
+                conversion_rate=conversion_rate,
+                avg_qualification_score=0,  # TODO: Calculate from actual scores
+                top_industries=[],  # TODO: Extract from lead data
+                insights=insights
+            )
+
+        except Exception as e:
+            logger.error(f"Error analyzing pipeline: {e}")
+            return PipelineAnalysis(
+                period_days=days,
+                total_leads=0,
+                by_tier={},
+                by_source={},
+                conversion_rate=0,
+                avg_qualification_score=0,
+                top_industries=[],
+                insights=[f"Error querying pipeline data: {str(e)}"]
+            )
     
     async def recommend_outbound_targets(
         self,

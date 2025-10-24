@@ -6,8 +6,8 @@ generates fixes using DSPy, and proposes them to Josh via Slack for approval.
 Pattern:
 1. Monitor logs continuously (Railway + Phoenix)
 2. Detect anomalies (errors, performance issues, patterns)
-3. Analyze root cause (DSPy-powered)
-4. Generate fix (DSPy-powered code generation)
+3. Analyze root cause 
+4. Generate fix (code generation)
 5. Post to Slack for approval
 6. Apply fix when approved
 
