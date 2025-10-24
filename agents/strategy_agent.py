@@ -41,6 +41,23 @@ from core.context_builder import build_context
 
 
 
+from enum import Enum
+
+# ===== Agent State Management =====
+
+class AgentState(str, Enum):
+    """Agent state for visibility and tracking."""
+    IDLE = 'idle'
+    RECEIVING_MESSAGE = 'receiving_message'
+    REASONING = 'reasoning'
+    CALLING_TOOL = 'calling_tool'
+    DELEGATING = 'delegating'
+    WAITING_FOR_SUBORDINATE = 'waiting_for_subordinate'
+    SYNTHESIZING_RESULTS = 'synthesizing_results'
+    RESPONDING = 'responding'
+    ERROR = 'error'
+
+
 # ===== Data Models =====
 
 class PipelineAnalysis(BaseModel):
@@ -298,6 +315,75 @@ class StrategyAgent(dspy.Module):
     
     # ===== ReAct Tools =====
     
+
+        # State tracking for visibility
+        self.state = AgentState.IDLE
+        self.state_history = []
+        logger.info("✅ StrategyAgent initialized with state tracking")
+
+    async def set_state(self, state: AgentState, metadata: dict = None):
+        """Update agent state and broadcast to Slack if important.
+
+        Args:
+            state: New agent state
+            metadata: Optional metadata about state transition
+        """
+        # Update state
+        self.state = state
+
+        # Log transition
+        self.state_history.append({
+            'state': state.value,
+            'timestamp': datetime.now().isoformat(),
+            'metadata': metadata or {}
+        })
+
+        # Log to console
+        logger.info(f"🤖 State: {state.value} {metadata or ''}")
+
+        # Broadcast to Slack (only important states to avoid spam)
+        important_states = [
+            AgentState.DELEGATING,
+            AgentState.WAITING_FOR_SUBORDINATE,
+            AgentState.ERROR
+        ]
+
+        if state in important_states and self.slack_bot_token:
+            try:
+                # Format notification
+                emoji_map = {
+                    AgentState.DELEGATING: '🔄',
+                    AgentState.WAITING_FOR_SUBORDINATE: '⏳',
+                    AgentState.ERROR: '❌'
+                }
+                emoji = emoji_map.get(state, '🤖')
+
+                notification = f"{emoji} **StrategyAgent State**: {state.value}"
+                if metadata:
+                    notification += "\n" + json.dumps(metadata, indent=2)
+
+                # Send to Slack (async, don't block)
+                asyncio.create_task(self._send_slack_notification(notification))
+            except Exception as e:
+                logger.error(f"Failed to broadcast state: {e}")
+
+    async def _send_slack_notification(self, message: str):
+        """Send state notification to Slack."""
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    "https://slack.com/api/chat.postMessage",
+                    headers={"Authorization": f"Bearer {self.slack_bot_token}"},
+                    json={
+                        "channel": self.josh_slack_dm_channel,
+                        "text": message
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Failed to send Slack notification: {e}")
+
+
     def detect_action_intent(self, message: str) -> bool:
         """Detect if message requires tool execution (ReAct).
 
@@ -319,14 +405,18 @@ class StrategyAgent(dspy.Module):
         message_lower = message.lower()
         return any(keyword in message_lower for keyword in action_keywords)
 
-    def respond_optimized(self, message: str, user_id: str = "josh", force_complex: bool = False) -> str:
+    async def respond_optimized(self, message: str, user_id: str = "josh", force_complex: bool = False) -> str:
         """Optimized response with ReAct routing (Phoenix: 3-6x faster, 12x cheaper)."""
         import time
         start = time.time()
         try:
+            # State: Receiving message
+            await self.set_state(AgentState.RECEIVING_MESSAGE)
+
             # NEW: Check for action intent FIRST (enables tool calling via ReAct)
             if self.detect_action_intent(message):
                 logger.info("🎯 Action intent detected - using ReAct for tool calling")
+                await self.set_state(AgentState.REASONING)
                 context = build_context(message, self.supabase, True)  # Force complex context for actions
                 history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
 
@@ -359,9 +449,12 @@ class StrategyAgent(dspy.Module):
             self.conversation_history[user_id].append({"role": "assistant", "content": response})
             if len(self.conversation_history[user_id]) > 20:
                 self.conversation_history[user_id] = self.conversation_history[user_id][-20:]
+            await self.set_state(AgentState.RESPONDING)
             logger.info(f"⚡ {time.time()-start:.2f}s | {model} | ${cost:.4f}")
+            await self.set_state(AgentState.IDLE)
             return response
         except Exception as e:
+            await self.set_state(AgentState.ERROR, {'error': str(e)})
             logger.error(f"❌ respond_optimized: {e}")
             return f"Error: {str(e)}"
 
@@ -1146,7 +1239,7 @@ class StrategyAgent(dspy.Module):
             DSPy-generated response text
         """
         # Phoenix optimization: use respond_optimized
-        return self.respond_optimized(message=message, user_id=user_id)
+        return await self.respond_optimized(message=message, user_id=user_id)
 
     async def analyze_pipeline(self, days: int = 7) -> PipelineAnalysis:
         """Analyze the inbound pipeline.
