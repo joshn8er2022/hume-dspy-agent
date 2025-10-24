@@ -14,7 +14,7 @@
 
 **Strategic Layer** (StrategyAgent):
 - GEPA optimization ($30)
-- GPT-4 or Claude Sonnet (customer-facing)
+- Claude Sonnet (primary) or GPT-4 (customer-facing)
 - Llama 3.1 70B + GEPA (autonomous overnight)
 - Complex reasoning, multi-agent coordination
 
@@ -87,8 +87,8 @@
 
 **COMPOUNDING EFFECT**: 10-15x better than baseline free model!
 
-**Comparison to GPT-4 o1**:
-- GPT-4 o1-preview: $200/hour, 90-95% accuracy
+**Comparison to Claude Opus or GPT-4 o1**:
+- Claude Opus or GPT-4 o1-preview: $200/hour, 90-95% accuracy
 - Llama + GEPA + Sequential: $0/hour runtime, 85-95% accuracy
 - **Result: Match o1 performance at 99.9% cost reduction!**
 
@@ -114,7 +114,7 @@
 
 ### Monthly Runtime Costs
 
-**Customer-Facing** (GPT-4/Claude):
+**Customer-Facing** (Claude/GPT-4):
 - Direct user interactions: $50-100/month
 
 **Autonomous Strategic** (Llama + GEPA):
@@ -140,6 +140,54 @@
 **ROI**: $200 investment → $350-440/month savings = **2x ROI in first month!**
 
 ---
+
+
+---
+
+## 🎯 MODEL SELECTION STRATEGY (Model-Agnostic via LiteLLM)
+
+**Primary Models** (via OpenRouter):
+- **Claude Sonnet 4.5**: Primary for strategic reasoning ($3/M tokens)
+- **Claude Haiku 4.5**: Fast execution tasks ($0.25/M tokens)
+- **Llama 3.1 70B**: Free autonomous work (via Groq)
+- **Mixtral 8x7B**: Free high-volume execution (via Groq)
+- **Qwen 2.5 72B**: Free alternative (via OpenRouter)
+
+**Fallback Models**:
+- GPT-4o: If Claude unavailable
+- GPT-4o Mini: Fast cheap alternative
+
+**Model-Agnostic Architecture**:
+- LiteLLM handles all model calls
+- OpenRouter provides unified API
+- Easy to switch models per task
+- A/B test different models
+- Optimize for cost/performance trade-offs
+
+**GEPA Optimization**:
+- Can optimize for ANY model (Claude, GPT-4, Llama, etc.)
+- Model-specific optimizations saved separately
+- Load appropriate optimized prompts per model
+
+**Example**:
+```python
+class SmartModelSelector:
+    MODELS = {
+        "strategic": "openrouter/anthropic/claude-sonnet-4.5",
+        "fast": "openrouter/anthropic/claude-haiku-4.5",
+        "free_strategic": "groq/llama-3.1-70b-versatile",
+        "free_execution": "groq/mixtral-8x7b-32768"
+    }
+    
+    def select(self, task_type, is_customer_facing, is_autonomous):
+        if is_customer_facing:
+            return self.MODELS["strategic"]  # Claude Sonnet
+        elif is_autonomous and task_type == "strategic":
+            return self.MODELS["free_strategic"]  # Llama + GEPA
+        else:
+            return self.MODELS["free_execution"]  # Mixtral
+```
+
 
 ## 🚀 COMPLETE IMPLEMENTATION ROADMAP
 
