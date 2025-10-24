@@ -1,17 +1,17 @@
 """
-Comprehensive Pydantic Data Models
+Comprehensive Pydantic Data Models (v2 Compatible)
 
 All data structures for Hume DSPy Agent system.
 Follows hybrid LangGraph+DSPy+Pydantic architecture.
 
 Principles:
 - ALL data must be Pydantic BaseModel
-- Validators for business logic
+- Validators for business logic (v2 API)
 - Proper field descriptions
 - Type safety throughout
 """
 
-from pydantic import BaseModel, Field, validator, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -80,7 +80,7 @@ class Lead(BaseModel):
     updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     
     # Metadata
-    source: Optional[str] = Field(default=None, description="Lead source (typeform, manual, etc.)")
+    source: Optional[str] = Field(default=None, description="Lead source")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     
     @field_validator('email')
@@ -105,13 +105,53 @@ class QualificationResult(BaseModel):
     lead_id: str = Field(..., description="Lead UUID")
     tier: QualificationTier = Field(..., description="Qualification tier")
     score: int = Field(..., ge=0, le=100, description="Overall score")
-    business_fit_score: int = Field(..., ge=0, le=50, description="Business fit score")
-    engagement_score: int = Field(..., ge=0, le=50, description="Engagement score")
+    business_fit_score: int = Field(..., ge=0, le=50)
+    engagement_score: int = Field(..., ge=0, le=50)
     
     reasoning: str = Field(..., description="Qualification reasoning")
-    next_actions: List[str] = Field(default_factory=list, description="Recommended actions")
+    next_actions: List[str] = Field(default_factory=list)
     
     qualified_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ===== COMPANY & CONTACT MODELS =====
+
+class CompanyData(BaseModel):
+    """Company information."""
+    name: str = Field(..., description="Company name")
+    domain: Optional[str] = Field(default=None, description="Company domain")
+    industry: Optional[str] = Field(default=None, description="Industry")
+    size: Optional[str] = Field(default=None, description="Company size")
+    revenue: Optional[str] = Field(default=None, description="Annual revenue")
+    location: Optional[str] = Field(default=None, description="HQ location")
+    
+    # Metadata
+    linkedin: Optional[str] = Field(default=None)
+    website: Optional[str] = Field(default=None)
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+
+class ContactInfo(BaseModel):
+    """Contact information."""
+    id: Optional[str] = Field(default=None, description="Contact UUID")
+    name: str = Field(..., description="Contact name")
+    email: str = Field(..., description="Contact email")
+    title: Optional[str] = Field(default=None, description="Job title")
+    phone: Optional[str] = Field(default=None, description="Phone number")
+    linkedin: Optional[str] = Field(default=None, description="LinkedIn URL")
+    
+    # Company
+    company_name: Optional[str] = Field(default=None)
+    
+    # Metadata
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        if '@' not in v:
+            raise ValueError('Invalid email format')
+        return v.lower().strip()
 
 
 # ===== COMMUNICATION MODELS =====
@@ -121,9 +161,9 @@ class EmailMessage(BaseModel):
     to: str = Field(..., description="Recipient email")
     subject: str = Field(..., description="Email subject")
     body: str = Field(..., description="Email body (HTML or plain text)")
-    from_email: Optional[str] = Field(default=None, description="Sender email")
-    cc: Optional[List[str]] = Field(default=None, description="CC recipients")
-    bcc: Optional[List[str]] = Field(default=None, description="BCC recipients")
+    from_email: Optional[str] = Field(default=None)
+    cc: Optional[List[str]] = Field(default=None)
+    bcc: Optional[List[str]] = Field(default=None)
     
     # Metadata
     template_id: Optional[str] = Field(default=None)
@@ -141,8 +181,8 @@ class EmailMessage(BaseModel):
 class SMSMessage(BaseModel):
     """SMS message data model."""
     to: str = Field(..., description="Recipient phone number")
-    body: str = Field(..., max_length=160, description="SMS body (max 160 chars)")
-    from_number: Optional[str] = Field(default=None, description="Sender phone")
+    body: str = Field(..., max_length=160, description="SMS body")
+    from_number: Optional[str] = Field(default=None)
     
     # Metadata
     lead_id: Optional[str] = Field(default=None)
@@ -152,19 +192,33 @@ class SMSMessage(BaseModel):
     @classmethod
     def validate_length(cls, v: str) -> str:
         if len(v) > 160:
-            raise ValueError('SMS body must be 160 characters or less')
+            raise ValueError('SMS must be 160 characters or less')
         return v
 
 
 class CallRecord(BaseModel):
     """Phone call record."""
-    lead_id: str = Field(..., description="Lead UUID")
-    phone_number: str = Field(..., description="Phone number called")
+    lead_id: str = Field(...)
+    phone_number: str = Field(...)
     duration_seconds: Optional[int] = Field(default=None, ge=0)
-    outcome: Optional[str] = Field(default=None, description="Call outcome")
-    transcript: Optional[str] = Field(default=None, description="Call transcript")
+    outcome: Optional[str] = Field(default=None)
+    transcript: Optional[str] = Field(default=None)
     
     called_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+
+class Touchpoint(BaseModel):
+    """Campaign touchpoint."""
+    id: Optional[str] = Field(default=None)
+    contact_id: str = Field(...)
+    channel: ChannelType = Field(...)
+    message: str = Field(...)
+    
+    scheduled_at: datetime = Field(...)
+    executed_at: Optional[datetime] = Field(default=None)
+    outcome: Optional[str] = Field(default=None)
+    
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -172,7 +226,7 @@ class CallRecord(BaseModel):
 
 class ResearchFindings(BaseModel):
     """Research findings data model."""
-    lead_id: str = Field(..., description="Lead UUID")
+    lead_id: str = Field(...)
     company_name: Optional[str] = Field(default=None)
     
     # Findings
@@ -181,8 +235,8 @@ class ResearchFindings(BaseModel):
     competitive_intel: Optional[Dict[str, Any]] = Field(default_factory=dict)
     
     # Quality
-    sources: List[str] = Field(default_factory=list, description="Data sources")
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Confidence score")
+    sources: List[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     
     researched_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -191,8 +245,8 @@ class ResearchFindings(BaseModel):
 
 class FollowUpState(BaseModel):
     """State for FollowUpAgent LangGraph workflow."""
-    lead: Lead = Field(..., description="Lead being followed up")
-    qualification: QualificationResult = Field(..., description="Qualification result")
+    lead: Lead = Field(...)
+    qualification: QualificationResult = Field(...)
     
     # Sequence tracking
     emails_sent: int = Field(default=0, ge=0)
@@ -206,6 +260,7 @@ class FollowUpState(BaseModel):
     # Current state
     current_step: str = Field(default="initial_email")
     next_action: str = Field(default="send_initial_email")
+    current_email: Optional[EmailMessage] = Field(default=None)
     
     # Results
     responses_received: int = Field(default=0)
@@ -214,8 +269,9 @@ class FollowUpState(BaseModel):
 
 class ABMCampaignState(BaseModel):
     """State for AccountOrchestrator LangGraph workflow."""
-    company_name: str = Field(..., description="Target company")
-    contacts: List[Dict[str, Any]] = Field(default_factory=list, description="Company contacts")
+    company: CompanyData = Field(...)
+    contacts: List[ContactInfo] = Field(default_factory=list)
+    touchpoints: List[Touchpoint] = Field(default_factory=list)
     
     # Campaign tracking
     touchpoints_executed: int = Field(default=0)
@@ -235,13 +291,13 @@ class ABMCampaignState(BaseModel):
 
 class StrategyDecision(BaseModel):
     """Strategic decision data model."""
-    decision_type: str = Field(..., description="Type of decision")
-    recommendation: str = Field(..., description="Recommended action")
-    reasoning: str = Field(..., description="Decision reasoning")
+    decision_type: str = Field(...)
+    recommendation: str = Field(...)
+    reasoning: str = Field(...)
     
     # Impact
-    expected_impact: str = Field(..., description="Expected outcome")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in decision")
+    expected_impact: str = Field(...)
+    confidence: float = Field(..., ge=0.0, le=1.0)
     
     # Execution
     priority: Priority = Field(default=Priority.MEDIUM)
@@ -273,10 +329,10 @@ class PipelineStats(BaseModel):
 
 class Task(BaseModel):
     """Task data model for delegation."""
-    id: str = Field(..., description="Task UUID")
-    description: str = Field(..., description="Task description")
-    assigned_to: str = Field(..., description="Agent assigned to task")
-    assigned_by: str = Field(..., description="Agent that assigned task")
+    id: str = Field(...)
+    description: str = Field(...)
+    assigned_to: str = Field(...)
+    assigned_by: str = Field(...)
     
     priority: Priority = Field(default=Priority.MEDIUM)
     status: str = Field(default="pending")
@@ -295,10 +351,10 @@ class Task(BaseModel):
 
 class Issue(BaseModel):
     """Issue detected by monitoring."""
-    id: str = Field(..., description="Issue UUID")
-    severity: str = Field(..., description="critical, high, medium, low")
-    description: str = Field(..., description="Issue description")
-    component: str = Field(..., description="Affected component")
+    id: str = Field(...)
+    severity: str = Field(...)
+    description: str = Field(...)
+    component: str = Field(...)
     
     detected_at: datetime = Field(default_factory=datetime.utcnow)
     resolved_at: Optional[datetime] = Field(default=None)
