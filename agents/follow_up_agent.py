@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 # Define the agent state
+
+import dspy
+from dspy_modules.signatures import ComposeFollowUpEmail, DecideNextAction
 class LeadJourneyState(TypedDict):
     """State for tracking a lead's autonomous journey."""
     lead_id: str
@@ -64,21 +67,16 @@ class FollowUpAgent:
 
         if openrouter_api_key:
             # Use OpenRouter with Sonnet 4.5
-            self.llm = ChatOpenAI(
-                model="anthropic/claude-sonnet-4.5",
-                api_key=openrouter_api_key,
-                base_url="https://openrouter.ai/api/v1",
-                temperature=0.7,
-            )
+            # DSPy modules for email composition and decision-making
+        self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+        self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
             logger.info("✅ Follow-up agent using OpenRouter Sonnet 4.5")
         elif anthropic_api_key:
             # Fallback to Anthropic direct
             from langchain_anthropic import ChatAnthropic
-            self.llm = ChatAnthropic(
-                model="claude-3-5-sonnet-20241022",
-                api_key=anthropic_api_key,
-                temperature=0.7,
-            )
+            # DSPy modules for email composition and decision-making
+        self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+        self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
             logger.info("✅ Follow-up agent using Anthropic direct (fallback)")
         else:
             self.llm = None
