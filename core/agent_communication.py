@@ -94,6 +94,26 @@ AGENT_A2A_ENDPOINTS = {
 }
 
 
+def _get_base_url() -> str:
+    """
+    Determine the correct base URL for A2A communication.
+    
+    In production (Railway), agents communicate via localhost since they're in the same container.
+    The API_BASE_URL env var can override this if needed.
+    """
+    # Check for explicit override
+    if base_url := os.getenv("API_BASE_URL"):
+        return base_url
+    
+    # Check if we're in Railway (has RAILWAY_ENVIRONMENT env var)
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        # In Railway, use localhost since all agents are in same container
+        return "http://localhost:8080"  # Railway uses port 8080
+    
+    # Local development
+    return "http://localhost:8000"
+
+
 class AgentCommunication:
     """
     Inter-agent communication manager.
@@ -112,9 +132,9 @@ class AgentCommunication:
         self.agent = agent
         self.agent_name = agent.__class__.__name__
         self.channel = _global_channel
+        self.base_url = _get_base_url()
         
-        # Get base URL from environment or default to localhost
-        self.base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+        logger.info(f"🔗 {self.agent_name} communication initialized (base_url: {self.base_url})")
     
     async def ask_agent(
         self,
