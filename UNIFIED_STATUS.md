@@ -393,3 +393,67 @@ This phase is ALWAYS messy because:
 **Last Updated**: Oct 24, 2025, 11:45 AM MT
 **Next Update**: Oct 31, 2025 (end of Week 2)
 **Owner**: Josh + Cascade AI
+
+---
+
+## 🏗️ WEEK 1.5: ARCHITECTURAL CONSISTENCY (Oct 25-28) 🆕
+
+**Priority**: 🔴 CRITICAL (Foundation for all future work)
+**Status**: Starting tomorrow
+**Effort**: 4 days
+**Purpose**: Implement hybrid LangGraph+DSPy+Pydantic architecture consistently
+
+### The Three-Pillar Pattern
+
+**1. Pydantic** = Data Layer (Type Safety)
+**2. DSPy** = Reasoning Layer (LLM Intelligence)  
+**3. LangGraph** = Orchestration Layer (Workflows)
+
+**Pattern**: `Pydantic validates → DSPy reasons → LangGraph orchestrates → Pydantic validates output`
+
+### Implementation Plan
+
+**Day 1** (Oct 25):
+- ✅ HYBRID_ARCHITECTURE.md created (commit 31c10ed)
+- 🎯 Create models/pydantic_models.py (ALL data structures)
+- 🎯 Audit all agents against hybrid pattern
+
+**Day 2** (Oct 26):
+- 🎯 Enhance FollowUpAgent (add DSPy modules to LangGraph nodes)
+- 🎯 Test hybrid pattern integration
+
+**Day 3** (Oct 27):
+- 🎯 Implement DSPy optimization for InboundAgent
+- 🎯 A/B test optimized vs baseline
+
+**Day 4** (Oct 28):
+- 🎯 Convert AccountOrchestrator to LangGraph
+- 🎯 Deploy all changes
+- 🎯 Measure improvements
+
+### Expected Outcomes
+
+**Performance**:
+- 📈 30-50% better qualification accuracy (8.3% → 15-25%)
+- 📈 2-3x more qualified leads (5/mo → 10-15/mo)
+- 💰 $150K-300K/month additional revenue
+
+**Architecture**:
+- ✅ 100% agents follow hybrid pattern
+- ✅ Pydantic for ALL data
+- ✅ DSPy for ALL LLM calls
+- ✅ LangGraph for ALL workflows
+
+**Foundation**:
+- ✅ Can systematically optimize any agent
+- ✅ Type safety prevents errors
+- ✅ Ready for autonomous monitoring
+
+### Cost
+
+**One-time**: ~$10 (DSPy optimization)
+**Ongoing**: $0 (optimization is permanent)
+
+---
+
+**Last Updated**: Oct 24, 2025, 1:01 PM PT
