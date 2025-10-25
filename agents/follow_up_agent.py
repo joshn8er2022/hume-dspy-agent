@@ -68,15 +68,15 @@ class FollowUpAgent:
         if openrouter_api_key:
             # Use OpenRouter with Sonnet 4.5
             # DSPy modules for email composition and decision-making
-        self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
-        self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
+            self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+            self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
             logger.info("✅ Follow-up agent using OpenRouter Sonnet 4.5")
         elif anthropic_api_key:
             # Fallback to Anthropic direct
             from langchain_anthropic import ChatAnthropic
             # DSPy modules for email composition and decision-making
-        self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
-        self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
+            self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+            self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
             logger.info("✅ Follow-up agent using Anthropic direct (fallback)")
         else:
             self.llm = None
@@ -145,22 +145,7 @@ class FollowUpAgent:
         Returns:
             PostgresSaver if DATABASE_URL is set, otherwise MemorySaver
         """
-        # Try DATABASE_URL first, then construct from Supabase credentials
         database_url = os.getenv("DATABASE_URL")
-
-        if not database_url:
-            # Construct from Supabase credentials
-            supabase_url = os.getenv("SUPABASE_URL")
-            supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
-
-            if supabase_url and supabase_key:
-                # Extract project ID from Supabase URL
-                # Format: https://umawnwaoahhuttbeyuxs.supabase.co
-                project_id = supabase_url.replace('https://', '').replace('.supabase.co', '')
-
-                # Construct PostgreSQL connection string
-                # Supabase PostgreSQL: postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres
-                database_url = f"postgresql://postgres:{supabase_key}@db.{project_id}.supabase.co:5432/postgres"
         
         if database_url:
             try:
