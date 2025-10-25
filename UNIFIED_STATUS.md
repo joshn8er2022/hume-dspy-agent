@@ -577,3 +577,85 @@ def strategy_quality_with_feedback(example, prediction, trace=None):
 ---
 
 **Last Updated**: Oct 24, 2025, 2:55 PM PT
+
+---
+
+## 🎨 UI IMPLEMENTATION PLAN
+
+**Added**: Oct 25, 2025, 3:38 AM MT
+**Purpose**: Internal monitoring + External customer portal
+
+### Two-Tier UI Strategy
+
+**Internal Admin UI** (Streamlit):
+- Agent status dashboard
+- Pipeline metrics
+- Manual lead qualification
+- Campaign management
+- GEPA optimization controls
+- Permission approval interface
+
+**External Customer UI** (Next.js):
+- Lead submission form
+- Qualification status
+- Follow-up tracking
+- Meeting scheduling
+- Email preferences
+
+---
+
+## 📋 UI IMPLEMENTATION TIMELINE
+
+### Week 2 (Oct 29 - Nov 4) - Internal Admin UI
+
+**Days 1-3** (24 hours):
+1. 🎯 Create Streamlit admin dashboard
+2. 🎯 Agent status monitoring
+3. 🎯 Pipeline metrics visualization
+4. 🎯 Manual lead qualification interface
+5. 🎯 Campaign management UI
+6. 🎯 GEPA optimization controls
+7. 🎯 Permission approval interface
+
+**Deliverable**: Internal admin UI deployed
+
+**Days 4-5**: GEPA optimization (as planned)
+
+---
+
+### Week 3-4 (Nov 5-18) - External Customer UI
+
+**Week 3** (40 hours):
+1. 🎯 Next.js project setup
+2. 🎯 Lead submission form
+3. 🎯 Qualification status page
+4. 🎯 Follow-up tracking
+5. 🎯 Supabase Auth integration
+
+**Week 4** (40 hours):
+1. 🎯 Meeting scheduling
+2. 🎯 Email preferences
+3. 🎯 Testing
+4. 🎯 Deploy to Vercel
+
+**Deliverable**: External customer portal deployed
+
+---
+
+## 💰 COST ANALYSIS
+
+**Internal UI** (Streamlit):
+- Development: 24 hours
+- Hosting: $0 (Railway)
+- Maintenance: Low
+
+**External UI** (Next.js):
+- Development: 80 hours
+- Hosting: $0 (Vercel free tier)
+- Maintenance: Medium
+
+**Total**: 104 hours (13 days)
+
+---
+
+**Last Updated**: Oct 25, 2025, 3:38 AM MT
