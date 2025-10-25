@@ -104,14 +104,12 @@ def _get_base_url() -> str:
     return "http://localhost:8000"
 
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-# Thread pool for running sync DSPy calls in async context
-_executor = ThreadPoolExecutor(max_workers=10)
-
 class DSPyNativeA2A:
-    """DSPy-native inter-agent communication with proper async handling."""
+    """DSPy-native inter-agent communication.
+
+    Uses DSPy signatures for type-safe, optimizable A2A communication.
+    Inspired by Microsoft AutoGen's Agent-as-Tool pattern.
+    """
 
     def __init__(self, agent: Any):
         self.agent = agent
@@ -132,17 +130,23 @@ class DSPyNativeA2A:
         task: str,
         context: Optional[Dict] = None
     ) -> A2AResponse:
-        """Call another agent using DSPy signatures (async-safe)."""
+        """Call another agent using DSPy signatures.
+
+        Args:
+            target_agent_name: Name of target agent
+            task: Task to delegate
+            context: Additional context
+
+        Returns:
+            A2AResponse with structured result
+        """
         import json
 
-        # Run DSPy call in thread pool (DSPy is sync)
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            _executor,
-            self.agent_tool_call,
-            target_agent_name,
-            task,
-            json.dumps(context or {})
+        # Use universal AgentToolCall signature
+        result = self.agent_tool_call(
+            agent_name=target_agent_name,
+            task=task,
+            context=json.dumps(context or {})
         )
 
         # Return structured Pydantic response
@@ -153,6 +157,89 @@ class DSPyNativeA2A:
             response=result.result,
             data=json.loads(result.data) if result.data else None
         )
+
+    async def ask_agent_typed(
+        self,
+        target_agent: Any,
+        question: str,
+        context: Optional[str] = None,
+        **kwargs
+    ) -> A2AResponse:
+        """Ask agent using type-specific signature.
+
+        Automatically selects appropriate DSPy signature based on target agent.
+        """
+        target_name = target_agent.__class__.__name__
+
+        try:
+            # Select appropriate signature
+            if target_name == "InboundAgent":
+                result = self.ask_inbound(
+                    question=question,
+                    lead_id=kwargs.get('lead_id')
+                )
+                data = {
+                    'pipeline_data': result.pipeline_data,
+                    'lead_data': result.lead_data
+                }
+
+            elif target_name == "ResearchAgent":
+                result = self.ask_research(
+                    research_request=question,
+                    lead_context=context or "",
+                    depth=kwargs.get('depth', 'standard')
+                )
+                data = {
+                    'findings': result.findings,
+                    'sources': result.sources,
+                    'confidence': result.confidence
+                }
+
+            elif target_name == "FollowUpAgent":
+                result = self.ask_followup(
+                    query=question,
+                    lead_id=kwargs.get('lead_id')
+                )
+                data = {
+                    'status': result.status,
+                    'next_action': result.next_action,
+                    'emails_sent': result.emails_sent
+                }
+
+            elif target_name == "AuditAgent":
+                result = self.ask_audit(
+                    query=question,
+                    time_range=kwargs.get('time_range', '24h')
+                )
+                data = {
+                    'metrics': result.metrics,
+                    'insights': result.insights,
+                    'recommendations': result.recommendations
+                }
+
+            else:
+                # Fallback to universal signature
+                return await self.call_agent(target_name, question, context)
+
+            # Return structured response
+            return A2AResponse(
+                from_agent=self.agent_name,
+                to_agent=target_name,
+                success=True,
+                response=result.response if hasattr(result, 'response') else str(result),
+                data=data
+            )
+
+        except Exception as e:
+            logger.error(f"A2A call failed: {e}")
+            return A2AResponse(
+                from_agent=self.agent_name,
+                to_agent=target_name,
+                success=False,
+                response="",
+                error=str(e)
+            )
+
 
 # Keep existing HTTP-based A2A for backward compatibility
 def _get_base_url() -> str:
