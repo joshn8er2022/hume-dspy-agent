@@ -332,37 +332,112 @@ class SelfOptimizingAgent(dspy.Module):
     async def _run_optimization(self):
         """Run optimization (GEPA or BootstrapFewShot).
 
-        Calls appropriate optimizer based on self.rules.optimizer.
+        Actually executes optimization, not placeholder.
         """
         logger.info(f"🔧 Running {self.rules.optimizer} optimization for {self.agent_name}")
 
         try:
             if self.rules.optimizer == "gepa":
-                # Run GEPA optimization
+                # Import GEPA optimizer
                 from optimization.gepa_optimizer import GEPAOptimizer
+                import dspy
 
                 optimizer = GEPAOptimizer(
                     max_metric_calls=500,
                     reflection_model="openrouter/anthropic/claude-sonnet-4.5"
                 )
 
-                # TODO: Load trainset and metric for this agent
-                # For now, log that optimization would run
-                logger.info(f"✅ GEPA optimization would run for {self.agent_name}")
-                logger.info(f"  - Estimated cost: $30")
-                logger.info(f"  - Estimated time: 1.5-3 hours")
+                # Create simple trainset from recent performance history
+                trainset = self._create_trainset_from_history()
+
+                if len(trainset) < 10:
+                    logger.warning(f"⚠️ Not enough training data ({len(trainset)} examples), need 10+")
+                    logger.info("Skipping optimization until more data available")
+                    return
+
+                # Define metric function
+                def metric(example, prediction, trace=None):
+                    # Simple success metric
+                    if hasattr(prediction, 'success'):
+                        return 1.0 if prediction.success else 0.0
+                    return 0.5  # Unknown
+
+                # Run GEPA optimization
+                logger.info(f"🔧 Running GEPA optimization with {len(trainset)} examples...")
+                result = await optimizer.optimize(
+                    agent=self,
+                    trainset=trainset,
+                    metric=metric,
+                    agent_name=self.agent_name
+                )
+
+                logger.info(f"✅ GEPA optimization complete!")
+                logger.info(f"  - Baseline: {result.baseline_score:.2%}")
+                logger.info(f"  - Optimized: {result.optimized_score:.2%}")
+                logger.info(f"  - Improvement: +{result.improvement:.2%}")
+                logger.info(f"  - Cost: ${result.optimization_cost:.2f}")
+                logger.info(f"  - Saved to: {result.saved_to}")
 
             elif self.rules.optimizer == "bootstrap":
-                # Run BootstrapFewShot optimization
-                logger.info(f"✅ BootstrapFewShot optimization would run for {self.agent_name}")
-                logger.info(f"  - Estimated cost: $5")
-                logger.info(f"  - Estimated time: 30 minutes")
+                # Import BootstrapFewShot
+                import dspy
+                from dspy.teleprompt import BootstrapFewShot
+
+                # Create trainset
+                trainset = self._create_trainset_from_history()
+
+                if len(trainset) < 5:
+                    logger.warning(f"⚠️ Not enough training data ({len(trainset)} examples), need 5+")
+                    logger.info("Skipping optimization until more data available")
+                    return
+
+                # Define metric
+                def metric(example, prediction, trace=None):
+                    if hasattr(prediction, 'success'):
+                        return 1.0 if prediction.success else 0.0
+                    return 0.5
+
+                # Run BootstrapFewShot
+                logger.info(f"🔧 Running BootstrapFewShot with {len(trainset)} examples...")
+                optimizer = BootstrapFewShot(metric=metric, max_bootstrapped_demos=4)
+                optimized = optimizer.compile(student=self, trainset=trainset)
+
+                # Save optimized agent
+                save_path = f"optimized_{self.agent_name.lower()}_bootstrap.json"
+                optimized.save(save_path)
+
+                logger.info(f"✅ BootstrapFewShot optimization complete!")
+                logger.info(f"  - Saved to: {save_path}")
 
             else:
                 logger.warning(f"⚠️ Unknown optimizer: {self.rules.optimizer}")
 
         except Exception as e:
             logger.error(f"❌ Optimization failed for {self.agent_name}: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _create_trainset_from_history(self) -> List:
+        """Create training dataset from performance history.
+
+        Converts recent performance records into DSPy examples.
+        """
+        import dspy
+
+        trainset = []
+
+        # Use recent successful tasks as training examples
+        for record in self.performance_tracker.history:
+            if record.success and record.user_satisfaction >= 3.5:
+                # Create DSPy example from successful task
+                example = dspy.Example(
+                    task=record.task,
+                    success=True
+                ).with_inputs("task")
+
+                trainset.append(example)
+
+        return trainset
     async def forward_async(self, task: str, **kwargs) -> Dict[str, Any]:
         """Override in subclass."""
         raise NotImplementedError("Subclass must implement forward_async()")
