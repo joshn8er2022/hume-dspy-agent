@@ -104,7 +104,7 @@ async def start_background_tasks():
     import asyncio
     
     try:
-        from monitoring.proactive_monitor import start_monitoring
+        # from monitoring.proactive_monitor import start_monitoring  # Disabled: Railway CLI not available in container
         
         # Start monitoring in background (checks every 5 minutes)
         asyncio.create_task(start_monitoring(interval_seconds=300))
