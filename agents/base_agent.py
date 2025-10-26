@@ -237,12 +237,45 @@ class PermissionManager:
     async def _wait_for_approval(self, agent_name: str, tool_name: str) -> bool:
         """Wait for user approval via Slack.
 
-        TODO: Implement actual Slack message monitoring.
-        For now, returns False (deny).
+        Monitors Slack for approval message.
+        Returns True if approved, False if denied.
         """
-        # Placeholder: Would monitor Slack for approval message
-        await asyncio.sleep(1)
-        return False  # Placeholder: deny for now
+        try:
+            from integrations.slack_client import SlackClient
+            slack = SlackClient()
+
+            # Poll for approval message
+            # Check every 5 seconds for approval
+            for _ in range(60):  # 5 minutes max (60 * 5 seconds)
+                # Check for approval message in #agent-permissions channel
+                messages = await slack.get_recent_messages(
+                    channel="#agent-permissions",
+                    limit=10
+                )
+
+                for msg in messages:
+                    text = msg.get('text', '').lower()
+
+                    # Check for approval
+                    if f"approve {agent_name.lower()}" in text:
+                        logger.info(f"✅ {agent_name}: Permission approved for {tool_name}")
+                        return True
+
+                    # Check for denial
+                    if "deny" in text and agent_name.lower() in text:
+                        logger.info(f"❌ {agent_name}: Permission denied for {tool_name}")
+                        return False
+
+                # Wait 5 seconds before checking again
+                await asyncio.sleep(5)
+
+            # Timeout after 5 minutes
+            logger.warning(f"⏱️ {agent_name}: Approval timeout for {tool_name}")
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ {agent_name}: Approval monitoring failed: {e}")
+            return False  # Error = deny
 
 # ===== SELF-OPTIMIZING AGENT BASE CLASS =====
 
