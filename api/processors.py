@@ -360,7 +360,7 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
             response = await client.post(
                 "https://slack.com/api/chat.postMessage",
                 headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-                json={"channel": channel_id, "text": message, "mrkdwn": True},
+                json={"channel": SLACK_CHANNEL, "text": message, "mrkdwn": True},
                 timeout=10.0
             )
             response_data = response.json() if response.status_code == 200 else {}
@@ -412,7 +412,7 @@ async def send_slack_notification_simple(data: dict):
             response = await client.post(
                 "https://slack.com/api/chat.postMessage",
                 headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-                json={"channel": channel_id, "text": message, "mrkdwn": True},
+                json={"channel": SLACK_CHANNEL, "text": message, "mrkdwn": True},
                 timeout=10.0
             )
             if response.status_code == 200 and response.json().get('ok'):
