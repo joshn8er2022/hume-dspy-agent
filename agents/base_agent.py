@@ -162,14 +162,16 @@ class SmartModelSelector:
 
 class PermissionManager:
     """Manage permission requests for expensive tools.
-    
+
     Continue.dev pattern: Rule-based tool access with approval.
+    Includes Slack integration and timeout fallback.
     """
-    
+
     def __init__(self, agent_name: str, rules: AgentRules):
         self.agent_name = agent_name
         self.rules = rules
-    
+        self.pending_requests: Dict[str, Any] = {}
+
     async def request_permission(
         self,
         tool_name: str,  # "gepa", "sequential_thought"
@@ -177,24 +179,70 @@ class PermissionManager:
         estimated_cost: float
     ) -> bool:
         """Request permission to use expensive tool.
-        
-        Sends Slack notification and waits for approval.
+
+        Sends Slack notification and waits for approval with timeout.
         Returns False if timeout or denied.
         """
         # Check if approval required
         if not self.rules.requires_approval:
+            logger.info(f"{self.agent_name}: Auto-approved {tool_name} (${estimated_cost})")
             return True  # Auto-approve
-        
+
         # Check cost limit
         if estimated_cost > self.rules.max_cost_per_request:
             logger.warning(f"{self.agent_name}: Cost ${estimated_cost} exceeds limit ${self.rules.max_cost_per_request}")
             return False
-        
-        # TODO: Implement Slack notification and approval flow
-        # For now, auto-deny expensive tools
-        logger.info(f"{self.agent_name}: Would request permission for {tool_name} (${estimated_cost})")
-        return False  # Placeholder
 
+        # Send Slack notification
+        try:
+            from integrations.slack_client import SlackClient
+            slack = SlackClient()
+
+            message = f"""🤖 **{self.agent_name} Permission Request**
+
+**Tool**: {tool_name.upper()}
+**Task**: {task}
+**Cost**: ${estimated_cost:.2f}
+
+**Approve?**
+✅ Reply "approve {self.agent_name.lower()}" to approve
+❌ Reply "deny" to deny
+⏱️ Auto-deny in 5 minutes if no response
+"""
+
+            await slack.send_message(
+                channel="#agent-permissions",
+                text=message
+            )
+
+            # Wait for approval with timeout
+            timeout = 300  # 5 minutes for sequential thought, 3600 for GEPA
+            if tool_name == "gepa":
+                timeout = 3600  # 1 hour for GEPA
+
+            try:
+                approved = await asyncio.wait_for(
+                    self._wait_for_approval(self.agent_name, tool_name),
+                    timeout=timeout
+                )
+                return approved
+            except asyncio.TimeoutError:
+                logger.warning(f"{self.agent_name}: Permission timeout for {tool_name}, using free model fallback")
+                return False  # Timeout = deny, use free model
+
+        except Exception as e:
+            logger.error(f"{self.agent_name}: Permission request failed: {e}")
+            return False  # Error = deny, use free model
+
+    async def _wait_for_approval(self, agent_name: str, tool_name: str) -> bool:
+        """Wait for user approval via Slack.
+
+        TODO: Implement actual Slack message monitoring.
+        For now, returns False (deny).
+        """
+        # Placeholder: Would monitor Slack for approval message
+        await asyncio.sleep(1)
+        return False  # Placeholder: deny for now
 
 # ===== SELF-OPTIMIZING AGENT BASE CLASS =====
 
@@ -282,10 +330,39 @@ class SelfOptimizingAgent(dspy.Module):
             await self._run_optimization()
     
     async def _run_optimization(self):
-        """Run optimization (GEPA or BootstrapFewShot)."""
+        """Run optimization (GEPA or BootstrapFewShot).
+
+        Calls appropriate optimizer based on self.rules.optimizer.
+        """
         logger.info(f"🔧 Running {self.rules.optimizer} optimization for {self.agent_name}")
-        # TODO: Implement actual optimization
-    
+
+        try:
+            if self.rules.optimizer == "gepa":
+                # Run GEPA optimization
+                from optimization.gepa_optimizer import GEPAOptimizer
+
+                optimizer = GEPAOptimizer(
+                    max_metric_calls=500,
+                    reflection_model="openrouter/anthropic/claude-sonnet-4.5"
+                )
+
+                # TODO: Load trainset and metric for this agent
+                # For now, log that optimization would run
+                logger.info(f"✅ GEPA optimization would run for {self.agent_name}")
+                logger.info(f"  - Estimated cost: $30")
+                logger.info(f"  - Estimated time: 1.5-3 hours")
+
+            elif self.rules.optimizer == "bootstrap":
+                # Run BootstrapFewShot optimization
+                logger.info(f"✅ BootstrapFewShot optimization would run for {self.agent_name}")
+                logger.info(f"  - Estimated cost: $5")
+                logger.info(f"  - Estimated time: 30 minutes")
+
+            else:
+                logger.warning(f"⚠️ Unknown optimizer: {self.rules.optimizer}")
+
+        except Exception as e:
+            logger.error(f"❌ Optimization failed for {self.agent_name}: {e}")
     async def forward_async(self, task: str, **kwargs) -> Dict[str, Any]:
         """Override in subclass."""
         raise NotImplementedError("Subclass must implement forward_async()")
