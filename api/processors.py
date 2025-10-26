@@ -209,6 +209,34 @@ async def process_typeform_event(event: dict):
         else:
             await send_slack_notification_simple(event['raw_payload'])
 
+        
+
+        # Step 6.5: Trigger ResearchAgent for WARM/HOT leads (A2A coordination)
+        if result and result.tier in ['warm', 'hot', 'scorching']:
+            try:
+                logger.info(f"🔗 Triggering ResearchAgent for {result.tier.upper()} lead: {lead.email}")
+
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    research_response = await client.post(
+                        "http://localhost:8000/agents/research/a2a",
+                        json={
+                            "lead_id": str(lead.id),
+                            "tier": result.tier,
+                            "email": lead.email,
+                            "company": lead.company
+                        },
+                        timeout=30.0
+                    )
+
+                    if research_response.status_code == 200:
+                        logger.info(f"✅ ResearchAgent triggered successfully")
+                    else:
+                        logger.error(f"❌ ResearchAgent trigger failed: {research_response.status_code}")
+            except Exception as e:
+                logger.error(f"❌ Failed to trigger ResearchAgent: {e}")
+                # Don't fail the whole process if research trigger fails
+
         # Step 6: Start autonomous follow-up agent (LangGraph)
         if result and slack_thread_ts:
             try:
