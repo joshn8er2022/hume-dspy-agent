@@ -30,33 +30,75 @@ class SequentialThoughtMCPServer:
         agent_name: str = "Unknown"
     ) -> Dict[str, Any]:
         """Run sequential thought reasoning.
-        
-        Args:
-            problem: Problem to solve
-            max_thoughts: Maximum thoughts (default: 20)
-            agent_name: Name of requesting agent
-        
-        Returns:
-            Reasoning result with thoughts and conclusion
+
+        Actually executes multi-step reasoning, not placeholder.
         """
         logger.info(f"🧠 Sequential thought requested by {agent_name}")
         logger.info(f"  - Problem: {problem[:100]}...")
         logger.info(f"  - Max thoughts: {max_thoughts}")
-        
-        # TODO: Implement actual sequential thought execution
-        # For now, return placeholder
-        
-        cost = self._estimate_cost(max_thoughts)
-        
+
+        import dspy
+
+        # Configure model for reasoning
+        dspy.configure(lm=dspy.LM("openrouter/anthropic/claude-sonnet-4.5"))
+
+        # Create sequential thought signature
+        class ThinkStep(dspy.Signature):
+            """Single step in sequential thought process."""
+            problem: str = dspy.InputField(desc="Problem to solve")
+            previous_thoughts: str = dspy.InputField(desc="Previous thoughts (JSON)")
+            thought_number: int = dspy.InputField(desc="Current thought number")
+
+            thought: str = dspy.OutputField(desc="Current thought")
+            next_thought_needed: bool = dspy.OutputField(desc="Need another thought?")
+            confidence: float = dspy.OutputField(desc="Confidence in solution (0-1)")
+
+        # Run sequential thought process
+        think_module = dspy.ChainOfThought(ThinkStep)
+
+        thoughts = []
+        previous_thoughts_str = "[]"
+
+        for i in range(max_thoughts):
+            # Execute thought step
+            result = think_module(
+                problem=problem,
+                previous_thoughts=previous_thoughts_str,
+                thought_number=i + 1
+            )
+
+            # Record thought
+            thought_record = {
+                "number": i + 1,
+                "thought": result.thought,
+                "confidence": result.confidence
+            }
+            thoughts.append(thought_record)
+
+            logger.info(f"💭 Thought {i+1}/{max_thoughts}: {result.thought[:100]}...")
+
+            # Check if done
+            if not result.next_thought_needed or result.confidence >= 0.9:
+                logger.info(f"✅ Sequential thought complete after {i+1} thoughts")
+                break
+
+            # Update previous thoughts
+            import json
+            previous_thoughts_str = json.dumps(thoughts)
+
+        # Calculate cost
+        cost = self._estimate_cost(len(thoughts))
+
         return {
-            "status": "started",
+            "status": "complete",
             "agent_name": agent_name,
             "problem": problem,
-            "max_thoughts": max_thoughts,
-            "estimated_cost": cost,
-            "estimated_time": "2-5 minutes"
+            "thoughts": thoughts,
+            "total_thoughts": len(thoughts),
+            "final_confidence": thoughts[-1]["confidence"] if thoughts else 0.0,
+            "actual_cost": cost,
+            "duration": f"{len(thoughts) * 30} seconds (estimated)"
         }
-    
     def _estimate_cost(self, max_thoughts: int) -> float:
         """Estimate sequential thought cost.
         
