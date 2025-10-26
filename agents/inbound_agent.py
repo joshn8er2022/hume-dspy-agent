@@ -175,7 +175,7 @@ class InboundAgent(SelfOptimizingAgent):
             suggested_email_template=email_template,
             suggested_sms_message=sms_template,
             agent_version="1.0.0",
-            model_used=settings.dspy_model,
+            model_used=settings.PRIMARY_MODEL,
             processing_time_ms=processing_time,
         )
 
