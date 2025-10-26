@@ -23,6 +23,7 @@ import dspy
 import json
 
 from agents.inbound_agent import InboundAgent
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 from agents.research_agent import ResearchAgent
 from agents.follow_up_agent import FollowUpAgent
 from dspy_modules.conversation_signatures import (
@@ -138,7 +139,7 @@ class StrategyConversation(dspy.Signature):
 
 # ===== Strategy Agent =====
 
-class StrategyAgent(dspy.Module):
+class StrategyAgent(SelfOptimizingAgent):
     """Personal AI advisor for strategic decision-making.
     
     Refactored as dspy.Module for better architecture and DSPy optimization.
@@ -146,7 +147,21 @@ class StrategyAgent(dspy.Module):
     """
     
     def __init__(self):
-        super().__init__()  # Initialize dspy.Module
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["claude-sonnet-4.5", "llama-3.1-70b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["gepa", "sequential_thought", "research", "mcp"],
+            requires_approval=True,
+            max_cost_per_request=1.00,
+            optimizer="gepa",
+            auto_optimize_threshold=0.70,
+            department="Strategy"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="StrategyAgent", rules=rules)
+        
         self.slack_bot_token = (
             os.getenv("SLACK_BOT_TOKEN") or
             os.getenv("SLACK_MCP_XOXB_TOKEN") or

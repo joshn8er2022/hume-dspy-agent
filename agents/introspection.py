@@ -13,6 +13,7 @@ Benefits:
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 import logging
 
 from models import Lead, QualificationResult, LeadTier
@@ -96,10 +97,25 @@ class IntrospectionResponse(BaseModel):
 
 # ===== Introspection Service =====
 
-class AgentIntrospectionService:
+class AgentIntrospectionService(SelfOptimizingAgent):
     """Service for A2A introspection of autonomous agents."""
 
     def __init__(self):
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["supabase", "monitoring", "analytics"],
+            requires_approval=False,
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",
+            auto_optimize_threshold=0.80,
+            department="System"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="Introspection", rules=rules)
+        
         # Initialize DSPy before creating agents (base_model pattern)
         self._ensure_dspy_configured()
 

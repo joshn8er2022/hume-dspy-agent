@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Define the agent state
 
 import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 from dspy_modules.signatures import ComposeFollowUpEmail, DecideNextAction
 class LeadJourneyState(TypedDict):
     """State for tracking a lead's autonomous journey."""
@@ -54,10 +55,25 @@ class LeadJourneyState(TypedDict):
     error: str | None
 
 
-class FollowUpAgent:
+class FollowUpAgent(SelfOptimizingAgent):
     """Autonomous agent for managing lead follow-ups using LangGraph."""
 
     def __init__(self):
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["email", "supabase", "gmass"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot
+            auto_optimize_threshold=0.80,
+            department="Sales"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="FollowUpAgent", rules=rules)
+        
         self.slack = SlackClient()
         self.email_client = EmailClient()
 

@@ -11,6 +11,7 @@ Handles autonomous multi-contact campaigns with:
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 from enum import Enum
 import json
 
@@ -40,7 +41,7 @@ class ContactRole(Enum):
     TERTIARY = "tertiary"
 
 
-class AccountOrchestrator:
+class AccountOrchestrator(SelfOptimizingAgent):
     """
     Orchestrates multi-contact ABM campaigns with autonomous decision-making.
     
@@ -53,6 +54,21 @@ class AccountOrchestrator:
     """
     
     def __init__(self, supabase_client=None, config: Optional[Dict] = None):
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["supabase", "email", "orchestration"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot
+            auto_optimize_threshold=0.80,
+            department="Sales"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="AccountOrchestrator", rules=rules)
+        
         """
         Initialize AccountOrchestrator.
         

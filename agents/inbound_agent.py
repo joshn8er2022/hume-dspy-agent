@@ -1,5 +1,6 @@
 """DSPy-based Inbound Lead Qualification Agent."""
 import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import time
@@ -30,7 +31,7 @@ from config.settings import settings
 from agents.account_orchestrator import AccountOrchestrator
 
 
-class InboundAgent(dspy.Module):
+class InboundAgent(SelfOptimizingAgent):
     """Intelligent inbound lead qualification agent using DSPy.
 
     This agent analyzes incoming leads from Typeform submissions,
@@ -39,7 +40,20 @@ class InboundAgent(dspy.Module):
     """
 
     def __init__(self):
-        super().__init__()
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["research", "supabase", "qualification"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot
+            auto_optimize_threshold=0.80,  # Optimize if <80% accuracy
+            department="Sales"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="InboundAgent", rules=rules)
 
         # Initialize DSPy modules
         self.analyze_business = dspy.ChainOfThought(AnalyzeBusinessFit)

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 import httpx
 import os
 import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ class ResearchResult(BaseModel):
 
 # ===== Research Agent =====
 
-class ResearchAgent(dspy.Module):
+class ResearchAgent(SelfOptimizingAgent):
     """Agent for conducting deep research on leads and companies.
     
     Refactored as dspy.Module for better architecture and DSPy optimization.
@@ -117,7 +118,21 @@ class ResearchAgent(dspy.Module):
     """
     
     def __init__(self):
-        super().__init__()  # Initialize dspy.Module
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["research", "web_search", "supabase"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot (cheaper)
+            auto_optimize_threshold=0.80,
+            department="Research"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="ResearchAgent", rules=rules)
+        
         
         # DSPy modules for research workflow
         self.plan_research = dspy.ChainOfThought(ResearchPlanning)
