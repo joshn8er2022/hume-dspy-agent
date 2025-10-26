@@ -13,6 +13,7 @@ from typing import Any
 
 from config.settings import settings
 from utils.retry import async_retry
+from utils.slack_helpers import get_channel_id
 
 logger = logging.getLogger(__name__)
 
@@ -329,7 +330,7 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
             response = await client.post(
                 "https://slack.com/api/chat.postMessage",
                 headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-                json={"channel": SLACK_CHANNEL, "text": message, "mrkdwn": True},
+                json={"channel": channel_id, "text": message, "mrkdwn": True},
                 timeout=10.0
             )
             response_data = response.json() if response.status_code == 200 else {}
@@ -381,7 +382,7 @@ async def send_slack_notification_simple(data: dict):
             response = await client.post(
                 "https://slack.com/api/chat.postMessage",
                 headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
-                json={"channel": SLACK_CHANNEL, "text": message, "mrkdwn": True},
+                json={"channel": channel_id, "text": message, "mrkdwn": True},
                 timeout=10.0
             )
             if response.status_code == 200 and response.json().get('ok'):
