@@ -29,6 +29,11 @@ from dspy_modules import (
 from core.company_context import get_company_context_for_qualification
 from config.settings import settings
 from agents.account_orchestrator import AccountOrchestrator
+import logging
+
+# Configure logging for debugging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class InboundAgent(SelfOptimizingAgent):
@@ -105,6 +110,7 @@ class InboundAgent(SelfOptimizingAgent):
         total_score = criteria.calculate_total()
 
         # Step 4: Determine tier and qualification status
+        logger.info("🎯 Executing tier classification...")
         tier = self._determine_tier(total_score)
         is_qualified = total_score >= self.COLD_THRESHOLD
 
@@ -231,6 +237,7 @@ class InboundAgent(SelfOptimizingAgent):
         if campaign_id:
             result.campaign_id = campaign_id
 
+        logger.info(f"✅ Qualification complete - Tier: {result.tier if 'result' in locals() else 'unknown'}, Score: {result.score if 'result' in locals() else 0}")
         return result
 
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:
