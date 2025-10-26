@@ -470,6 +470,47 @@ class SelfOptimizingAgent(dspy.Module):
 
                 trainset.append(example)
 
+
+
+    async def save_state(self, state: Dict[str, Any]) -> None:
+        """Save agent state to Supabase."""
+        try:
+            from config.settings import settings
+            from supabase import create_client
+
+            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
+            await supabase.table('agent_state').upsert({
+                'agent_id': self.agent_id,
+                'agent_type': self.__class__.__name__,
+                'state': state,
+                'last_updated': datetime.now().isoformat()
+            }).execute()
+
+            logger.info(f"✅ State saved for agent {self.agent_id}")
+        except Exception as e:
+            logger.error(f"❌ Failed to save state: {e}")
+
+    async def load_state(self) -> Optional[Dict[str, Any]]:
+        """Load agent state from Supabase."""
+        try:
+            from config.settings import settings
+            from supabase import create_client
+
+            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
+            result = await supabase.table('agent_state').select('state').eq('agent_id', self.agent_id).execute()
+
+            if result.data:
+                logger.info(f"✅ State loaded for agent {self.agent_id}")
+                return result.data[0]['state']
+            else:
+                logger.info(f"ℹ️ No saved state for agent {self.agent_id}")
+                return None
+        except Exception as e:
+            logger.error(f"❌ Failed to load state: {e}")
+            return None
+
         return trainset
     async def forward_async(self, task: str, **kwargs) -> Dict[str, Any]:
         """Override in subclass."""
