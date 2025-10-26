@@ -520,6 +520,29 @@ async def research_agent_a2a(request: Request):
         response = await research_agent.respond(message_content)
         
         logger.info(f"✅ ResearchAgent A2A Response: {str(response)[:100]}...")
+
+        # Trigger FollowUpAgent after successful research
+        try:
+            logger.info(f"🔗 Triggering FollowUpAgent after research completion")
+
+            import httpx
+            async with httpx.AsyncClient() as client:
+                followup_response = await client.post(
+                    "http://localhost:8000/agents/followup/a2a",
+                    json={
+                        "message": f"Research completed for lead. Start follow-up sequence. Research insights: {str(response)[:500]}"
+                    },
+                    timeout=30.0
+                )
+
+                if followup_response.status_code == 200:
+                    logger.info(f"✅ FollowUpAgent triggered successfully")
+                else:
+                    logger.error(f"❌ FollowUpAgent trigger failed: {followup_response.status_code}")
+        except Exception as e:
+            logger.error(f"❌ Failed to trigger FollowUpAgent: {e}")
+            # Don't fail the whole process if follow-up trigger fails
+
         
         return JSONResponse(content={
             "status": "success",
