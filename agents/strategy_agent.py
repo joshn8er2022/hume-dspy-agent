@@ -2006,9 +2006,10 @@ I've received approval to implement this fix.
         try:
             logger.info(f"🎯 StrategyAgent processing lead webhook")
 
-            # Step 1: Parse lead data
-            from models import Lead
-            lead = Lead.from_typeform(lead_data)
+            # Step 1: Parse lead data using proven transformation utility
+            from models.lead import Lead
+            from utils.typeform_transform import transform_typeform_webhook
+            lead = transform_typeform_webhook(lead_data)
             logger.info(f"   Lead: {lead.email} ({lead.company})")
 
             # Step 2: Strategic reasoning - determine engagement strategy
