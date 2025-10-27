@@ -648,6 +648,33 @@ async def typeform_webhook_receiver(
     source = "typeform"
     start_time = datetime.utcnow()
     
+    # Feature flag routing: StrategyAgent vs. InboundAgent
+    USE_STRATEGY_AGENT_ENTRY = os.getenv("USE_STRATEGY_AGENT_ENTRY", "false").lower() == "true"
+
+    if USE_STRATEGY_AGENT_ENTRY:
+        # NEW: Route to StrategyAgent for strategic processing
+        logger.info("🎯 Routing to StrategyAgent (strategic processing)")
+        try:
+            from agents.strategy_agent import StrategyAgent
+            strategy_agent = StrategyAgent()
+
+            # Get raw payload
+            raw_body = await request.body()
+            raw_payload = json.loads(raw_body.decode('utf-8'))
+
+            # Process via StrategyAgent
+            result = await strategy_agent.process_lead_webhook(raw_payload)
+            logger.info(f"✅ StrategyAgent processing complete: {result.get('status')}")
+
+            return {"status": "success", "processor": "StrategyAgent", "result": result}
+        except Exception as e:
+            logger.error(f"❌ StrategyAgent processing failed: {e}")
+            logger.info("   Falling back to InboundAgent processing")
+            # Fall through to existing InboundAgent processing below
+
+    # EXISTING: InboundAgent processing (default when flag OFF or StrategyAgent fails)
+    logger.info("📥 Using InboundAgent processing (default)")
+
     try:
         logger.info("="*80)
         logger.info(f"📥 WEBHOOK RECEIVED: {source}")
