@@ -2026,7 +2026,7 @@ I've received approval to implement this fix.
             return {
                 "status": "success",
                 "lead_id": str(lead.id),
-                "strategy": strategy.dict(),
+                "strategy": strategy.model_dump(),
                 "result": result
             }
 
@@ -2065,22 +2065,39 @@ I've received approval to implement this fix.
         return {"status": "success", "delegations": results}
     
     async def _delegate_to_inbound(self, lead):
-        """Delegate to InboundAgent."""
+        """Delegate to InboundAgent via HTTP endpoint."""
+        import httpx
         try:
-            from agents.inbound_agent import InboundAgent
-            inbound = InboundAgent()
-            result = inbound.forward(lead)
-            return {"status": "success", "tier": str(result.tier), "score": result.score}
+            # Use the correct base URL (localhost:8080 for Railway)
+            base_url = self.communication.base_url if self.communication else "http://localhost:8080"
+            url = f"{base_url}/agents/inbound/qualify"
+            
+            logger.info(f"🔗 Delegating to InboundAgent: {url}")
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                r = await client.post(url, json={"lead": lead.model_dump()})
+                
+                if r.status_code == 200:
+                    result = r.json()
+                    qualification = result.get('result', {})
+                    return {
+                        "status": "success",
+                        "tier": qualification.get('tier'),
+                        "score": qualification.get('score')
+                    }
+                else:
+                    return {"status": "error", "error": f"HTTP {r.status_code}"}
+                    
         except Exception as e:
             logger.error(f"InboundAgent delegation failed: {e}")
             return {"status": "error", "error": str(e)}
-    
+
     async def _delegate_to_research(self, lead):
         """Delegate to ResearchAgent."""
         import httpx
         try:
             async with httpx.AsyncClient() as client:
-                r = await client.post("http://localhost:8000/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                r = await client.post(f"{self.communication.base_url if self.communication else "http://localhost:8080"}/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
                 return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
         except Exception as e:
             return {"status": "error", "error": str(e)}
@@ -2090,7 +2107,7 @@ I've received approval to implement this fix.
         import httpx
         try:
             async with httpx.AsyncClient() as client:
-                r = await client.post("http://localhost:8000/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                r = await client.post(f"{self.communication.base_url if self.communication else "http://localhost:8080"}/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
                 return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
         except Exception as e:
             return {"status": "error", "error": str(e)}
@@ -2114,7 +2131,7 @@ I've received approval to implement this fix.
             await supabase.table('agent_state').insert({
                 'agent_name': 'StrategyAgent',
                 'lead_id': str(lead.id),
-                'state_data': {'strategy': strategy.dict() if hasattr(strategy, 'dict') else {}, 'result': result},
+                'state_data': {'strategy': strategy.model_dump() if hasattr(strategy, 'dict') else {}, 'result': result},
                 'status': 'completed'
             }).execute()
         except Exception as e:

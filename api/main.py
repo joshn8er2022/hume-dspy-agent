@@ -526,6 +526,64 @@ async def inbound_agent_a2a(request: Request):
         )
 
 
+
+@app.post("/agents/inbound/qualify")
+async def inbound_agent_qualify(request: Request):
+    """Dedicated endpoint for InboundAgent lead qualification.
+    
+    Expects: {"lead": {...}}  # Lead object as JSON
+    Returns: {"status": "success", "result": {...}}  # QualificationResult
+    """
+    try:
+        payload = await request.json()
+        lead_data = payload.get("lead")
+        
+        if not lead_data:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No lead data provided"}
+            )
+        
+        logger.info(f"📨 InboundAgent Qualification Request")
+        logger.info(f"   Lead ID: {lead_data.get('id')}")
+        logger.info(f"   Email: {lead_data.get('email')}")
+        
+        # Import and initialize InboundAgent (reuse if exists)
+        from agents.inbound_agent import InboundAgent
+        from models.lead import Lead
+        
+        if not hasattr(app.state, 'inbound_agent'):
+            app.state.inbound_agent = InboundAgent()
+        
+        inbound_agent = app.state.inbound_agent
+        
+        # Create Lead object from data
+        lead = Lead(**lead_data)
+        
+        # Qualify the lead using forward()
+        result = inbound_agent.forward(lead)
+        
+        logger.info(f"✅ InboundAgent Qualification Complete")
+        logger.info(f"   Score: {result.score}")
+        logger.info(f"   Tier: {result.tier}")
+        
+        # Return QualificationResult as JSON
+        return JSONResponse(content={
+            "status": "success",
+            "result": result.model_dump(),  # Use model_dump() for Pydantic v2
+            "agent": "InboundAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ InboundAgent Qualification failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+
 @app.post("/agents/research/a2a")
 async def research_agent_a2a(request: Request):
     """A2A endpoint for ResearchAgent - deep lead research."""
