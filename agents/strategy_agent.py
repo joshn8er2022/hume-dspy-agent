@@ -2099,7 +2099,7 @@ I've received approval to implement this fix.
         from api.processors import process_typeform_event
         import uuid
         try:
-            await process_typeform_event(str(uuid.uuid4()), lead_data)
+            await process_typeform_event(lead_data)
             return {"status": "success", "fallback": True}
         except Exception as e:
             return {"status": "error", "error": str(e)}
