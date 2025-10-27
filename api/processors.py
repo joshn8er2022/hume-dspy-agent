@@ -310,8 +310,8 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
         SLACK_CHANNEL = settings.SLACK_CHANNEL_INBOUND
         
         if not SLACK_BOT_TOKEN:
-        logger.error("❌ SLACK_BOT_TOKEN not set - cannot send Slack notification")
-        logger.error("   Set SLACK_BOT_TOKEN environment variable in Railway")
+            logger.error("❌ SLACK_BOT_TOKEN not set - cannot send Slack notification")
+            logger.error("   Set SLACK_BOT_TOKEN environment variable in Railway")
             return
         
         # Build enhanced message with agent reasoning
