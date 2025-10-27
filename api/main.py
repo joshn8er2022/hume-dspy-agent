@@ -115,34 +115,34 @@ async def start_background_tasks():
         logger.info("🔄 Proactive monitoring started (5-minute intervals)")
         logger.info("   Phase 0.6: Self-healing enabled with human approval")
     
-    # Start autonomous execution scheduler (Phase 1)
-    try:
-        # Schedule follow-up checks (hourly)
-        scheduler.add_job(
-            check_leads_needing_followup,
-            trigger=IntervalTrigger(hours=1),
-            id="followup_check",
-            replace_existing=True
-        )
-
-        # Schedule monitoring (every 30 min)
-        scheduler.add_job(
-            autonomous_monitoring,
-            trigger=IntervalTrigger(minutes=30),
-            id="pipeline_monitoring",
-            replace_existing=True
-        )
-
-        # Start scheduler
-        scheduler.start()
-        logger.info("✅ Autonomous scheduler started")
-        logger.info("   - Follow-up checks: Every hour")
-        logger.info("   - Pipeline monitoring: Every 30 minutes")
-    except Exception as e:
-        logger.error(f"❌ Scheduler failed to start: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-
+        # Start autonomous execution scheduler (Phase 1)
+        try:
+            # Schedule follow-up checks (hourly)
+            scheduler.add_job(
+                check_leads_needing_followup,
+                trigger=IntervalTrigger(hours=1),
+                id="followup_check",
+                replace_existing=True
+            )
+    
+            # Schedule monitoring (every 30 min)
+            scheduler.add_job(
+                autonomous_monitoring,
+                trigger=IntervalTrigger(minutes=30),
+                id="pipeline_monitoring",
+                replace_existing=True
+            )
+    
+            # Start scheduler
+            scheduler.start()
+            logger.info("✅ Autonomous scheduler started")
+            logger.info("   - Follow-up checks: Every hour")
+            logger.info("   - Pipeline monitoring: Every 30 minutes")
+        except Exception as e:
+            logger.error(f"❌ Scheduler failed to start: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
     except Exception as e:
         logger.warning(f"⚠️ Proactive monitoring failed to start: {e}")
         logger.info("   System will continue without proactive monitoring")
