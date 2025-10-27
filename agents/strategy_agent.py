@@ -131,10 +131,11 @@ class StrategyConversation(dspy.Signature):
     
     response: str = dspy.OutputField(desc="Natural, intelligent response to user")
     # Made truly optional - prevents parsing errors on long responses (Phase 0 Fix #1)
-    suggested_actions: str = dspy.OutputField(
-        desc="Comma-separated list of suggested next actions (optional, leave blank if none)",
-        prefix="Suggested Actions (optional):"
-    )
+    suggested_actions: Optional[str] = dspy.OutputField(
+    desc="Comma-separated list of suggested next actions (optional, leave blank if none)",
+    prefix="Suggested Actions (optional):",
+    default=""  # Default to empty string if not provided
+)
 
 
 # ===== Strategy Agent =====
@@ -221,13 +222,13 @@ class StrategyAgent(SelfOptimizingAgent):
                 haiku_lm = dspy.LM(
                     model="openrouter/anthropic/claude-haiku-4.5",
                     api_key=openrouter_key,
-                    max_tokens=2000,
+                    max_tokens=8000,
                     temperature=0.7
                 )
                 sonnet_lm = dspy.LM(
                     model="openrouter/anthropic/claude-sonnet-4.5",
                     api_key=openrouter_key,
-                    max_tokens=3000,  # More tokens for complex reasoning
+                    max_tokens=8000,  # More tokens for complex reasoning
                     temperature=0.7
                 )
                 dspy.configure(lm=haiku_lm)
