@@ -111,9 +111,9 @@ async def start_background_tasks():
         # from monitoring.proactive_monitor import start_monitoring  # Disabled: Railway CLI not available in container
         
         # Start monitoring in background (checks every 5 minutes)
-        asyncio.create_task(start_monitoring(interval_seconds=300))
-        logger.info("🔄 Proactive monitoring started (5-minute intervals)")
-        logger.info("   Phase 0.6: Self-healing enabled with human approval")
+#         asyncio.create_task(start_monitoring(interval_seconds=300))
+#         logger.info("🔄 Proactive monitoring started (5-minute intervals)")
+#         logger.info("   Phase 0.6: Self-healing enabled with human approval")
     
         # Start autonomous execution scheduler (Phase 1)
         try:
