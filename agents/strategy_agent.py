@@ -1987,5 +1987,137 @@ I've received approval to implement this fix.
             return f"❌ Audit failed: {str(e)}\n\nI tried to pull real data but encountered an error. Check logs for details."
 
 
+
+
+    # ===== Webhook Processing (StrategyAgent as Entry Point) =====
+
+    async def process_lead_webhook(self, lead_data: dict) -> dict:
+        """Process incoming lead from Typeform webhook.
+
+        This is the NEW entry point for strategic lead processing.
+        StrategyAgent strategizes engagement, then delegates to specialists.
+
+        Args:
+            lead_data: Raw Typeform webhook data
+
+        Returns:
+            dict with status, lead_id, strategy, and results
+        """
+        try:
+            logger.info(f"🎯 StrategyAgent processing lead webhook")
+
+            # Step 1: Parse lead data
+            from models import Lead
+            lead = Lead.from_typeform(lead_data)
+            logger.info(f"   Lead: {lead.email} ({lead.company})")
+
+            # Step 2: Strategic reasoning - determine engagement strategy
+            strategy = await self._strategize_engagement(lead)
+            logger.info(f"   Strategy: {strategy.approach}")
+
+            # Step 3: Execute strategy via delegation
+            result = await self._execute_strategy(lead, strategy)
+            logger.info(f"   Result: {result.get('status')}")
+
+            # Step 4: Save state
+            await self._save_lead_state(lead, strategy, result)
+
+            return {
+                "status": "success",
+                "lead_id": str(lead.id),
+                "strategy": strategy.dict(),
+                "result": result
+            }
+
+        except Exception as e:
+            logger.error(f"❌ StrategyAgent webhook processing failed: {e}")
+            logger.error(f"   Falling back to InboundAgent")
+            import traceback
+            logger.error(traceback.format_exc())
+
+            # FALLBACK: Delegate to InboundAgent
+            return await self._fallback_to_inbound(lead_data)
+
+    
+    async def _strategize_engagement(self, lead):
+        """Determine engagement strategy for lead."""
+        from models.engagement_strategy import EngagementStrategy, EngagementApproach, PersonalizationLevel
+        
+        research_needed = bool(lead.company and len(lead.company) > 5)
+        approach = EngagementApproach.RESEARCH_FIRST if research_needed else EngagementApproach.QUALIFY_AND_EMAIL
+        
+        return EngagementStrategy(
+            approach=approach,
+            research_needed=research_needed,
+            qualification_needed=True,
+            personalization_level=PersonalizationLevel.CUSTOM if research_needed else PersonalizationLevel.TARGETED
+        )
+    
+    async def _execute_strategy(self, lead, strategy):
+        """Execute strategy by delegating to specialists."""
+        results = {}
+        if strategy.qualification_needed:
+            results['qualification'] = await self._delegate_to_inbound(lead)
+        if strategy.research_needed:
+            results['research'] = await self._delegate_to_research(lead)
+        results['engagement'] = await self._delegate_to_followup(lead, strategy, results.get('research'))
+        return {"status": "success", "delegations": results}
+    
+    async def _delegate_to_inbound(self, lead):
+        """Delegate to InboundAgent."""
+        try:
+            from agents.inbound_agent import InboundAgent
+            inbound = InboundAgent()
+            result = inbound.forward(lead)
+            return {"status": "success", "tier": str(result.tier), "score": result.score}
+        except Exception as e:
+            logger.error(f"InboundAgent delegation failed: {e}")
+            return {"status": "error", "error": str(e)}
+    
+    async def _delegate_to_research(self, lead):
+        """Delegate to ResearchAgent."""
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post("http://localhost:8000/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
+    async def _delegate_to_followup(self, lead, strategy, research_data=None):
+        """Delegate to FollowUpAgent."""
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post("http://localhost:8000/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
+    async def _fallback_to_inbound(self, lead_data):
+        """Fallback to InboundAgent."""
+        from api.processors import process_typeform_event
+        import uuid
+        try:
+            await process_typeform_event(str(uuid.uuid4()), lead_data)
+            return {"status": "success", "fallback": True}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
+    async def _save_lead_state(self, lead, strategy, result):
+        """Save state to database."""
+        try:
+            from config.settings import settings
+            from supabase import create_client
+            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+            await supabase.table('agent_state').insert({
+                'agent_name': 'StrategyAgent',
+                'lead_id': str(lead.id),
+                'state_data': {'strategy': strategy.dict() if hasattr(strategy, 'dict') else {}, 'result': result},
+                'status': 'completed'
+            }).execute()
+        except Exception as e:
+            logger.error(f"Failed to save state: {e}")
+
 # ===== Export =====
 __all__ = ['StrategyAgent', 'PipelineAnalysis', 'OutboundTarget', 'StrategyRecommendation']
