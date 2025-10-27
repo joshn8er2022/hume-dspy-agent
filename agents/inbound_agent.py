@@ -64,6 +64,11 @@ class InboundAgent(SelfOptimizingAgent):
         self.analyze_business = dspy.ChainOfThought(AnalyzeBusinessFit)
         self.analyze_engagement = dspy.ChainOfThought(AnalyzeEngagement)
         self.determine_actions = dspy.ChainOfThought(DetermineNextActions)
+
+        # AI-Driven Tier Determination (Week 1 Priority)
+        from dspy_modules.tier_determination import AITierClassifier
+        self.ai_tier_classifier = AITierClassifier()
+        logger.info("   AI Tier Classifier: ✅ Initialized")
         self.generate_email = dspy.ChainOfThought(GenerateEmailTemplate)
         self.generate_sms = dspy.ChainOfThought(GenerateSMSMessage)
 
@@ -111,7 +116,7 @@ class InboundAgent(SelfOptimizingAgent):
 
         # Step 4: Determine tier and qualification status
         logger.info("🎯 Executing tier classification...")
-        tier = self._determine_tier(total_score)
+        tier = self._determine_tier(total_score, lead, engagement)
         is_qualified = total_score >= self.COLD_THRESHOLD
 
         # Step 5: Determine next actions
@@ -341,8 +346,50 @@ class InboundAgent(SelfOptimizingAgent):
             company_data_score=company_data_score,
         )
 
-    def _determine_tier(self, score: int) -> LeadTier:
-        """Determine qualification tier from score using 6-tier granular system."""
+    def _determine_tier(self, score: int, lead, engagement: dict) -> LeadTier:
+        """Determine tier using AI-driven contextual classification.
+        
+        Args:
+            score: Overall qualification score (0-100)
+            lead: Lead object with all context
+            engagement: Dict with engagement analysis
+        
+        Returns:
+            LeadTier enum value
+        """
+        import os
+        
+        # Feature flag for A/B testing
+        use_ai_tier = os.getenv("USE_AI_TIER_DETERMINATION", "false").lower() == "true"
+        
+        if use_ai_tier:
+            # AI-driven tier determination
+            try:
+                result = self.ai_tier_classifier.forward(lead, score, engagement)
+                tier_str = result.tier.upper()
+                
+                # Map string to enum
+                tier_map = {
+                    "SCORCHING": LeadTier.SCORCHING,
+                    "HOT": LeadTier.HOT,
+                    "WARM": LeadTier.WARM,
+                    "COOL": LeadTier.COOL,
+                    "COLD": LeadTier.COLD,
+                    "UNQUALIFIED": LeadTier.UNQUALIFIED
+                }
+                
+                tier = tier_map.get(tier_str, LeadTier.UNQUALIFIED)
+                
+                logger.info(f"🤖 AI Tier: {tier.value} (confidence: {result.confidence:.2f})")
+                logger.info(f"   Reasoning: {result.reasoning[:100]}...")
+                
+                return tier
+            except Exception as e:
+                logger.error(f"❌ AI tier determination failed: {e}")
+                logger.info("   Falling back to hardcoded thresholds")
+                # Fall through to hardcoded logic
+        
+        # Hardcoded thresholds (fallback or when AI disabled)
         if score >= self.SCORCHING_THRESHOLD:
             return LeadTier.SCORCHING
         elif score >= self.HOT_THRESHOLD:
