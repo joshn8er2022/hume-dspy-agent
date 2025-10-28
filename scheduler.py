@@ -9,7 +9,17 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Initialize scheduler
-scheduler = AsyncIOScheduler()
+# Lazy initialization - don't create during import (prevents blocking)
+scheduler = None
+
+def get_scheduler():
+    """Get or create scheduler instance (lazy initialization)."""
+    global scheduler
+    if scheduler is None:
+        scheduler = AsyncIOScheduler()
+        logger.info("✅ AsyncIOScheduler initialized (lazy)")
+    return scheduler
+
 
 
 async def check_leads_needing_followup():

@@ -82,7 +82,7 @@ except Exception as e:
     logger.error(traceback.format_exc())
 
 # Autonomous execution scheduler
-from scheduler import scheduler, check_leads_needing_followup, autonomous_monitoring, run_performance_monitoring
+from scheduler import get_scheduler, check_leads_needing_followup, autonomous_monitoring, run_performance_monitoring
 from apscheduler.triggers.interval import IntervalTrigger
 
 app = FastAPI(
@@ -118,7 +118,7 @@ async def start_background_tasks():
         # Start autonomous execution scheduler (Phase 1)
         try:
             # Schedule follow-up checks (hourly)
-            scheduler.add_job(
+            get_scheduler().add_job(
                 check_leads_needing_followup,
                 trigger=IntervalTrigger(hours=1),
                 id="followup_check",
@@ -126,7 +126,7 @@ async def start_background_tasks():
             )
     
             # Schedule monitoring (every 30 min)
-            scheduler.add_job(
+            get_scheduler().add_job(
                 autonomous_monitoring,
                 trigger=IntervalTrigger(minutes=30),
                 id="pipeline_monitoring",
@@ -136,13 +136,13 @@ async def start_background_tasks():
             # Start scheduler
 
             # Schedule PerformanceAgent monitoring (every 30 min)
-            scheduler.add_job(
+            get_scheduler().add_job(
                 run_performance_monitoring,
                 trigger=IntervalTrigger(minutes=30),
                 id="performance_monitoring",
                 replace_existing=True
             )
-            scheduler.start()
+            get_scheduler().start()
             logger.info("✅ Autonomous scheduler started")
             logger.info("   - Follow-up checks: Every hour")
             logger.info("   - Pipeline monitoring: Every 30 minutes")
