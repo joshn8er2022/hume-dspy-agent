@@ -160,3 +160,24 @@ def stop_scheduler():
     logger.info("🛑 Stopping autonomous execution scheduler...")
     scheduler.shutdown()
     logger.info("✅ Scheduler stopped")
+
+async def run_performance_monitoring():
+    """Run PerformanceAgent to monitor system performance."""
+    try:
+        logger.info("🔄 Running PerformanceAgent monitoring...")
+        
+        from agents.performance_agent import PerformanceAgent
+        
+        # Initialize PerformanceAgent
+        performance_agent = PerformanceAgent()
+        
+        # Run monitoring workflow
+        result = await performance_agent.monitor_system()
+        
+        logger.info(f"✅ PerformanceAgent monitoring complete: {result.get('status')}")
+        
+    except Exception as e:
+        logger.error(f"❌ PerformanceAgent monitoring failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
