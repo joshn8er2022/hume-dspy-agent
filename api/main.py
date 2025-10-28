@@ -82,7 +82,7 @@ except Exception as e:
     logger.error(traceback.format_exc())
 
 # Autonomous execution scheduler
-from scheduler import scheduler, check_leads_needing_followup, autonomous_monitoring
+from scheduler import scheduler, check_leads_needing_followup, autonomous_monitoring, run_performance_monitoring
 from apscheduler.triggers.interval import IntervalTrigger
 
 app = FastAPI(
@@ -134,6 +134,14 @@ async def start_background_tasks():
             )
     
             # Start scheduler
+
+            # Schedule PerformanceAgent monitoring (every 30 min)
+            scheduler.add_job(
+                run_performance_monitoring,
+                trigger=IntervalTrigger(minutes=30),
+                id="performance_monitoring",
+                replace_existing=True
+            )
             scheduler.start()
             logger.info("✅ Autonomous scheduler started")
             logger.info("   - Follow-up checks: Every hour")
@@ -696,6 +704,38 @@ async def followup_agent_a2a(request: Request):
 
 # FastA2A Protocol Endpoints
 # ============================================================================
+
+
+@app.post("/agents/performance/trigger")
+async def trigger_performance_monitoring(request: Request):
+    """Manually trigger PerformanceAgent monitoring."""
+    try:
+        logger.info("📊 Manual PerformanceAgent trigger")
+        
+        from agents.performance_agent import PerformanceAgent
+        
+        # Initialize PerformanceAgent
+        performance_agent = PerformanceAgent()
+        
+        # Run monitoring workflow
+        result = await performance_agent.monitor_system()
+        
+        logger.info(f"✅ PerformanceAgent monitoring complete: {result.get('status')}")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "result": result,
+            "agent": "PerformanceAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ PerformanceAgent trigger failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
 
 @app.post("/webhooks/typeform")
 async def typeform_webhook_receiver(
