@@ -88,7 +88,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 app = FastAPI(
     title="Hume DSPy Agent - Event Sourced",
     description="Event sourcing webhook system with async processing",
-    version="2.1.0"
+    version="2.1.1"
 )
 
 # ============================================================================
