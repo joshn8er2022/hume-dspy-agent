@@ -2132,7 +2132,7 @@ I've received approval to implement this fix.
         import httpx
         try:
             async with httpx.AsyncClient() as client:
-                r = await client.post(f"{self.communication.base_url if self.communication else "http://localhost:8080"}/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                r = await client.post(f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
                 return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
         except Exception as e:
             return {"status": "error", "error": str(e)}
@@ -2142,7 +2142,7 @@ I've received approval to implement this fix.
         import httpx
         try:
             async with httpx.AsyncClient() as client:
-                r = await client.post(f"{self.communication.base_url if self.communication else "http://localhost:8080"}/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                r = await client.post(f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
                 return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
         except Exception as e:
             return {"status": "error", "error": str(e)}
