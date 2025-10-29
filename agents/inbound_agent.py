@@ -17,13 +17,13 @@ from models import (
     NextAction,
     LeadStatus,
 )
-from dspy_modules import (
-    QualifyLead,
+from dspy_modules.qualification_signatures import (
     AnalyzeBusinessFit,
     AnalyzeEngagement,
     DetermineNextActions,
     GenerateEmailTemplate,
     GenerateSMSMessage,
+    QualifyLead,
 )
 # from core import settings as core_settings  # Not needed - using config.settings
 from core.company_context import get_company_context_for_qualification
@@ -87,87 +87,104 @@ class InboundAgent(SelfOptimizingAgent):
 
 
     def forward(self, lead: Lead) -> QualificationResult:
-        """Process and qualify a lead.
-
-        Args:
-            lead: Lead object to qualify
-
-        Returns:
-            QualificationResult with score, reasoning, and next actions
-        """
+        """Process and qualify a lead."""
         start_time = time.time()
+        self._prepare_lead_data(lead)
+        business_fit, engagement = self._run_qualification_analysis(lead)
+        total_score, tier, is_qualified, criteria = self._calculate_score_and_tier(
+            lead, business_fit, engagement
+        )
+        actions_result, email_template, sms_template = self._generate_actions_and_templates(
+            lead, total_score, tier, is_qualified
+        )
+        result = self._compile_qualification_result(
+            lead,
+            business_fit,
+            engagement,
+            total_score,
+            tier,
+            is_qualified,
+            criteria,
+            actions_result,
+            email_template,
+            sms_template,
+            start_time,
+        )
+        self._save_to_memory_and_initiate_campaign(
+            lead, result, total_score, tier, is_qualified, actions_result
+        )
+        logger.info(
+            f"✅ Qualification complete - Tier: {result.tier}, Score: {result.score}"
+        )
+        return result
 
-        # COMPATIBILITY FIX: Extract semantic fields from old Typeform field IDs
-        # Old database records have raw field IDs, new ones have semantic names
+    def _prepare_lead_data(self, lead: Lead):
+        """Extracts semantic fields from old Typeform field IDs."""
         semantic_data = lead.extract_semantic_fields()
         if semantic_data:
-            # Enrich lead with extracted semantic data for qualification
             lead._semantic_enrichment = semantic_data
 
-        # Step 1: Analyze business fit
+    def _run_qualification_analysis(self, lead: Lead) -> tuple[dict, dict]:
+        """Analyzes business fit and engagement."""
         business_fit = self._analyze_business_fit(lead)
-
-        # Step 2: Analyze engagement
         engagement = self._analyze_engagement(lead)
+        return business_fit, engagement
 
-        # Step 3: Calculate total score and criteria
+    def _calculate_score_and_tier(self, lead: Lead, business_fit: dict, engagement: dict) -> tuple[int, LeadTier, bool, QualificationCriteria]:
+        """Calculates total score, criteria, and determines tier."""
         criteria = self._calculate_criteria(lead, business_fit, engagement)
         total_score = criteria.calculate_total()
-
-        # Step 4: Determine tier and qualification status
-        logger.info("🎯 Executing tier classification...")
         tier = self._determine_tier(total_score, lead, engagement)
         is_qualified = total_score >= self.COLD_THRESHOLD
+        return total_score, tier, is_qualified, criteria
 
-        # Step 5: Determine next actions
+    def _generate_actions_and_templates(self, lead: Lead, total_score: int, tier: LeadTier, is_qualified: bool) -> tuple[any, str | None, str | None]:
+        """Determines next actions and generates personalized templates."""
         actions_result = self.determine_actions(
             company_context=get_company_context_for_qualification(),
             qualification_score=total_score,
             tier=tier.value,
-            has_booking=lead.has_field('calendly_url'),
+            has_booking=lead.has_field("calendly_url"),
             response_complete=lead.is_complete(),
         )
-
-        # Step 6: Generate personalized templates if qualified
-        email_template = None
-        sms_template = None
-
+        email_template, sms_template = None, None
         if is_qualified and lead.is_complete():
-            email_result = self.generate_email(
-                company_context=get_company_context_for_qualification(),
-                lead_name=(lead.get_field('first_name', '') + ' ' + lead.get_field('last_name', '')).strip() or 'there',
-                company=lead.get_field('company') or "your practice",
-                business_size=lead.get_field('business_size') if lead.get_field('business_size') else "small business",
-                patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "1-50 patients",
-                needs_summary=lead.get_field('ai_summary') or "body composition tracking",
-                tier=tier.value,
-            )
-            email_template = f"""Subject: {email_result.email_subject}
+            email_template, sms_template = self._generate_templates(lead, tier)
+        return actions_result, email_template, sms_template
 
-{email_result.email_body}"""
+    def _generate_templates(self, lead: Lead, tier: LeadTier) -> tuple[str, str]:
+        """Generates email and SMS templates."""
+        email_result = self.generate_email(
+            company_context=get_company_context_for_qualification(),
+            lead_name=(
+                lead.get_field("first_name", "") + " " + lead.get_field("last_name", "")
+            ).strip()
+            or "there",
+            company=lead.get_field("company") or "your practice",
+            business_size=lead.get_field("business_size") or "small business",
+            patient_volume=lead.get_field("patient_volume") or "1-50 patients",
+            needs_summary=lead.get_field("ai_summary") or "body composition tracking",
+            tier=tier.value,
+        )
+        email_template = f"Subject: {email_result.email_subject}\n\n{email_result.email_body}"
+        sms_result = self.generate_sms(
+            company_context=get_company_context_for_qualification(),
+            lead_name=lead.get_field("first_name"),
+            tier=tier.value,
+            has_booking=lead.has_field("calendly_url"),
+        )
+        sms_template = sms_result.sms_message
+        return email_template, sms_template
 
-            sms_result = self.generate_sms(
-                company_context=get_company_context_for_qualification(),
-                lead_name=lead.get_field('first_name'),
-                tier=tier.value,
-                has_booking=lead.has_field('calendly_url'),
-            )
-            sms_template = sms_result.sms_message
-
-        # Step 7: Compile reasoning
+    def _compile_qualification_result(self, lead: Lead, business_fit: dict, engagement: dict, total_score: int, tier: LeadTier, is_qualified: bool, criteria: QualificationCriteria, actions_result: any, email_template: str | None, sms_template: str | None, start_time: float) -> QualificationResult:
+        """Compiles the final qualification result."""
         reasoning = self._compile_reasoning(
             lead, business_fit, engagement, total_score, tier
         )
-
-        # Step 8: Extract key factors and concerns
         key_factors = self._extract_key_factors(lead, business_fit, engagement)
         concerns = self._extract_concerns(lead, business_fit, engagement)
-
-        # Calculate processing time
         processing_time = int((time.time() - start_time) * 1000)
-
-        # Create qualification result
-        result = QualificationResult(
+        return QualificationResult(
             is_qualified=is_qualified,
             score=total_score,
             tier=tier,
@@ -184,9 +201,19 @@ class InboundAgent(SelfOptimizingAgent):
             processing_time_ms=processing_time,
         )
 
-        # AGENT ZERO MEMORY: Save this lead for future learning
+    def _save_to_memory_and_initiate_campaign(self, lead: Lead, result: QualificationResult, total_score: int, tier: LeadTier, is_qualified: bool, actions_result: any):
+        """Saves lead to memory and initiates ABM campaign if qualified."""
+        self._save_lead_to_memory(lead, total_score, tier, actions_result, result.reasoning)
+        if is_qualified and tier in [
+            LeadTier.SCORCHING,
+            LeadTier.HOT,
+            LeadTier.WARM,
+        ]:
+            self._initiate_abm_campaign(lead, total_score, tier, result)
+
+    def _save_lead_to_memory(self, lead: Lead, total_score: int, tier: LeadTier, actions_result: any, reasoning: str):
+        """Saves the lead to agent memory."""
         try:
-            # Convert LeadTier to MemoryLeadTier
             memory_tier_map = {
                 LeadTier.SCORCHING: MemoryLeadTier.SCORCHING,
                 LeadTier.HOT: MemoryLeadTier.HOT,
@@ -195,55 +222,55 @@ class InboundAgent(SelfOptimizingAgent):
                 LeadTier.COLD: MemoryLeadTier.COLD,
                 LeadTier.UNQUALIFIED: MemoryLeadTier.UNQUALIFIED,
             }
-
             lead_memory = LeadMemory(
                 lead_id=lead.id,
                 email=lead.email,
-                company=lead.get_field('company'),
+                company=lead.get_field("company"),
                 qualification_score=total_score,
                 tier=memory_tier_map.get(tier, MemoryLeadTier.UNQUALIFIED),
-                practice_size=lead.get_field('business_size'),
-                patient_volume=lead.get_field('patient_volume'),
-                industry=lead.get_field('industry') or 'Healthcare',
-                strategy_used=actions_result.primary_action.action_type if actions_result.primary_action else None,
-                converted=None,  # Will be updated later when we know conversion
+                practice_size=lead.get_field("business_size"),
+                patient_volume=lead.get_field("patient_volume"),
+                industry=lead.get_field("industry") or "Healthcare",
+                strategy_used=actions_result.primary_action.action_type
+                if actions_result.primary_action
+                else None,
+                converted=None,
                 key_insights=reasoning[:500] if reasoning else None,
             )
-
-            # Save to memory (async)
             memory_id = asyncio.run(self.memory.save_lead_memory(lead_memory))
             print(f"💾 Saved lead to memory: {lead.email} (ID: {memory_id})")
         except Exception as e:
-            # Graceful degradation - continue even if memory save fails
             print(f"⚠️ Memory save failed (non-critical): {e}")
 
-        
-        # ABM CAMPAIGN: Initiate multi-contact campaign for qualified leads
-        campaign_id = None
-        if is_qualified and tier in [LeadTier.SCORCHING, LeadTier.HOT, LeadTier.WARM]:
-            try:
-                campaign_data = {
-                    'company_name': lead.get_field('company') or 'Unknown Company',
-                    'contact_name': f"{lead.get_field('first_name', '')} {lead.get_field('last_name', '')}".strip() or 'Unknown',
-                    'contact_email': lead.email,
-                    'contact_phone': lead.get_field('phone'),
-                    'contact_title': lead.get_field('title') or 'Unknown',
-                    'inquiry_topic': lead.get_field('ai_summary') or lead.get_field('use_case') or 'our platform',
-                    'qualification_tier': tier.value,
-                    'qualification_score': total_score,
-                    'business_size': lead.get_field('business_size'),
-                    'patient_volume': lead.get_field('patient_volume'),
-                }
-                campaign_result = asyncio.run(self.orchestrator.process_new_lead(campaign_data))
-                campaign_id = campaign_result.get('campaign_id')
-                print(f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})")
-            except Exception as e:
-                print(f"⚠️ ABM campaign initiation failed (non-critical): {e}")
-        if campaign_id:
-            result.campaign_id = campaign_id
-
-        logger.info(f"✅ Qualification complete - Tier: {result.tier if 'result' in locals() else 'unknown'}, Score: {result.score if 'result' in locals() else 0}")
-        return result
+    def _initiate_abm_campaign(self, lead: Lead, total_score: int, tier: LeadTier, result: QualificationResult):
+        """Initiates an ABM campaign for the lead."""
+        try:
+            campaign_data = {
+                "company_name": lead.get_field("company") or "Unknown Company",
+                "contact_name": f"{lead.get_field('first_name', '')} {lead.get_field('last_name', '')}".strip()
+                or "Unknown",
+                "contact_email": lead.email,
+                "contact_phone": lead.get_field("phone"),
+                "contact_title": lead.get_field("title") or "Unknown",
+                "inquiry_topic": lead.get_field("ai_summary")
+                or lead.get_field("use_case")
+                or "our platform",
+                "qualification_tier": tier.value,
+                "qualification_score": total_score,
+                "business_size": lead.get_field("business_size"),
+                "patient_volume": lead.get_field("patient_volume"),
+            }
+            campaign_result = asyncio.run(
+                self.orchestrator.process_new_lead(campaign_data)
+            )
+            campaign_id = campaign_result.get("campaign_id")
+            print(
+                f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})"
+            )
+            if campaign_id:
+                result.campaign_id = campaign_id
+        except Exception as e:
+            print(f"⚠️ ABM campaign initiation failed (non-critical): {e}")
 
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:
         """Analyze business fit using DSPy."""

@@ -8,10 +8,11 @@ import asyncio
 import httpx
 import json
 import time
+import os
 from datetime import datetime
 from typing import Dict, List, Any
 
-BASE_URL = "https://hume-dspy-agent-production.up.railway.app"
+BASE_URL = os.environ.get("BASE_URL", "https://hume-dspy-agent-production.up.railway.app")
 
 class TestRunner:
     def __init__(self):

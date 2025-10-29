@@ -130,13 +130,8 @@ Qualify a lead and get scoring, tier, and recommended actions.
 ## 🧪 Testing
 
 ```bash
-# Run test script
-python tests/test_agent.py
-
-# Test with sample lead
-curl -X POST http://localhost:8000/qualify \
-  -H "Content-Type: application/json" \
-  -d @tests/sample_lead.json
+# Run comprehensive test suite
+python tests/test_suite_comprehensive.py
 ```
 
 ## 📦 Project Structure
@@ -152,12 +147,11 @@ hume-dspy-agent/
 │   ├── qualification.py      # Qualification models
 │   └── agent_state.py        # Agent state models
 ├── tools/
-│   ├── close_crm.py          # Close CRM integration
-│   ├── sendgrid.py           # Email sending
-│   ├── twilio.py             # SMS sending
-│   └── slack.py              # Slack notifications
+│   ├── rag_tools.py          # RAG tools
+│   ├── strategy_tools.py     # Strategy tools
+│   └── wolfram_alpha.py      # Wolfram Alpha integration
 ├── tests/
-│   └── test_agent.py         # Test scripts
+│   └── test_suite_comprehensive.py # Comprehensive test suite
 ├── .env.example              # Environment template
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
