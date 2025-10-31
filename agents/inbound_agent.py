@@ -1,8 +1,13 @@
 """DSPy-based Inbound Lead Qualification Agent."""
 import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import time
+import asyncio
+
+# Agent Zero Memory Integration
+from memory import get_agent_memory, LeadMemory, LeadTier as MemoryLeadTier
 
 from models import (
     Lead,
@@ -20,12 +25,18 @@ from dspy_modules import (
     GenerateEmailTemplate,
     GenerateSMSMessage,
 )
-from core import settings as core_settings
+# from core import settings as core_settings  # Not needed - using config.settings
 from core.company_context import get_company_context_for_qualification
 from config.settings import settings
+from agents.account_orchestrator import AccountOrchestrator
+import logging
+
+# Configure logging for debugging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
-class InboundAgent(dspy.Module):
+class InboundAgent(SelfOptimizingAgent):
     """Intelligent inbound lead qualification agent using DSPy.
 
     This agent analyzes incoming leads from Typeform submissions,
@@ -34,12 +45,30 @@ class InboundAgent(dspy.Module):
     """
 
     def __init__(self):
-        super().__init__()
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["research", "supabase", "qualification"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot
+            auto_optimize_threshold=0.80,  # Optimize if <80% accuracy
+            department="Sales"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="InboundAgent", rules=rules)
 
         # Initialize DSPy modules
         self.analyze_business = dspy.ChainOfThought(AnalyzeBusinessFit)
         self.analyze_engagement = dspy.ChainOfThought(AnalyzeEngagement)
         self.determine_actions = dspy.ChainOfThought(DetermineNextActions)
+
+        # AI-Driven Tier Determination (Week 1 Priority)
+        from dspy_modules.tier_determination import AITierClassifier
+        self.ai_tier_classifier = AITierClassifier()
+        logger.info("   AI Tier Classifier: ✅ Initialized")
         self.generate_email = dspy.ChainOfThought(GenerateEmailTemplate)
         self.generate_sms = dspy.ChainOfThought(GenerateSMSMessage)
 
@@ -49,6 +78,13 @@ class InboundAgent(dspy.Module):
         self.WARM_THRESHOLD = settings.WARM_THRESHOLD
         self.COOL_THRESHOLD = settings.COOL_THRESHOLD
         self.COLD_THRESHOLD = settings.COLD_THRESHOLD
+
+        # Agent Zero Memory System
+        self.memory = get_agent_memory("inbound_agent")
+
+        # ABM Campaign Orchestrator
+        self.orchestrator = AccountOrchestrator()
+
 
     def forward(self, lead: Lead) -> QualificationResult:
         """Process and qualify a lead.
@@ -79,7 +115,8 @@ class InboundAgent(dspy.Module):
         total_score = criteria.calculate_total()
 
         # Step 4: Determine tier and qualification status
-        tier = self._determine_tier(total_score)
+        logger.info("🎯 Executing tier classification...")
+        tier = self._determine_tier(total_score, lead, engagement)
         is_qualified = total_score >= self.COLD_THRESHOLD
 
         # Step 5: Determine next actions
@@ -143,10 +180,69 @@ class InboundAgent(dspy.Module):
             suggested_email_template=email_template,
             suggested_sms_message=sms_template,
             agent_version="1.0.0",
-            model_used=core_settings.dspy_model,
+            model_used=settings.PRIMARY_MODEL,
             processing_time_ms=processing_time,
         )
 
+        # AGENT ZERO MEMORY: Save this lead for future learning
+        try:
+            # Convert LeadTier to MemoryLeadTier
+            memory_tier_map = {
+                LeadTier.SCORCHING: MemoryLeadTier.SCORCHING,
+                LeadTier.HOT: MemoryLeadTier.HOT,
+                LeadTier.WARM: MemoryLeadTier.WARM,
+                LeadTier.COOL: MemoryLeadTier.COOL,
+                LeadTier.COLD: MemoryLeadTier.COLD,
+                LeadTier.UNQUALIFIED: MemoryLeadTier.UNQUALIFIED,
+            }
+
+            lead_memory = LeadMemory(
+                lead_id=lead.id,
+                email=lead.email,
+                company=lead.get_field('company'),
+                qualification_score=total_score,
+                tier=memory_tier_map.get(tier, MemoryLeadTier.UNQUALIFIED),
+                practice_size=lead.get_field('business_size'),
+                patient_volume=lead.get_field('patient_volume'),
+                industry=lead.get_field('industry') or 'Healthcare',
+                strategy_used=actions_result.primary_action.action_type if actions_result.primary_action else None,
+                converted=None,  # Will be updated later when we know conversion
+                key_insights=reasoning[:500] if reasoning else None,
+            )
+
+            # Save to memory (async)
+            memory_id = asyncio.run(self.memory.save_lead_memory(lead_memory))
+            print(f"💾 Saved lead to memory: {lead.email} (ID: {memory_id})")
+        except Exception as e:
+            # Graceful degradation - continue even if memory save fails
+            print(f"⚠️ Memory save failed (non-critical): {e}")
+
+        
+        # ABM CAMPAIGN: Initiate multi-contact campaign for qualified leads
+        campaign_id = None
+        if is_qualified and tier in [LeadTier.SCORCHING, LeadTier.HOT, LeadTier.WARM]:
+            try:
+                campaign_data = {
+                    'company_name': lead.get_field('company') or 'Unknown Company',
+                    'contact_name': f"{lead.get_field('first_name', '')} {lead.get_field('last_name', '')}".strip() or 'Unknown',
+                    'contact_email': lead.email,
+                    'contact_phone': lead.get_field('phone'),
+                    'contact_title': lead.get_field('title') or 'Unknown',
+                    'inquiry_topic': lead.get_field('ai_summary') or lead.get_field('use_case') or 'our platform',
+                    'qualification_tier': tier.value,
+                    'qualification_score': total_score,
+                    'business_size': lead.get_field('business_size'),
+                    'patient_volume': lead.get_field('patient_volume'),
+                }
+                campaign_result = asyncio.run(self.orchestrator.process_new_lead(campaign_data))
+                campaign_id = campaign_result.get('campaign_id')
+                print(f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})")
+            except Exception as e:
+                print(f"⚠️ ABM campaign initiation failed (non-critical): {e}")
+        if campaign_id:
+            result.campaign_id = campaign_id
+
+        logger.info(f"✅ Qualification complete - Tier: {result.tier if 'result' in locals() else 'unknown'}, Score: {result.score if 'result' in locals() else 0}")
         return result
 
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:
@@ -250,8 +346,50 @@ class InboundAgent(dspy.Module):
             company_data_score=company_data_score,
         )
 
-    def _determine_tier(self, score: int) -> LeadTier:
-        """Determine qualification tier from score using 6-tier granular system."""
+    def _determine_tier(self, score: int, lead, engagement: dict) -> LeadTier:
+        """Determine tier using AI-driven contextual classification.
+        
+        Args:
+            score: Overall qualification score (0-100)
+            lead: Lead object with all context
+            engagement: Dict with engagement analysis
+        
+        Returns:
+            LeadTier enum value
+        """
+        import os
+        
+        # Feature flag for A/B testing
+        use_ai_tier = os.getenv("USE_AI_TIER_DETERMINATION", "false").lower() == "true"
+        
+        if use_ai_tier:
+            # AI-driven tier determination
+            try:
+                result = self.ai_tier_classifier.forward(lead, score, engagement)
+                tier_str = result.tier.upper()
+                
+                # Map string to enum
+                tier_map = {
+                    "SCORCHING": LeadTier.SCORCHING,
+                    "HOT": LeadTier.HOT,
+                    "WARM": LeadTier.WARM,
+                    "COOL": LeadTier.COOL,
+                    "COLD": LeadTier.COLD,
+                    "UNQUALIFIED": LeadTier.UNQUALIFIED
+                }
+                
+                tier = tier_map.get(tier_str, LeadTier.UNQUALIFIED)
+                
+                logger.info(f"🤖 AI Tier: {tier.value} (confidence: {result.confidence:.2f})")
+                logger.info(f"   Reasoning: {result.reasoning[:100]}...")
+                
+                return tier
+            except Exception as e:
+                logger.error(f"❌ AI tier determination failed: {e}")
+                logger.info("   Falling back to hardcoded thresholds")
+                # Fall through to hardcoded logic
+        
+        # Hardcoded thresholds (fallback or when AI disabled)
         if score >= self.SCORCHING_THRESHOLD:
             return LeadTier.SCORCHING
         elif score >= self.HOT_THRESHOLD:
@@ -332,3 +470,65 @@ class InboundAgent(dspy.Module):
             concerns.append("Small business (may have budget constraints)")
 
         return concerns
+
+    async def respond(self, message: str) -> str:
+        """A2A endpoint - respond to inter-agent messages about lead qualification.
+        
+        Args:
+            message: JSON string or natural language query about a lead
+            
+        Returns:
+            String response with qualification results
+        """
+        import json
+        from supabase import create_client
+        import os
+        
+        try:
+            # Try to parse as JSON first (structured request)
+            try:
+                data = json.loads(message)
+                lead_id = data.get('lead_id')
+                
+                if not lead_id:
+                    return "❌ Error: No lead_id provided in request"
+                    
+                # Fetch lead from Supabase
+                supabase = create_client(
+                    os.getenv('SUPABASE_URL'),
+                    os.getenv('SUPABASE_KEY')
+                )
+                
+                result = supabase.table('leads').select('*').eq('id', lead_id).execute()
+                
+                if not result.data:
+                    return f"❌ Error: Lead {lead_id} not found"
+                    
+                lead_data = result.data[0]
+                lead = Lead(**lead_data)
+                
+            except json.JSONDecodeError:
+                # Natural language query - extract lead info
+                return "❌ Error: Please provide lead_id in JSON format: {\"lead_id\": \"...\"}" 
+                
+            # Qualify the lead
+            qualification = self.forward(lead)
+            
+            # Format response
+            response_parts = [
+                f"📊 **Lead Qualification: {lead.name}**",
+                f"",
+                f"**Tier:** {qualification.tier}",
+                f"**Score:** {qualification.score}/100",
+                f"",
+                f"**Reasoning:**",
+                qualification.reasoning,
+                f"",
+                f"**Next Steps:** {qualification.next_steps}"
+            ]
+            
+            return "\n".join(response_parts)
+            
+        except Exception as e:
+            import traceback
+            return f"❌ Error qualifying lead: {str(e)}\n\n{traceback.format_exc()}"

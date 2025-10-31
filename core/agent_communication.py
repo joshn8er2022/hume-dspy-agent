@@ -1,23 +1,42 @@
-"""
-Inter-Agent Communication Framework
+"""Inter-Agent Communication Framework
 
-Enables agents to communicate and collaborate with each other.
-Agents can ask each other for help, share information, and coordinate actions.
+DSPy-native A2A communication with type safety and optimization.
+Inspired by Microsoft AutoGen's Agent-as-Tool pattern.
 
-Based on Agent Zero's agent collaboration patterns.
+Enables:
+- Type-safe agent communication (Pydantic models)
+- Optimizable A2A protocols (DSPy compilation)
+- Structured requests/responses
+- Better error handling
 """
 
 import logging
+import dspy
 from typing import Any, Optional, Dict, List
 import asyncio
 from datetime import datetime
+import httpx
+import os
+
+from dspy_modules.a2a_signatures import (
+    AgentToolCall,
+    AskInboundAgent,
+    AskResearchAgent,
+    AskFollowUpAgent,
+    AskAuditAgent,
+    DelegateTask,
+    NotifyAgent,
+    A2ARequest,
+    A2AResponse
+)
+from models.pydantic_models import Lead, QualificationResult
 
 logger = logging.getLogger(__name__)
 
 
 class AgentMessage:
     """A message sent between agents."""
-    
+
     def __init__(
         self,
         from_agent: str,
@@ -29,39 +48,31 @@ class AgentMessage:
         self.from_agent = from_agent
         self.to_agent = to_agent
         self.message = message
-        self.message_type = message_type  # request, response, notification
+        self.message_type = message_type
         self.metadata = metadata or {}
         self.timestamp = datetime.utcnow()
         self.id = f"{from_agent}→{to_agent}_{self.timestamp.timestamp()}"
-    
+
     def __repr__(self):
         return f"AgentMessage({self.from_agent} → {self.to_agent}: {self.message[:50]}...)"
 
 
 class CommunicationChannel:
-    """
-    Communication channel for inter-agent messages.
-    
-    Tracks all communication between agents for:
-    - Debugging
-    - Performance analysis
-    - Coordination patterns
-    """
-    
+    """Communication channel for inter-agent messages."""
+
     def __init__(self):
         self.messages: List[AgentMessage] = []
-        self.max_history = 1000  # Keep last 1000 messages
-    
+        self.max_history = 1000
+
     def send(self, message: AgentMessage):
         """Record a sent message."""
         self.messages.append(message)
-        
-        # Trim history if needed
+
         if len(self.messages) > self.max_history:
             self.messages = self.messages[-self.max_history:]
-        
+
         logger.info(f"📨 {message.from_agent} → {message.to_agent}: {message.message[:80]}...")
-    
+
     def get_conversation(self, agent1: str, agent2: str, limit: int = 10) -> List[AgentMessage]:
         """Get conversation between two agents."""
         conversation = [
@@ -70,17 +81,185 @@ class CommunicationChannel:
                (msg.from_agent == agent2 and msg.to_agent == agent1)
         ]
         return conversation[-limit:]
-    
-    def get_agent_activity(self, agent_name: str, limit: int = 20) -> List[AgentMessage]:
-        """Get all messages involving an agent."""
-        return [
-            msg for msg in self.messages[-limit*2:]
-            if msg.from_agent == agent_name or msg.to_agent == agent_name
-        ][-limit:]
 
 
-# Global communication channel (singleton)
+# Global communication channel
 _global_channel = CommunicationChannel()
+
+
+# Agent name to A2A endpoint mapping
+AGENT_A2A_ENDPOINTS = {
+    "InboundAgent": "/agents/inbound/a2a",
+    "ResearchAgent": "/agents/research/a2a",
+    "FollowUpAgent": "/agents/followup/a2a",
+    "StrategyAgent": "/a2a"
+}
+
+
+def _get_base_url() -> str:
+    """Determine correct base URL for A2A communication."""
+    # Check if running in Railway
+    if os.getenv('RAILWAY_ENVIRONMENT'):
+        return "http://localhost:8080"
+    return "http://localhost:8000"
+
+
+class DSPyNativeA2A:
+    """DSPy-native inter-agent communication.
+
+    Uses DSPy signatures for type-safe, optimizable A2A communication.
+    Inspired by Microsoft AutoGen's Agent-as-Tool pattern.
+    """
+
+    def __init__(self, agent: Any):
+        self.agent = agent
+        self.agent_name = agent.__class__.__name__
+
+        # DSPy modules for A2A communication
+        self.agent_tool_call = dspy.ChainOfThought(AgentToolCall)
+        self.ask_inbound = dspy.ChainOfThought(AskInboundAgent)
+        self.ask_research = dspy.ChainOfThought(AskResearchAgent)
+        self.ask_followup = dspy.ChainOfThought(AskFollowUpAgent)
+        self.ask_audit = dspy.ChainOfThought(AskAuditAgent)
+        self.delegate_task = dspy.ChainOfThought(DelegateTask)
+        self.notify_agent = dspy.ChainOfThought(NotifyAgent)
+
+    async def call_agent(
+        self,
+        target_agent_name: str,
+        task: str,
+        context: Optional[Dict] = None
+    ) -> A2AResponse:
+        """Call another agent using DSPy signatures.
+
+        Args:
+            target_agent_name: Name of target agent
+            task: Task to delegate
+            context: Additional context
+
+        Returns:
+            A2AResponse with structured result
+        """
+        import json
+
+        # Use universal AgentToolCall signature
+        result = self.agent_tool_call(
+            agent_name=target_agent_name,
+            task=task,
+            context=json.dumps(context or {})
+        )
+
+        # Return structured Pydantic response
+        return A2AResponse(
+            from_agent=self.agent_name,
+            to_agent=target_agent_name,
+            success=result.success,
+            response=result.result,
+            data=json.loads(result.data) if result.data else None
+        )
+
+    async def ask_agent_typed(
+        self,
+        target_agent: Any,
+        question: str,
+        context: Optional[str] = None,
+        **kwargs
+    ) -> A2AResponse:
+        """Ask agent using type-specific signature.
+
+        Automatically selects appropriate DSPy signature based on target agent.
+        """
+        target_name = target_agent.__class__.__name__
+
+        try:
+            # Select appropriate signature
+            if target_name == "InboundAgent":
+                result = self.ask_inbound(
+                    question=question,
+                    lead_id=kwargs.get('lead_id')
+                )
+                data = {
+                    'pipeline_data': result.pipeline_data,
+                    'lead_data': result.lead_data
+                }
+
+            elif target_name == "ResearchAgent":
+                result = self.ask_research(
+                    research_request=question,
+                    lead_context=context or "",
+                    depth=kwargs.get('depth', 'standard')
+                )
+                data = {
+                    'findings': result.findings,
+                    'sources': result.sources,
+                    'confidence': result.confidence
+                }
+
+            elif target_name == "FollowUpAgent":
+                result = self.ask_followup(
+                    query=question,
+                    lead_id=kwargs.get('lead_id')
+                )
+                data = {
+                    'status': result.status,
+                    'next_action': result.next_action,
+                    'emails_sent': result.emails_sent
+                }
+
+            elif target_name == "AuditAgent":
+                result = self.ask_audit(
+                    query=question,
+                    time_range=kwargs.get('time_range', '24h')
+                )
+                data = {
+                    'metrics': result.metrics,
+                    'insights': result.insights,
+                    'recommendations': result.recommendations
+                }
+
+            else:
+                # Fallback to universal signature
+                return await self.call_agent(target_name, question, context)
+
+            # Return structured response
+            return A2AResponse(
+                from_agent=self.agent_name,
+                to_agent=target_name,
+                success=True,
+                response=result.response if hasattr(result, 'response') else str(result),
+                data=data
+            )
+
+        except Exception as e:
+            logger.error(f"A2A call failed: {e}")
+            return A2AResponse(
+                from_agent=self.agent_name,
+                to_agent=target_name,
+                success=False,
+                response="",
+                error=str(e)
+            )
+
+
+# Keep existing HTTP-based A2A for backward compatibility
+def _get_base_url() -> str:
+    """
+    Determine the correct base URL for A2A communication.
+    
+    In production (Railway), agents communicate via localhost since they're in the same container.
+    The API_BASE_URL env var can override this if needed.
+    """
+    # Check for explicit override
+    if base_url := os.getenv("API_BASE_URL"):
+        return base_url
+    
+    # Check if we're in Railway (has RAILWAY_ENVIRONMENT env var)
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        # In Railway, use localhost since all agents are in same container
+        return "http://localhost:8080"  # Railway uses port 8080
+    
+    # Local development
+    return "http://localhost:8000"
 
 
 class AgentCommunication:
@@ -101,6 +280,9 @@ class AgentCommunication:
         self.agent = agent
         self.agent_name = agent.__class__.__name__
         self.channel = _global_channel
+        self.base_url = _get_base_url()
+        
+        logger.info(f"🔗 {self.agent_name} communication initialized (base_url: {self.base_url})")
     
     async def ask_agent(
         self,
@@ -115,10 +297,10 @@ class AgentCommunication:
             target_agent: The agent to ask
             question: Question or request
             context: Optional context to provide
-            
+        
         Returns:
             Response from target agent
-            
+        
         Example:
             # Strategy Agent asks Research Agent
             research = await self.communication.ask_agent(
@@ -146,6 +328,43 @@ class AgentCommunication:
         self.channel.send(outgoing)
         
         try:
+            # FIRST: Try A2A HTTP endpoint (new method)
+            if target_name in AGENT_A2A_ENDPOINTS:
+                endpoint = AGENT_A2A_ENDPOINTS[target_name]
+                url = f"{self.base_url}{endpoint}"
+                
+                logger.info(f"🔗 Using A2A endpoint: {url}")
+                
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        url,
+                        json={"message": full_message}
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    
+                    # Extract response text from A2A protocol response
+                    if isinstance(result, dict) and "response" in result:
+                        response_text = result["response"]
+                    else:
+                        response_text = str(result)
+                    
+                    # Record incoming response
+                    incoming = AgentMessage(
+                        from_agent=target_name,
+                        to_agent=self.agent_name,
+                        message=response_text,
+                        message_type="response",
+                        metadata={"in_response_to": outgoing.id, "via": "a2a_http"}
+                    )
+                    self.channel.send(incoming)
+                    
+                    logger.info(f"✅ {target_name} responded via A2A to {self.agent_name}")
+                    return response_text
+            
+            # FALLBACK: Try legacy direct method calls
+            logger.warning(f"⚠️ No A2A endpoint for {target_name}, trying legacy methods")
+            
             # Call target agent's main method
             # Different agents have different interfaces, so we try common ones
             if hasattr(target_agent, 'process'):
@@ -171,7 +390,7 @@ class AgentCommunication:
                 to_agent=self.agent_name,
                 message=response,
                 message_type="response",
-                metadata={"in_response_to": outgoing.id}
+                metadata={"in_response_to": outgoing.id, "via": "legacy_direct"}
             )
             self.channel.send(incoming)
             
@@ -196,7 +415,7 @@ class AgentCommunication:
             target_agent: Agent to notify
             notification: Notification message
             metadata: Optional metadata
-            
+        
         Example:
             # Strategy Agent notifies Follow-Up Agent
             await self.communication.notify_agent(
@@ -233,10 +452,10 @@ class AgentCommunication:
             agents: List of agents to broadcast to
             message: Message to broadcast
             wait_for_responses: Whether to wait for and collect responses
-            
+        
         Returns:
             List of responses if wait_for_responses=True, else None
-            
+        
         Example:
             # Strategy Agent broadcasts to all agents
             responses = await self.communication.broadcast(
@@ -311,3 +530,4 @@ async def ask_agent_static(from_agent: Any, to_agent: Any, question: str, contex
     """
     comm = AgentCommunication(from_agent)
     return await comm.ask_agent(to_agent, question, context)
+

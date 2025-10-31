@@ -16,11 +16,12 @@ from datetime import datetime, timedelta
 import httpx
 from supabase import create_client, Client
 import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 
 logger = logging.getLogger(__name__)
 
 
-class AuditAgent(dspy.Module):
+class AuditAgent(SelfOptimizingAgent):
     """Agent that performs real data audits - no hallucinations, just facts.
     
     Refactored as dspy.Module for consistency with other agents.
@@ -29,7 +30,21 @@ class AuditAgent(dspy.Module):
     """
     
     def __init__(self):
-        super().__init__()  # Initialize dspy.Module
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["supabase", "analytics", "reporting"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot
+            auto_optimize_threshold=0.80,
+            department="Analytics"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="AuditAgent", rules=rules)
+        
         
         # Initialize Supabase
         self.supabase: Optional[Client] = None

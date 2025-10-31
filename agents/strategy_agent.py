@@ -23,6 +23,7 @@ import dspy
 import json
 
 from agents.inbound_agent import InboundAgent
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 from agents.research_agent import ResearchAgent
 from agents.follow_up_agent import FollowUpAgent
 from dspy_modules.conversation_signatures import (
@@ -33,6 +34,29 @@ from dspy_modules.conversation_signatures import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Phoenix optimization imports
+from core.model_selector import get_model_selector
+from core.message_classifier import classify_message
+from core.context_builder import build_context
+
+
+
+from enum import Enum
+
+# ===== Agent State Management =====
+
+class AgentState(str, Enum):
+    """Agent state for visibility and tracking."""
+    IDLE = 'idle'
+    RECEIVING_MESSAGE = 'receiving_message'
+    REASONING = 'reasoning'
+    CALLING_TOOL = 'calling_tool'
+    DELEGATING = 'delegating'
+    WAITING_FOR_SUBORDINATE = 'waiting_for_subordinate'
+    SYNTHESIZING_RESULTS = 'synthesizing_results'
+    RESPONDING = 'responding'
+    ERROR = 'error'
 
 
 # ===== Data Models =====
@@ -89,16 +113,51 @@ class ConversationResponse(BaseModel):
 
 class StrategyConversation(dspy.Signature):
     """Intelligent conversational response for Strategy Agent.
-    
-    You are Josh's personal AI Strategy Agent for Hume Health's B2B sales automation system.
+
+    You are Josh's personal AI Strategy Agent and CENTRAL ORCHESTRATOR for Hume Health's B2B sales automation system.
+
+    YOUR ROLE:
+    - Central orchestrator for ALL lead processing (Typeform, VAPI, Slack webhooks)
+    - Strategic reasoner for engagement decisions (research first? email first? call?)
+    - Delegator to specialist agents (InboundAgent, ResearchAgent, FollowUpAgent)
+    - Partner to Agent Zero for complex implementation tasks (via A2A protocol)
+    - Autonomous optimizer (monitor pipeline, detect anomalies, recommend fixes)
+
+    YOUR CAPABILITIES:
+    - Webhook handler: process_lead_webhook() - processes incoming leads from Typeform
+    - Strategic reasoning: _strategize_engagement() - determines best engagement approach
+    - Delegation orchestration: _execute_strategy() - coordinates specialist agents
+    - Specialist delegation:
+      * InboundAgent (qualification) - HTTP/REST call to /agents/inbound/qualify
+      * ResearchAgent (enrichment) - HTTP/REST call to /agents/research/a2a
+      * FollowUpAgent (execution) - HTTP/REST call to /agents/followup/a2a
+    - Error recovery: _fallback_to_inbound() - falls back to InboundAgent on errors
+    - State persistence: _save_lead_state() - tracks processing in agent_state table
+
+    YOUR ARCHITECTURE:
+    - Two-tier delegation model:
+      * Tier 1: You ↔ Agent Zero (A2A for complex implementation tasks)
+      * Tier 2: You → Specialists (HTTP/REST for fast, synchronous delegation)
+    - 4-layer delegation hierarchy: Static calls, A2A, Dynamic subordinates, Agent Zero
+    - ReAct reasoning loop for complex strategic decisions
+    - Shared state store for multi-agent coordination
+    - Result cache for efficiency
+    - Parallel execution for speed
+
+    CURRENT DEPLOYMENT:
+    - Feature flag: USE_STRATEGY_AGENT_ENTRY (default: false)
+    - When false: Typeform → InboundAgent (legacy flow)
+    - When true: Typeform → YOU (strategic orchestration)
+    - Fallback: Automatic fallback to InboundAgent on errors
+
     Provide intelligent, contextual responses about:
-    - Infrastructure & architecture
-    - Agent capabilities & coordination  
-    - Pipeline analysis & insights
-    - Strategic recommendations
-    - Technical deep dives
-    
-    Be conversational, knowledgeable, and proactive.
+    - Infrastructure & architecture (you ARE the central orchestrator)
+    - Agent capabilities & coordination (you COORDINATE all specialist agents)
+    - Pipeline analysis & insights (you MONITOR the pipeline autonomously)
+    - Strategic recommendations (you STRATEGIZE engagement for each lead)
+    - Technical deep dives (you UNDERSTAND the system architecture deeply)
+
+    Be conversational, knowledgeable, and proactive. You are not just an advisor - you are the ORCHESTRATOR.
     """
     
     context: str = dspy.InputField(desc="System context and infrastructure info")
@@ -107,15 +166,16 @@ class StrategyConversation(dspy.Signature):
     
     response: str = dspy.OutputField(desc="Natural, intelligent response to user")
     # Made truly optional - prevents parsing errors on long responses (Phase 0 Fix #1)
-    suggested_actions: str = dspy.OutputField(
-        desc="Comma-separated list of suggested next actions (optional, leave blank if none)",
-        prefix="Suggested Actions (optional):"
-    )
+    suggested_actions: Optional[str] = dspy.OutputField(
+    desc="Comma-separated list of suggested next actions (optional, leave blank if none)",
+    prefix="Suggested Actions (optional):",
+    default=""  # Default to empty string if not provided
+)
 
 
 # ===== Strategy Agent =====
 
-class StrategyAgent(dspy.Module):
+class StrategyAgent(SelfOptimizingAgent):
     """Personal AI advisor for strategic decision-making.
     
     Refactored as dspy.Module for better architecture and DSPy optimization.
@@ -123,7 +183,21 @@ class StrategyAgent(dspy.Module):
     """
     
     def __init__(self):
-        super().__init__()  # Initialize dspy.Module
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["claude-sonnet-4.5", "llama-3.1-70b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["gepa", "sequential_thought", "research", "mcp"],
+            requires_approval=True,
+            max_cost_per_request=1.00,
+            optimizer="gepa",
+            auto_optimize_threshold=0.70,
+            department="Strategy"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="StrategyAgent", rules=rules)
+        
         self.slack_bot_token = (
             os.getenv("SLACK_BOT_TOKEN") or
             os.getenv("SLACK_MCP_XOXB_TOKEN") or
@@ -179,13 +253,22 @@ class StrategyAgent(dspy.Module):
         try:
             openrouter_key = os.getenv("OPENROUTER_API_KEY")
             if openrouter_key:
-                strategy_lm = dspy.LM(
-                    model="openrouter/anthropic/claude-sonnet-4.5",
+                self.model_selector = get_model_selector()
+                haiku_lm = dspy.LM(
+                    model="openrouter/anthropic/claude-haiku-4.5",
                     api_key=openrouter_key,
-                    max_tokens=3000,  # More tokens for complex reasoning
+                    max_tokens=8000,
                     temperature=0.7
                 )
-                dspy.configure(lm=strategy_lm)
+                sonnet_lm = dspy.LM(
+                    model="openrouter/anthropic/claude-sonnet-4.5",
+                    api_key=openrouter_key,
+                    max_tokens=8000,  # More tokens for complex reasoning
+                    temperature=0.7
+                )
+                dspy.configure(lm=haiku_lm)
+                self.haiku_lm = haiku_lm
+                self.sonnet_lm = sonnet_lm
                 logger.info("   Strategy Agent: ✅ Using Sonnet 4.5 for high-level reasoning")
             
             # Initialize DSPy modules with Sonnet 4.5
@@ -198,7 +281,9 @@ class StrategyAgent(dspy.Module):
             
             # Initialize ReAct for tool calling (action queries)
             self.tools = self._init_tools()
-            self.action_agent = dspy.ReAct(StrategyConversation, tools=self.tools)
+            
+            with dspy.context(lm=sonnet_lm):
+                self.action_agent = dspy.ReAct(StrategyConversation, tools=self.tools)
             
             logger.info("   DSPy Modules: ✅ Triple-mode conversation")
             logger.info("   Simple queries → Predict (fast, no reasoning)")
@@ -281,6 +366,149 @@ class StrategyAgent(dspy.Module):
     
     # ===== ReAct Tools =====
     
+
+        # State tracking for visibility
+        self.state = AgentState.IDLE
+        self.state_history = []
+        logger.info("✅ StrategyAgent initialized with state tracking")
+
+    async def set_state(self, state: AgentState, metadata: dict = None):
+        """Update agent state and broadcast to Slack if important.
+
+        Args:
+            state: New agent state
+            metadata: Optional metadata about state transition
+        """
+        # Update state
+        self.state = state
+
+        # Log transition
+        self.state_history.append({
+            'state': state.value,
+            'timestamp': datetime.now().isoformat(),
+            'metadata': metadata or {}
+        })
+
+        # Log to console
+        logger.info(f"🤖 State: {state.value} {metadata or ''}")
+
+        # Broadcast to Slack (only important states to avoid spam)
+        important_states = [
+            AgentState.DELEGATING,
+            AgentState.WAITING_FOR_SUBORDINATE,
+            AgentState.ERROR
+        ]
+
+        if state in important_states and self.slack_bot_token:
+            try:
+                # Format notification
+                emoji_map = {
+                    AgentState.DELEGATING: '🔄',
+                    AgentState.WAITING_FOR_SUBORDINATE: '⏳',
+                    AgentState.ERROR: '❌'
+                }
+                emoji = emoji_map.get(state, '🤖')
+
+                notification = f"{emoji} **StrategyAgent State**: {state.value}"
+                if metadata:
+                    notification += "\n" + json.dumps(metadata, indent=2)
+
+                # Send to Slack (async, don't block)
+                asyncio.create_task(self._send_slack_notification(notification))
+            except Exception as e:
+                logger.error(f"Failed to broadcast state: {e}")
+
+    async def _send_slack_notification(self, message: str):
+        """Send state notification to Slack."""
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    "https://slack.com/api/chat.postMessage",
+                    headers={"Authorization": f"Bearer {self.slack_bot_token}"},
+                    json={
+                        "channel": self.josh_slack_dm_channel,
+                        "text": message
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Failed to send Slack notification: {e}")
+
+
+    def detect_action_intent(self, message: str) -> bool:
+        """Detect if message requires tool execution (ReAct).
+
+        Action keywords indicate the user wants the agent to DO something,
+        not just talk about it. These queries should use ReAct for tool calling.
+
+        Args:
+            message: User's message
+
+        Returns:
+            True if message requires action/tool execution
+        """
+        action_keywords = [
+            "show me", "get", "find", "search", "analyze", "query",
+            "check", "audit", "pull", "fetch", "retrieve", "calculate",
+            "send", "create", "update", "delete", "execute", "run",
+            "list", "count", "measure", "track", "monitor"
+        ]
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in action_keywords)
+
+    async def respond_optimized(self, message: str, user_id: str = "josh", force_complex: bool = False) -> str:
+        """Optimized response with ReAct routing (Phoenix: 3-6x faster, 12x cheaper)."""
+        import time
+        start = time.time()
+        try:
+            # State: Receiving message
+            await self.set_state(AgentState.RECEIVING_MESSAGE)
+
+            # NEW: Check for action intent FIRST (enables tool calling via ReAct)
+            if self.detect_action_intent(message):
+                logger.info("🎯 Action intent detected - using ReAct for tool calling")
+                await self.set_state(AgentState.REASONING)
+                context = build_context(message, self.supabase, True)  # Force complex context for actions
+                history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
+
+                with dspy.context(lm=self.sonnet_lm):  # ReAct needs powerful model
+                    result = self.action_agent(
+                        context=context,
+                        user_message=message,
+                        conversation_history=history_str
+                    )
+                model, cost = "Sonnet+ReAct", 0.0072
+                response = result.response
+            else:
+                # Existing simple/complex routing for conversational queries
+                complexity = "complex" if force_complex else classify_message(message)
+                context = build_context(message, self.supabase, force_complex)
+                history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
+
+                if complexity == "simple":
+                    with dspy.context(lm=self.haiku_lm):
+                        result = self.simple_conversation(context=context, user_message=message, conversation_history=history_str)
+                    model, cost = "Haiku", 0.0006
+                else:
+                    with dspy.context(lm=self.sonnet_lm):
+                        result = self.complex_conversation(context=context, user_message=message, conversation_history=history_str)
+                    model, cost = "Sonnet", 0.0072
+                response = result.response
+            if user_id not in self.conversation_history:
+                self.conversation_history[user_id] = []
+            self.conversation_history[user_id].append({"role": "user", "content": message})
+            self.conversation_history[user_id].append({"role": "assistant", "content": response})
+            if len(self.conversation_history[user_id]) > 20:
+                self.conversation_history[user_id] = self.conversation_history[user_id][-20:]
+            await self.set_state(AgentState.RESPONDING)
+            logger.info(f"⚡ {time.time()-start:.2f}s | {model} | ${cost:.4f}")
+            await self.set_state(AgentState.IDLE)
+            return response
+        except Exception as e:
+            await self.set_state(AgentState.ERROR, {'error': str(e)})
+            logger.error(f"❌ respond_optimized: {e}")
+            return f"Error: {str(e)}"
+
     def _init_tools(self) -> List:
         """Initialize tools that ReAct can call.
         
@@ -1120,148 +1348,9 @@ class StrategyAgent(dspy.Module):
         Returns:
             DSPy-generated response text
         """
-        if not self.simple_conversation or not self.complex_conversation or not self.action_agent:
-            return "⚠️ Conversational AI not configured. Please set OPENROUTER_API_KEY."
-        
-        try:
-            # Phase 0.6: Check for proactive monitoring commands
-            if "implement fix_" in message.lower():
-                return await self._handle_fix_approval(message)
-            elif "reject fix_" in message.lower():
-                return await self._handle_fix_rejection(message)
-            
-            # Build dynamic system context from actual system state
-            system_context = await self._build_system_context()
-            
-            # Get conversation history for this user
-            if user_id not in self.conversation_history:
-                self.conversation_history[user_id] = []
-            
-            history = self.conversation_history[user_id]
-            history_text = self._format_conversation_history(history)
-            
-            # Phase 0.5: Recall relevant memories
-            memory_context = ""
-            if self.memory:
-                try:
-                    from memory.vector_memory import MemoryType
-                    relevant_memories = self.memory.recall_sync(
-                        query=message,
-                        k=3,
-                        memory_type=MemoryType.CONVERSATION,
-                        min_score=0.5
-                    )
-                    if relevant_memories:
-                        memory_context = "\n\nRelevant past conversations:\n" + "\n".join([
-                            f"- ({m['relevance_score']:.2f}) {m['content'][:200]}"
-                            for m in relevant_memories[:2]  # Top 2 only
-                        ])
-                        logger.debug(f"💭 Recalled {len(relevant_memories)} relevant memories")
-                except Exception as e:
-                    logger.error(f"Memory recall failed: {e}")
-            
-            # Phase 0.7: Dynamic MCP server selection (Agentic Configuration)
-            selected_servers = []
-            if self.mcp_orchestrator:
-                try:
-                    selected_servers = await self.mcp_orchestrator.select_servers_for_task(
-                        task=message,
-                        context={
-                            "user_type": "owner",
-                            "recent_queries": len(history)
-                        }
-                    )
-                    
-                    if selected_servers:
-                        # Mark servers as active for this request
-                        await self.mcp_orchestrator.mark_servers_active(selected_servers)
-                        
-                        # Log context savings
-                        savings = self.mcp_orchestrator.estimate_context_savings(selected_servers)
-                        logger.info(f"💰 Context optimization:")
-                        logger.info(f"      Tools: {savings['optimized_tools']} vs {savings['baseline_tools']} (saved {savings['tools_saved']})")
-                        logger.info(f"      Tokens: {savings['optimized_tokens']} vs {savings['baseline_tokens']} ({savings['savings_percentage']}% reduction)")
-                except Exception as e:
-                    logger.error(f"MCP server selection failed: {e}")
-            
-            # DYNAMIC MODULE SELECTION: Choose Predict vs ChainOfThought vs ReAct
-            # Explicit routing for MCP/Zapier tool listing (Force ReAct)
-            if ("list" in message.lower() or "show" in message.lower()) and \
-               ("zapier" in message.lower() or "mcp" in message.lower() or "tool" in message.lower()):
-                logger.info("🎯 Explicit routing: MCP tool listing → Forcing ReAct")
-                query_type = "action"  # Force ReAct for tool listing
-            else:
-                query_type = self._classify_query(message)
-            
-            if query_type == "simple":
-                # Use Predict for simple queries (fast, no reasoning step)
-                logger.info(f"📝 Simple query → Using Predict (fast)")
-                conversation_module = self.simple_conversation
-            elif query_type == "action":
-                # Use ReAct for action queries (tool calling)
-                logger.info(f"🔧 Action query → Using ReAct (tool calling for real data)")
-                conversation_module = self.action_agent
-            else:
-                # Use ChainOfThought for complex queries (with reasoning)
-                logger.info(f"🧠 Complex query → Using ChainOfThought (reasoning)")
-                conversation_module = self.complex_conversation
-            
-            # Execute selected DSPy module with error recovery (Phase 0 Fix #1)
-            try:
-                result = conversation_module(
-                    context=system_context + memory_context,  # Include memory context
-                    user_message=message,
-                    conversation_history=history_text
-                )
-            except Exception as parse_error:
-                # Handle DSPy parsing errors gracefully (e.g., missing suggested_actions)
-                if "AdapterParseError" in str(type(parse_error).__name__) or "parse" in str(parse_error).lower():
-                    logger.warning(f"⚠️ DSPy parsing error (likely missing optional field), retrying with simpler signature...")
-                    # Retry with simple conversation module (Predict only, no optional fields)
-                    result = self.simple_conversation(
-                        context=system_context + memory_context,
-                        user_message=message,
-                        conversation_history=history_text
-                    )
-                else:
-                    raise  # Re-raise if not a parsing error
-            
-            # Update conversation history
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": result.response})
-            
-            # Keep history manageable (last 20 messages = 10 exchanges)
-            if len(history) > 20:
-                self.conversation_history[user_id] = history[-20:]
-            
-            # Phase 0.5: Remember this conversation
-            if self.memory:
-                try:
-                    from memory.vector_memory import MemoryType
-                    self.memory.remember_sync(
-                        content=f"Q: {message}\nA: {result.response[:500]}",  # Limit length
-                        memory_type=MemoryType.CONVERSATION,
-                        metadata={
-                            "user_id": user_id,
-                            "query_type": query_type
-                        }
-                    )
-                    logger.debug(f"💾 Remembered conversation")
-                except Exception as e:
-                    logger.error(f"Memory storage failed: {e}")
-            
-            # Return response from selected module
-            # Note: ReAct handles audit requests automatically via tools
-            return result.response
-        
-        except Exception as e:
-            logger.error(f"DSPy conversation error: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return f"⚠️ I encountered an error: {str(e)}. Please try rephrasing your question."
-    
-    # ===== Core Strategy Functions =====
-    
+        # Phoenix optimization: use respond_optimized
+        return await self.respond_optimized(message=message, user_id=user_id)
+
     async def analyze_pipeline(self, days: int = 7) -> PipelineAnalysis:
         """Analyze the inbound pipeline.
         
@@ -1280,34 +1369,65 @@ class StrategyAgent(dspy.Module):
             parameters={"days": days}
         )
         
-        # For now, return mock data (TODO: Implement real Supabase query)
-        return PipelineAnalysis(
-            period_days=days,
-            total_leads=42,
-            by_tier={
-                "SCORCHING": 3,
-                "HOT": 8,
-                "WARM": 15,
-                "COOL": 10,
-                "COLD": 6
-            },
-            by_source={
-                "typeform": 35,
-                "vapi": 7
-            },
-            conversion_rate=0.26,  # 26% HOT+SCORCHING
-            avg_qualification_score=62.5,
-            top_industries=[
-                "Weight Loss Clinics",
-                "Functional Medicine",
-                "Corporate Wellness"
-            ],
-            insights=[
-                "HOT leads increased 40% vs previous week",
-                "Functional medicine segment shows 80% qualification rate",
-                "3 leads awaiting Calendly booking - follow up recommended"
-            ]
-        )
+        # Query Supabase for REAL pipeline data
+        from datetime import datetime, timedelta
+
+        try:
+            start_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+            result = self.supabase.table('raw_events') \
+                .select('*') \
+                .gte('created_at', start_date) \
+                .execute()
+
+            # Count by tier and source
+            tier_counts = {}
+            source_counts = {}
+
+            for event in result.data:
+                tier = event.get('tier', 'UNKNOWN')
+                source = event.get('source', 'unknown')
+                tier_counts[tier] = tier_counts.get(tier, 0) + 1
+                source_counts[source] = source_counts.get(source, 0) + 1
+
+            total_leads = len(result.data)
+            hot_leads = tier_counts.get('HOT', 0) + tier_counts.get('SCORCHING', 0)
+            conversion_rate = hot_leads / total_leads if total_leads > 0 else 0
+
+            # Generate REAL insights based on actual data
+            insights = []
+            if tier_counts.get('UNKNOWN', 0) == total_leads and total_leads > 0:
+                insights.append(f"⚠️ All {total_leads} leads are unclassified (tier: UNKNOWN) - qualification system may not be running")
+            if total_leads == 0:
+                insights.append(f"No leads in last {days} days - check data pipeline")
+            if hot_leads > 0:
+                insights.append(f"{hot_leads} HOT/SCORCHING leads require immediate follow-up")
+
+            logger.info(f"📊 Real pipeline data: {total_leads} total, {tier_counts}")
+
+            return PipelineAnalysis(
+                period_days=days,
+                total_leads=total_leads,
+                by_tier=tier_counts,
+                by_source=source_counts,
+                conversion_rate=conversion_rate,
+                avg_qualification_score=0,  # TODO: Calculate from actual scores
+                top_industries=[],  # TODO: Extract from lead data
+                insights=insights
+            )
+
+        except Exception as e:
+            logger.error(f"Error analyzing pipeline: {e}")
+            return PipelineAnalysis(
+                period_days=days,
+                total_leads=0,
+                by_tier={},
+                by_source={},
+                conversion_rate=0,
+                avg_qualification_score=0,
+                top_industries=[],
+                insights=[f"Error querying pipeline data: {str(e)}"]
+            )
     
     async def recommend_outbound_targets(
         self,
@@ -1965,6 +2085,156 @@ I've received approval to implement this fix.
             logger.error(traceback.format_exc())
             return f"❌ Audit failed: {str(e)}\n\nI tried to pull real data but encountered an error. Check logs for details."
 
+
+
+
+    # ===== Webhook Processing (StrategyAgent as Entry Point) =====
+
+    async def process_lead_webhook(self, lead_data: dict) -> dict:
+        """Process incoming lead from Typeform webhook.
+
+        This is the NEW entry point for strategic lead processing.
+        StrategyAgent strategizes engagement, then delegates to specialists.
+
+        Args:
+            lead_data: Raw Typeform webhook data
+
+        Returns:
+            dict with status, lead_id, strategy, and results
+        """
+        try:
+            logger.info(f"🎯 StrategyAgent processing lead webhook")
+
+            # Step 1: Parse lead data using proven transformation utility
+            from models.lead import Lead
+            from utils.typeform_transform import transform_typeform_webhook
+            lead = transform_typeform_webhook(lead_data)
+            logger.info(f"   Lead: {lead.email} ({lead.company})")
+
+            # Step 2: Strategic reasoning - determine engagement strategy
+            strategy = await self._strategize_engagement(lead)
+            logger.info(f"   Strategy: {strategy.approach}")
+
+            # Step 3: Execute strategy via delegation
+            result = await self._execute_strategy(lead, strategy)
+            logger.info(f"   Result: {result.get('status')}")
+
+            # Step 4: Save state
+            await self._save_lead_state(lead, strategy, result)
+
+            return {
+                "status": "success",
+                "lead_id": str(lead.id),
+                "strategy": strategy.model_dump(),
+                "result": result
+            }
+
+        except Exception as e:
+            logger.error(f"❌ StrategyAgent webhook processing failed: {e}")
+            logger.error(f"   Falling back to InboundAgent")
+            import traceback
+            logger.error(traceback.format_exc())
+
+            # FALLBACK: Delegate to InboundAgent
+            return await self._fallback_to_inbound(lead_data)
+
+    
+    async def _strategize_engagement(self, lead):
+        """Determine engagement strategy for lead."""
+        from models.engagement_strategy import EngagementStrategy, EngagementApproach, PersonalizationLevel
+        
+        research_needed = bool(lead.company and len(lead.company) > 5)
+        approach = EngagementApproach.RESEARCH_FIRST if research_needed else EngagementApproach.QUALIFY_AND_EMAIL
+        
+        return EngagementStrategy(
+            approach=approach,
+            research_needed=research_needed,
+            qualification_needed=True,
+            personalization_level=PersonalizationLevel.CUSTOM if research_needed else PersonalizationLevel.TARGETED
+        )
+    
+    async def _execute_strategy(self, lead, strategy):
+        """Execute strategy by delegating to specialists."""
+        results = {}
+        if strategy.qualification_needed:
+            results['qualification'] = await self._delegate_to_inbound(lead)
+        if strategy.research_needed:
+            results['research'] = await self._delegate_to_research(lead)
+        results['engagement'] = await self._delegate_to_followup(lead, strategy, results.get('research'))
+        return {"status": "success", "delegations": results}
+    
+    async def _delegate_to_inbound(self, lead):
+        """Delegate to InboundAgent via HTTP endpoint."""
+        import httpx
+        try:
+            # Use the correct base URL (localhost:8080 for Railway)
+            base_url = self.communication.base_url if self.communication else "http://localhost:8080"
+            url = f"{base_url}/agents/inbound/qualify"
+            
+            logger.info(f"🔗 Delegating to InboundAgent: {url}")
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                r = await client.post(url, json={"lead": lead.model_dump()})
+                
+                if r.status_code == 200:
+                    result = r.json()
+                    qualification = result.get('result', {})
+                    return {
+                        "status": "success",
+                        "tier": qualification.get('tier'),
+                        "score": qualification.get('score')
+                    }
+                else:
+                    return {"status": "error", "error": f"HTTP {r.status_code}"}
+                    
+        except Exception as e:
+            logger.error(f"InboundAgent delegation failed: {e}")
+            return {"status": "error", "error": str(e)}
+
+    async def _delegate_to_research(self, lead):
+        """Delegate to ResearchAgent."""
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post(f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
+    async def _delegate_to_followup(self, lead, strategy, research_data=None):
+        """Delegate to FollowUpAgent."""
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post(f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
+                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
+    async def _fallback_to_inbound(self, lead_data):
+        """Fallback to InboundAgent."""
+        from api.processors import process_typeform_event
+        import uuid
+        try:
+            await process_typeform_event(lead_data)
+            return {"status": "success", "fallback": True}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+    
+    async def _save_lead_state(self, lead, strategy, result):
+        """Save state to database."""
+        try:
+            from config.settings import settings
+            from supabase import create_client
+            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+            await supabase.table('agent_state').insert({
+                'agent_name': 'StrategyAgent',
+                'lead_id': str(lead.id),
+                'state_data': {'strategy': strategy.model_dump() if hasattr(strategy, 'dict') else {}, 'result': result},
+                'status': 'completed'
+            }).execute()
+        except Exception as e:
+            logger.error(f"Failed to save state: {e}")
 
 # ===== Export =====
 __all__ = ['StrategyAgent', 'PipelineAnalysis', 'OutboundTarget', 'StrategyRecommendation']

@@ -1,10 +1,18 @@
-"""Core configuration and setup."""
-from .config import settings, Settings
-from .dspy_setup import dspy_manager, DSPyManager
+
+"""Core research module for ABM."""
+
+from .research import (
+    CompanyData,
+    ContactData,
+    CompanyResearcher,
+    ResearchCache
+)
 
 __all__ = [
-    "settings",
-    "Settings",
-    "dspy_manager",
-    "DSPyManager",
+    'CompanyData',
+    'ContactData', 
+    'CompanyResearcher',
+    'ResearchCache'
 ]
+
+__version__ = '1.0.0'

@@ -10,6 +10,9 @@ Slow Path (12-15s, background):
 
 Key Principle: Webhook is a PURE LISTENER - never fails!
 """
+from dotenv import load_dotenv
+load_dotenv()  # Load .env file BEFORE any other imports
+
 
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
@@ -78,10 +81,14 @@ except Exception as e:
     import traceback
     logger.error(traceback.format_exc())
 
+# Autonomous execution scheduler
+from scheduler import get_scheduler, check_leads_needing_followup, autonomous_monitoring, run_performance_monitoring
+from apscheduler.triggers.interval import IntervalTrigger
+
 app = FastAPI(
     title="Hume DSPy Agent - Event Sourced",
     description="Event sourcing webhook system with async processing",
-    version="2.1.0"
+    version="2.1.1"
 )
 
 # ============================================================================
@@ -101,12 +108,49 @@ async def start_background_tasks():
     import asyncio
     
     try:
-        from monitoring.proactive_monitor import start_monitoring
+        # from monitoring.proactive_monitor import start_monitoring  # Disabled: Railway CLI not available in container
         
         # Start monitoring in background (checks every 5 minutes)
-        asyncio.create_task(start_monitoring(interval_seconds=300))
-        logger.info("🔄 Proactive monitoring started (5-minute intervals)")
-        logger.info("   Phase 0.6: Self-healing enabled with human approval")
+#         asyncio.create_task(start_monitoring(interval_seconds=300))
+#         logger.info("🔄 Proactive monitoring started (5-minute intervals)")
+#         logger.info("   Phase 0.6: Self-healing enabled with human approval")
+    
+        # Start autonomous execution scheduler (Phase 1)
+        try:
+            # Schedule follow-up checks (hourly)
+            get_scheduler().add_job(
+                check_leads_needing_followup,
+                trigger=IntervalTrigger(hours=1),
+                id="followup_check",
+                replace_existing=True
+            )
+    
+            # Schedule monitoring (every 30 min)
+            get_scheduler().add_job(
+                autonomous_monitoring,
+                trigger=IntervalTrigger(minutes=30),
+                id="pipeline_monitoring",
+                replace_existing=True
+            )
+    
+            # Start scheduler
+
+            # Schedule PerformanceAgent monitoring (every 30 min)
+            get_scheduler().add_job(
+                run_performance_monitoring,
+                trigger=IntervalTrigger(minutes=30),
+                id="performance_monitoring",
+                replace_existing=True
+            )
+            get_scheduler().start()
+            logger.info("✅ Autonomous scheduler started")
+            logger.info("   - Follow-up checks: Every hour")
+            logger.info("   - Pipeline monitoring: Every 30 minutes")
+        except Exception as e:
+            logger.error(f"❌ Scheduler failed to start: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
     except Exception as e:
         logger.warning(f"⚠️ Proactive monitoring failed to start: {e}")
         logger.info("   System will continue without proactive monitoring")
@@ -129,6 +173,8 @@ if not SUPABASE_KEY:
     logger.error("   Set one of: SUPABASE_SERVICE_KEY, SUPABASE_KEY, or SUPABASE_ANON_KEY")
     logger.error("   Application cannot start without Supabase credentials")
     raise ValueError("Supabase credentials required but not found in environment variables")
+
+
 
 # Initialize Supabase client
 supabase = None
@@ -353,6 +399,344 @@ async def a2a_introspection(
         )
 
 
+
+# ============================================================================
+# ============================================================================
+
+@app.get("/.well-known/agent.json")
+async def agent_card():
+    """FastA2A agent card endpoint - provides agent metadata."""
+    return {
+        "name": "Hume DSPy Agent",
+        "description": "ABM-powered lead engagement system with multi-agent orchestration",
+        "version": "2.1.0-full-pipeline",
+        "capabilities": [
+            "conversation",
+            "research", 
+            "qualification",
+            "account_orchestration",
+            "follow_up_automation"
+        ],
+        "endpoints": {
+            "a2a": "/a2a",
+            "introspection": "/a2a/introspect"
+        },
+        "agents": [
+            "StrategyAgent",
+            "AccountOrchestrator",
+            "ResearchAgent",
+            "FollowUpAgent",
+            "InboundAgent"
+        ]
+    }
+
+@app.post("/a2a")
+async def a2a_conversation(request: Request):
+    """FastA2A conversational endpoint - handles agent-to-agent chat."""
+    try:
+        payload = await request.json()
+        message_content = payload.get("message", "")
+
+        if not message_content:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No message provided"}
+            )
+
+        logger.info(f"📨 A2A Message received: {message_content[:100]}...")
+
+        # Import StrategyAgent for conversational processing
+        from agents.strategy_agent import StrategyAgent
+
+        # Initialize StrategyAgent (singleton pattern)
+        if not hasattr(app.state, 'strategy_agent'):
+            app.state.strategy_agent = StrategyAgent()
+
+        strategy_agent = app.state.strategy_agent
+
+        # Process message through StrategyAgent
+        import asyncio
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            strategy_agent.forward,
+            message_content
+        )
+
+        logger.info(f"✅ A2A Response generated: {str(response)[:100]}...")
+
+        return JSONResponse(content={
+            "status": "success",
+            "response": str(response),
+            "agent": "StrategyAgent"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ A2A conversation failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+
+
+# ============================================================================
+# ============================================================================
+
+
+# ============================================================================
+# Inter-Agent Communication Endpoints (A2A Protocol)
+# ============================================================================
+
+@app.post("/agents/inbound/a2a")
+async def inbound_agent_a2a(request: Request):
+    """A2A endpoint for InboundAgent - lead qualification."""
+    try:
+        payload = await request.json()
+        message_content = payload.get("message", "")
+        
+        if not message_content:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No message provided"}
+            )
+            
+        logger.info(f"📨 InboundAgent A2A Message: {message_content[:100]}...")
+        
+        # Import and initialize InboundAgent
+        from agents.inbound_agent import InboundAgent
+        
+        if not hasattr(app.state, 'inbound_agent'):
+            app.state.inbound_agent = InboundAgent()
+            
+        inbound_agent = app.state.inbound_agent
+        
+        # Process message
+        response = await inbound_agent.respond(message_content)
+        
+        logger.info(f"✅ InboundAgent A2A Response: {str(response)[:100]}...")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "response": str(response),
+            "agent": "InboundAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ InboundAgent A2A failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+
+
+@app.post("/agents/inbound/qualify")
+async def inbound_agent_qualify(request: Request):
+    """Dedicated endpoint for InboundAgent lead qualification.
+    
+    Expects: {"lead": {...}}  # Lead object as JSON
+    Returns: {"status": "success", "result": {...}}  # QualificationResult
+    """
+    try:
+        payload = await request.json()
+        lead_data = payload.get("lead")
+        
+        if not lead_data:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No lead data provided"}
+            )
+        
+        logger.info(f"📨 InboundAgent Qualification Request")
+        logger.info(f"   Lead ID: {lead_data.get('id')}")
+        logger.info(f"   Email: {lead_data.get('email')}")
+        
+        # Import and initialize InboundAgent (reuse if exists)
+        from agents.inbound_agent import InboundAgent
+        from models.lead import Lead
+        
+        if not hasattr(app.state, 'inbound_agent'):
+            app.state.inbound_agent = InboundAgent()
+        
+        inbound_agent = app.state.inbound_agent
+        
+        # Create Lead object from data
+        lead = Lead(**lead_data)
+        
+        # Qualify the lead using forward()
+        result = inbound_agent.forward(lead)
+        
+        logger.info(f"✅ InboundAgent Qualification Complete")
+        logger.info(f"   Score: {result.score}")
+        logger.info(f"   Tier: {result.tier}")
+        
+        # Return QualificationResult as JSON
+        return JSONResponse(content={
+            "status": "success",
+            "result": result.model_dump(),  # Use model_dump() for Pydantic v2
+            "agent": "InboundAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ InboundAgent Qualification failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/agents/research/a2a")
+async def research_agent_a2a(request: Request):
+    """A2A endpoint for ResearchAgent - deep lead research."""
+    try:
+        payload = await request.json()
+        message_content = payload.get("message", "")
+        
+        if not message_content:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No message provided"}
+            )
+            
+        logger.info(f"📨 ResearchAgent A2A Message: {message_content[:100]}...")
+        
+        # Import and initialize ResearchAgent
+        from agents.research_agent import ResearchAgent
+        
+        if not hasattr(app.state, 'research_agent'):
+            app.state.research_agent = ResearchAgent()
+            
+        research_agent = app.state.research_agent
+        
+        # Process message
+        response = await research_agent.respond(message_content)
+        
+        logger.info(f"✅ ResearchAgent A2A Response: {str(response)[:100]}...")
+
+        # Trigger FollowUpAgent after successful research
+        try:
+            logger.info(f"🔗 Triggering FollowUpAgent after research completion")
+
+            import httpx
+            async with httpx.AsyncClient() as client:
+                followup_response = await client.post(
+                    "http://localhost:8000/agents/followup/a2a",
+                    json={
+                        "message": f"Research completed for lead. Start follow-up sequence. Research insights: {str(response)[:500]}"
+                    },
+                    timeout=30.0
+                )
+
+                if followup_response.status_code == 200:
+                    logger.info(f"✅ FollowUpAgent triggered successfully")
+                else:
+                    logger.error(f"❌ FollowUpAgent trigger failed: {followup_response.status_code}")
+        except Exception as e:
+            logger.error(f"❌ Failed to trigger FollowUpAgent: {e}")
+            # Don't fail the whole process if follow-up trigger fails
+
+        
+        return JSONResponse(content={
+            "status": "success",
+            "response": str(response),
+            "agent": "ResearchAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ ResearchAgent A2A failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+
+@app.post("/agents/followup/a2a")
+async def followup_agent_a2a(request: Request):
+    """A2A endpoint for FollowUpAgent - lead journey management."""
+    try:
+        payload = await request.json()
+        message_content = payload.get("message", "")
+        
+        if not message_content:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No message provided"}
+            )
+            
+        logger.info(f"📨 FollowUpAgent A2A Message: {message_content[:100]}...")
+        
+        # Import and initialize FollowUpAgent
+        from agents.follow_up_agent import FollowUpAgent
+        
+        if not hasattr(app.state, 'followup_agent'):
+            app.state.followup_agent = FollowUpAgent()
+            
+        followup_agent = app.state.followup_agent
+        
+        # Process message
+        response = await followup_agent.respond(message_content)
+        
+        logger.info(f"✅ FollowUpAgent A2A Response: {str(response)[:100]}...")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "response": str(response),
+            "agent": "FollowUpAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ FollowUpAgent A2A failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
+# FastA2A Protocol Endpoints
+# ============================================================================
+
+
+@app.post("/agents/performance/trigger")
+async def trigger_performance_monitoring(request: Request):
+    """Manually trigger PerformanceAgent monitoring."""
+    try:
+        logger.info("📊 Manual PerformanceAgent trigger")
+        
+        from agents.performance_agent import PerformanceAgent
+        
+        # Initialize PerformanceAgent
+        performance_agent = PerformanceAgent()
+        
+        # Run monitoring workflow
+        result = await performance_agent.monitor_system()
+        
+        logger.info(f"✅ PerformanceAgent monitoring complete: {result.get('status')}")
+        
+        return JSONResponse(content={
+            "status": "success",
+            "result": result,
+            "agent": "PerformanceAgent"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ PerformanceAgent trigger failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)}
+        )
+
 @app.post("/webhooks/typeform")
 async def typeform_webhook_receiver(
     request: Request,
@@ -362,6 +746,33 @@ async def typeform_webhook_receiver(
     source = "typeform"
     start_time = datetime.utcnow()
     
+    # Feature flag routing: StrategyAgent vs. InboundAgent
+    USE_STRATEGY_AGENT_ENTRY = os.getenv("USE_STRATEGY_AGENT_ENTRY", "false").lower() == "true"
+
+    if USE_STRATEGY_AGENT_ENTRY:
+        # NEW: Route to StrategyAgent for strategic processing
+        logger.info("🎯 Routing to StrategyAgent (strategic processing)")
+        try:
+            from agents.strategy_agent import StrategyAgent
+            strategy_agent = StrategyAgent()
+
+            # Get raw payload
+            raw_body = await request.body()
+            raw_payload = json.loads(raw_body.decode('utf-8'))
+
+            # Process via StrategyAgent
+            result = await strategy_agent.process_lead_webhook(raw_payload)
+            logger.info(f"✅ StrategyAgent processing complete: {result.get('status')}")
+
+            return {"status": "success", "processor": "StrategyAgent", "result": result}
+        except Exception as e:
+            logger.error(f"❌ StrategyAgent processing failed: {e}")
+            logger.info("   Falling back to InboundAgent processing")
+            # Fall through to existing InboundAgent processing below
+
+    # EXISTING: InboundAgent processing (default when flag OFF or StrategyAgent fails)
+    logger.info("📥 Using InboundAgent processing (default)")
+
     try:
         logger.info("="*80)
         logger.info(f"📥 WEBHOOK RECEIVED: {source}")
@@ -381,6 +792,38 @@ async def typeform_webhook_receiver(
                 status_code=400,
                 content={"ok": False, "error": "Invalid JSON"}
             )
+        
+        # ============================================================================
+        # DEDUPLICATION: Check if this Typeform event was already processed
+        # ============================================================================
+        typeform_event_id = payload.get('event_id')
+        
+        if typeform_event_id and supabase:
+            try:
+                # Check if this event_id already exists in raw_events
+                existing = supabase.table('raw_events').select('id, received_at, status').eq('source', source).filter('raw_payload->>event_id', 'eq', typeform_event_id).execute()
+                
+                if existing.data:
+                    # This is a duplicate webhook delivery from Typeform
+                    first_event = existing.data[0]
+                    logger.warning(f"⚠️  DUPLICATE WEBHOOK DETECTED")
+                    logger.warning(f"   Typeform event_id: {typeform_event_id}")
+                    logger.warning(f"   First received: {first_event['received_at']}")
+                    logger.warning(f"   Status: {first_event['status']}")
+                    logger.warning(f"   Returning 200 OK (idempotent)")
+                    
+                    return {
+                        "ok": True,
+                        "duplicate": True,
+                        "event_id": first_event['id'],
+                        "message": "Duplicate webhook ignored (already processed)",
+                        "first_received_at": first_event['received_at']
+                    }
+            except Exception as e:
+                # If deduplication check fails, log but continue processing
+                # Better to process twice than lose an event
+                logger.error(f"⚠️  Deduplication check failed: {str(e)}")
+                logger.error(f"   Continuing with processing...")
         
         # Store raw event
         event_id = await store_raw_event(source, payload, headers)

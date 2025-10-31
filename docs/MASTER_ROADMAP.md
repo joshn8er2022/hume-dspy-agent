@@ -146,6 +146,74 @@ class InstrumentManager:
 - No token bloat in prompts
 - Semantic tool discovery
 
+**0.5.3 Overture Maps Integration** (2-3 days) 🆕
+```python
+# geographic/overture_maps.py
+import requests
+import geopandas as gpd
+
+class OvertureMapsScraper:
+    """Free alternative to Google Maps API for geographic targeting"""
+
+    def __init__(self):
+        self.base_url = "https://overturemaps.org/download/"
+        self.data_cache = {}
+
+    async def get_healthcare_pois(self, bbox: tuple, categories: list):
+        """Download healthcare POIs in bounding box"""
+        # Download Overture Maps data (GeoJSON)
+        data = await self.download_poi_data(bbox, categories)
+
+        # Load into GeoDataFrame
+        gdf = gpd.GeoDataFrame.from_features(data['features'])
+
+        # Filter for healthcare/wellness
+        clinics = gdf[gdf['category'].isin(categories)]
+
+        return clinics
+
+    async def find_nearby_competitors(self, location: tuple, radius_m: int):
+        """Find competitors within radius for local messaging"""
+        # Spatial query for nearby POIs
+        nearby = self.spatial_query(location, radius_m)
+
+        return nearby
+
+    async def enrich_for_outbound(self, clinic_data: dict):
+        """Enrich clinic data for geographic outbound strategy"""
+        enriched = {
+            'name': clinic_data['name'],
+            'address': clinic_data['address'],
+            'coordinates': clinic_data['geometry']['coordinates'],
+            'category': clinic_data['category'],
+            'nearby_competitors': await self.find_nearby_competitors(
+                clinic_data['geometry']['coordinates'],
+                radius_m=1000  # 1km radius
+            ),
+            'market_density': len(nearby_competitors)
+        }
+
+        return enriched
+```
+
+**Benefits**:
+- **FREE** (vs Google Maps $200/mo + $7/1000 requests)
+- 6M+ healthcare POIs globally
+- Enables geographic outbound strategy (saved to memory: 353HRpWOZC)
+- Competitor proximity data for local messaging
+- No API rate limits
+
+**Integration**:
+- Load POI data into Supabase `geographic_targets` table
+- ResearchAgent enriches each clinic
+- FollowUpAgent uses local messaging templates
+- A/B test: Geographic vs generic outreach
+
+**Timeline**: 2-3 days to implement POC
+**Cost**: $0 (completely free)
+**Impact**: Enable Week 2 ABM geographic strategy
+
+
 #### Business Capabilities
 **SMS Integration** (2 days)
 - Twilio SDK (already in requirements)
@@ -306,6 +374,60 @@ class AgentCommunication:
 ## 🔄 PHASE 2: Intelligence & Content (Months 2-4)
 
 **Goal**: Smart decisions + automated content generation
+
+### 🏗️ DATABRICKS EVALUATION (Phase 2-3 Future) 🆕
+
+**Goal**: Unified data intelligence platform for all sales/marketing data
+
+**What It Is**:
+- Data Lakehouse = Data Lake + Data Warehouse + AI Platform
+- Centralizes: Supabase, Close CRM, GMass, Phoenix, Slack into ONE queryable platform
+- Built on Apache Spark, Delta Lake, MLflow (open source)
+
+**Key Capabilities**:
+1. **Unified Analytics**: SQL queries across ALL data sources
+2. **Real-Time Dashboards**: Live pipeline visibility (no more manual Phoenix queries)
+3. **Predictive ML**: Lead scoring, churn prediction, LTV forecasting
+4. **Multi-Channel Attribution**: Track customer journey across all touchpoints
+5. **HIPAA Compliant**: Critical for healthcare data
+
+**DSPy + Databricks Integration** (from research):
+- DSPy optimization runs on Databricks compute
+- Store training data in Delta Lake
+- Version control for prompts (JSON files)
+- Scalable to petabytes of data
+- Cost: ~$1 for optimization runs
+- Performance: 60% → 82% accuracy improvements
+
+**Use Case Example** (Overture Maps + DSPy + Databricks):
+```python
+# Place conflation at scale (70M+ records)
+# - Spatial clustering (fast)
+# - String similarity (fast)
+# - LLM for edge cases (DSPy optimized)
+# Result: 82-95% accuracy
+```
+
+**Implementation Timeline**:
+- **Phase 2 (Months 2-4)**: Evaluation + POC
+  - Start with free tier
+  - Migrate Phoenix traces first
+  - Build unified dashboard
+  - Prove ROI before full migration
+
+- **Phase 3 (Months 4-6)**: Production deployment
+  - Centralize all data sources
+  - Train ML models (lead scoring)
+  - Real-time analytics
+  - Automated insights for StrategyAgent
+
+**Cost Estimate**:
+- **Databricks**: $500-1000/month (compute + storage)
+- **Savings**: 10-15 hours/week manual data analysis
+- **ROI**: Better decisions through unified intelligence
+
+**Decision**: Evaluate in Q1 2026 after Week 2 ABM proven
+
 
 ---
 

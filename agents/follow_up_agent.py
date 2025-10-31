@@ -5,6 +5,7 @@ This agent manages the entire lead journey autonomously:
 - Monitors for responses
 - Schedules and sends follow-ups
 - Updates Slack thread with progress
+import asyncio
 - Escalates hot leads
 """
 
@@ -23,11 +24,17 @@ from models import Lead, LeadTier, LeadStatus
 from utils.slack_client import SlackClient
 from utils.email_client import EmailClient
 from config.settings import settings
+from agents.account_orchestrator import AccountOrchestrator
+from core.company_graph import CompanyGraph
 
 logger = logging.getLogger(__name__)
 
 
 # Define the agent state
+
+import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
+from dspy_modules.signatures import ComposeFollowUpEmail, DecideNextAction
 class LeadJourneyState(TypedDict):
     """State for tracking a lead's autonomous journey."""
     lead_id: str
@@ -48,10 +55,25 @@ class LeadJourneyState(TypedDict):
     error: str | None
 
 
-class FollowUpAgent:
+class FollowUpAgent(SelfOptimizingAgent):
     """Autonomous agent for managing lead follow-ups using LangGraph."""
 
     def __init__(self):
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["email", "supabase", "gmass"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot
+            auto_optimize_threshold=0.80,
+            department="Sales"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="FollowUpAgent", rules=rules)
+        
         self.slack = SlackClient()
         self.email_client = EmailClient()
 
@@ -61,21 +83,16 @@ class FollowUpAgent:
 
         if openrouter_api_key:
             # Use OpenRouter with Sonnet 4.5
-            self.llm = ChatOpenAI(
-                model="anthropic/claude-sonnet-4.5",
-                api_key=openrouter_api_key,
-                base_url="https://openrouter.ai/api/v1",
-                temperature=0.7,
-            )
+            # DSPy modules for email composition and decision-making
+            self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+            self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
             logger.info("✅ Follow-up agent using OpenRouter Sonnet 4.5")
         elif anthropic_api_key:
             # Fallback to Anthropic direct
             from langchain_anthropic import ChatAnthropic
-            self.llm = ChatAnthropic(
-                model="claude-3-5-sonnet-20241022",
-                api_key=anthropic_api_key,
-                temperature=0.7,
-            )
+            # DSPy modules for email composition and decision-making
+            self.compose_email = dspy.ChainOfThought(ComposeFollowUpEmail)
+            self.decide_next_action = dspy.ChainOfThought(DecideNextAction)
             logger.info("✅ Follow-up agent using Anthropic direct (fallback)")
         else:
             self.llm = None
@@ -83,6 +100,10 @@ class FollowUpAgent:
 
         # Build the state graph
         self.graph = self._build_graph()
+
+        # ABM Campaign Integration
+        self.orchestrator = AccountOrchestrator()
+        self.company_graph = CompanyGraph()
 
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state machine for lead journey."""
@@ -223,6 +244,30 @@ class FollowUpAgent:
 
     def send_follow_up(self, state: LeadJourneyState) -> LeadJourneyState:
         """Send a follow-up email."""
+        # ABM Campaign: Execute next campaign step if active campaign exists
+        try:
+            # Check if there's an active ABM campaign for this lead
+            campaign_context = asyncio.run(
+                self.company_graph.get_conversation_context(state['lead_id'])
+            )
+
+            if campaign_context and campaign_context.get('campaign_id'):
+                # Execute next campaign step (might contact colleagues)
+                campaign_result = asyncio.run(
+                    self.orchestrator.execute_campaign_step(campaign_context['campaign_id'])
+                )
+
+                if campaign_result.get('status') == 'completed':
+                    logger.info(f"🎯 ABM Campaign completed for {state['email']}")
+                    state['status'] = 'converted'
+                    return state
+                elif campaign_result.get('colleague_contacted'):
+                    logger.info(f"👥 ABM: Contacted colleague for {state['email']}")
+                    state['follow_up_count'] += 1
+                    return state
+        except Exception as e:
+            logger.warning(f"⚠️ ABM campaign check failed (non-critical): {e}")
+
         try:
             state['follow_up_count'] += 1
 
@@ -433,3 +478,102 @@ Moving to nurture campaign.
 
         result = self.graph.invoke(None, config)
         return result
+
+    async def respond(self, message: str) -> str:
+        """A2A endpoint - respond to inter-agent messages about lead follow-up.
+        
+        Args:
+            message: JSON string with lead info and action
+            
+        Returns:
+            String response with follow-up status
+        """
+        import json
+        from supabase import create_client
+        import os
+        
+        try:
+            # Parse JSON request
+            try:
+                data = json.loads(message)
+                lead_id = data.get('lead_id')
+                action = data.get('action', 'start')  # start, continue, status
+                
+                if not lead_id:
+                    return "❌ Error: No lead_id provided in request"
+                    
+            except json.JSONDecodeError:
+                return "❌ Error: Please provide lead info in JSON format: {\"lead_id\": \"...\", \"action\": \"start|continue|status\"}"
+                
+            # Fetch lead from Supabase
+            supabase = create_client(
+                os.getenv('SUPABASE_URL'),
+                os.getenv('SUPABASE_KEY')
+            )
+            
+            result = supabase.table('leads').select('*').eq('id', lead_id).execute()
+            
+            if not result.data:
+                return f"❌ Error: Lead {lead_id} not found"
+                
+            lead_data = result.data[0]
+            
+            # Execute action
+            if action == 'start':
+                # Start new follow-up journey
+                journey_result = self.start_lead_journey(
+                    lead_id=lead_id,
+                    email=lead_data.get('email'),
+                    first_name=lead_data.get('name', '').split()[0] if lead_data.get('name') else 'there',
+                    company=lead_data.get('company', 'your company'),
+                    tier=lead_data.get('tier', 'UNQUALIFIED'),
+                    slack_thread_ts=lead_data.get('slack_thread_ts'),
+                    slack_channel=lead_data.get('slack_channel_id')
+                )
+                
+                response_parts = [
+                    f"📧 **Follow-up Journey Started: {lead_data.get('name')}**",
+                    f"",
+                    f"**Lead ID:** {lead_id}",
+                    f"**Email:** {lead_data.get('email')}",
+                    f"**Company:** {lead_data.get('company')}",
+                    f"**Tier:** {lead_data.get('tier')}",
+                    f"",
+                    f"**Status:** Journey initiated",
+                    f"**Next Step:** Initial email will be sent"
+                ]
+                
+            elif action == 'continue':
+                # Continue existing journey
+                journey_result = self.continue_lead_journey(lead_id=lead_id)
+                
+                response_parts = [
+                    f"📧 **Follow-up Journey Continued: {lead_data.get('name')}**",
+                    f"",
+                    f"**Lead ID:** {lead_id}",
+                    f"**Status:** Journey continued",
+                    f"**Next Step:** Follow-up email scheduled"
+                ]
+                
+            elif action == 'status':
+                # Get current status
+                response_parts = [
+                    f"📧 **Follow-up Status: {lead_data.get('name')}**",
+                    f"",
+                    f"**Lead ID:** {lead_id}",
+                    f"**Email:** {lead_data.get('email')}",
+                    f"**Company:** {lead_data.get('company')}",
+                    f"**Tier:** {lead_data.get('tier')}",
+                    f"**Status:** {lead_data.get('status')}",
+                    f"",
+                    f"Use action='start' to begin follow-up journey"
+                ]
+                
+            else:
+                return f"❌ Error: Unknown action '{action}'. Use 'start', 'continue', or 'status'"
+                
+            return "\n".join(response_parts)
+            
+        except Exception as e:
+            import traceback
+            return f"❌ Error managing follow-up: {str(e)}\n\n{traceback.format_exc()}"

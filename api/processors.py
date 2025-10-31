@@ -13,6 +13,7 @@ from typing import Any
 
 from config.settings import settings
 from utils.retry import async_retry
+from utils.slack_helpers import get_channel_id
 
 logger = logging.getLogger(__name__)
 
@@ -135,23 +136,56 @@ async def process_typeform_event(event: dict):
         except Exception as e:
             logger.error(f"❌ DSPy failed: {str(e)}")
             import traceback
-            logger.error(traceback.format_exc())
             
-            # Track failure for observability
-            if supabase:
-                try:
-                    supabase.table('processing_failures').insert({
-                        'event_id': event.get('id'),
-                        'stage': 'dspy_qualification',
-                        'error': str(e),
-                        'traceback': traceback.format_exc(),
-                        'lead_email': lead.email if hasattr(lead, 'email') else None,
-                        'timestamp': datetime.utcnow().isoformat()
-                    }).execute()
-                except:
-                    pass  # Don't fail if error tracking fails
-            
-            # Continue without qualification
+        logger.error(f"❌ DSPy failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+        # Track failure for observability
+        if supabase:
+            try:
+                supabase.table('processing_failures').insert({
+                    'event_id': event.get('id'),
+                    'stage': 'dspy_qualification',
+                    'error': str(e),
+                    'traceback': traceback.format_exc(),
+                    'lead_email': lead.email if hasattr(lead, 'email') else None,
+                    'lead_company': lead.company if hasattr(lead, 'company') else None,
+                    'timestamp': datetime.utcnow().isoformat()
+                }).execute()
+            except:
+                pass  # Don't fail if error tracking fails
+
+        # Create fallback qualification result
+        from models.qualification import QualificationResult, QualificationCriteria
+        from models.lead import LeadTier, NextAction
+
+        result = QualificationResult(
+            is_qualified=False,
+            score=0,
+            tier=LeadTier.UNQUALIFIED,
+            reasoning=f"Qualification failed due to error: {str(e)[:200]}",
+            key_factors=[],
+            concerns=["DSPy qualification error - requires manual review"],
+            criteria=QualificationCriteria(
+                business_size_score=0,
+                patient_volume_score=0,
+                industry_fit_score=0,
+                response_quality_score=0,
+                calendly_booking_score=0,
+                response_complete_score=0,
+                company_data_score=0
+            ),
+            next_actions=[NextAction.MANUAL_REVIEW],
+            priority="low",
+            suggested_email_template=None,
+            suggested_sms_message=None,
+            agent_version="1.0.0",
+            model_used="error_fallback",
+            processing_time_ms=0
+        )
+
+        logger.warning(f"⚠️ Created fallback UNQUALIFIED result for lead {lead.email}")
         
         # Step 4: Extract transcript (deep_dive conversation)
         transcript_text = ""
@@ -174,6 +208,34 @@ async def process_typeform_event(event: dict):
             slack_channel, slack_thread_ts = await send_slack_notification_with_qualification(lead, result, transcript_text)
         else:
             await send_slack_notification_simple(event['raw_payload'])
+
+        
+
+        # Step 6.5: Trigger ResearchAgent for WARM/HOT leads (A2A coordination)
+        if result and result.tier in ['warm', 'hot', 'scorching']:
+            try:
+                logger.info(f"🔗 Triggering ResearchAgent for {result.tier.upper()} lead: {lead.email}")
+
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    research_response = await client.post(
+                        "http://localhost:8000/agents/research/a2a",
+                        json={
+                            "lead_id": str(lead.id),
+                            "tier": result.tier,
+                            "email": lead.email,
+                            "company": lead.company
+                        },
+                        timeout=30.0
+                    )
+
+                    if research_response.status_code == 200:
+                        logger.info(f"✅ ResearchAgent triggered successfully")
+                    else:
+                        logger.error(f"❌ ResearchAgent trigger failed: {research_response.status_code}")
+            except Exception as e:
+                logger.error(f"❌ Failed to trigger ResearchAgent: {e}")
+                # Don't fail the whole process if research trigger fails
 
         # Step 6: Start autonomous follow-up agent (LangGraph)
         if result and slack_thread_ts:
@@ -248,6 +310,8 @@ async def send_slack_notification_with_qualification(lead: Any, result: Any, tra
         SLACK_CHANNEL = settings.SLACK_CHANNEL_INBOUND
         
         if not SLACK_BOT_TOKEN:
+            logger.error("❌ SLACK_BOT_TOKEN not set - cannot send Slack notification")
+            logger.error("   Set SLACK_BOT_TOKEN environment variable in Railway")
             return
         
         # Build enhanced message with agent reasoning

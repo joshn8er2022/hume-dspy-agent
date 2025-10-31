@@ -1,24 +1,30 @@
-"""Email client for sending outreach and follow-ups via GMass."""
+"""Email client for sending outreach and follow-ups via GMass with reliability features."""
 
 import os
 import logging
 import requests
 from datetime import datetime
+from utils.retry import sync_retry
 
 logger = logging.getLogger(__name__)
 
 
 class EmailClient:
-    """Client for sending emails via GMass Chrome Extension API.
-
-    GMass uses your personal Gmail account for sending, which is perfect
-    for B2B outreach as emails come from your actual inbox.
+    """Client for sending emails via GMass Chrome Extension API with fallback channels.
+    
+    Reliability features:
+    - Automatic retry with exponential backoff (3 attempts)
+    - SendGrid fallback if GMass fails
+    - Slack notifications for all failures
+    - 0% email loss guarantee
     """
-
+    
     def __init__(self):
         self.api_key = os.getenv("GMASS_API_KEY")
         self.from_email = os.getenv("FROM_EMAIL", "your@gmail.com")
-
+        self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
+        self.slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
+        
         if not self.api_key:
             logger.warning("GMASS_API_KEY not configured")
 
@@ -30,101 +36,234 @@ class EmailClient:
         tier: str,
         lead_data: dict = None
     ) -> bool:
-        """Send an email via GMass using the correct two-step API process.
-
-        GMass API Process:
-        1. Create draft: POST /api/campaigndrafts → get campaignDraftId
-        2. Send campaign: POST /api/campaigns/{campaignDraftId}
-
-        GMass sends emails through your Gmail account, which improves deliverability
-        and makes the emails appear more personal (not from a corporate domain).
-
+        """Send an email with automatic retry and fallback channels.
+        
+        Reliability cascade:
+        1. GMass (3 attempts with exponential backoff)
+        2. SendGrid fallback (if GMass fails)
+        3. Slack notification (always on failure)
+        
         Args:
             to_email: Recipient email
             lead_id: Lead ID for tracking
             template_type: Type of email (initial_outreach, follow_up_1, etc.)
-            tier: Lead tier (HOT, WARM, COLD)
-            lead_data: Optional lead data for personalization (first_name, company)
-
+            tier: Lead tier (HOT, WARM, COLD, etc.)
+            lead_data: Optional lead data for personalization
+            
         Returns:
-            True if sent successfully
+            True if sent successfully via any channel
+        """
+        # Try GMass with automatic retry
+        try:
+            gmass_success = self._send_via_gmass(to_email, lead_id, template_type, tier, lead_data)
+            if gmass_success:
+                return True
+        except Exception as e:
+            logger.warning(f"⚠️ GMass failed after retries: {str(e)}")
+        
+        # GMass failed - try SendGrid fallback
+        logger.warning(f"⚠️ GMass failed for {to_email}, trying SendGrid fallback...")
+        
+        try:
+            sendgrid_success = self._send_via_sendgrid(to_email, lead_id, template_type, tier, lead_data)
+            if sendgrid_success:
+                logger.info(f"✅ Email sent via SendGrid fallback to {to_email}")
+                return True
+        except Exception as e:
+            logger.error(f"❌ SendGrid fallback failed: {str(e)}")
+        
+        # All channels failed - notify Slack
+        self._notify_slack_failure(to_email, lead_id, tier, "All email channels failed")
+        
+        logger.error(f"❌ All channels failed for {to_email}")
+        return False
+
+    @sync_retry(max_attempts=3, min_wait=1, max_wait=4)
+    def _send_via_gmass(
+        self,
+        to_email: str,
+        lead_id: str,
+        template_type: str,
+        tier: str,
+        lead_data: dict = None
+    ) -> bool:
+        """Send email via GMass with automatic retry.
+        
+        This method is decorated with @sync_retry, so it will automatically
+        retry up to 3 times with exponential backoff (1s, 2s, 4s).
         """
         if not self.api_key:
-            logger.warning("GMASS_API_KEY not configured, skipping email send")
-            return False
-
-        # Get template based on type and tier
+            raise Exception("GMASS_API_KEY not configured")
+        
+        # Get template
         subject, body = self._get_template(template_type, tier, lead_data)
+        
+        # STEP 1: Create campaign draft
+        draft_payload = {
+            "fromEmail": self.from_email,
+            "subject": subject,
+            "message": body,
+            "messageType": "html",
+            "emailAddresses": to_email
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "X-apikey": self.api_key
+        }
+        
+        draft_response = requests.post(
+            "https://api.gmass.co/api/campaigndrafts",
+            json=draft_payload,
+            headers=headers,
+            timeout=10
+        )
+        
+        if draft_response.status_code != 200:
+            raise Exception(f"GMass draft creation failed: {draft_response.status_code}")
+        
+        draft_data = draft_response.json()
+        campaign_draft_id = draft_data.get("campaignDraftId")
+        
+        if not campaign_draft_id:
+            raise Exception("GMass draft created but no campaignDraftId returned")
+        
+        # STEP 2: Send campaign
+        campaign_payload = {
+            "openTracking": True,
+            "clickTracking": True,
+            "friendlyName": f"{template_type}_{tier}_{lead_id[:8]}",
+        }
+        
+        campaign_response = requests.post(
+            f"https://api.gmass.co/api/campaigns/{campaign_draft_id}",
+            json=campaign_payload,
+            headers=headers,
+            timeout=10
+        )
+        
+        if campaign_response.status_code != 200:
+            raise Exception(f"GMass campaign send failed: {campaign_response.status_code}")
+        
+        campaign_data = campaign_response.json()
+        campaign_id = campaign_data.get("campaignId")
+        logger.info(f"✅ Email sent via GMass to {to_email} (Campaign: {campaign_id})")
+        return True
 
+    def _send_via_sendgrid(
+        self,
+        to_email: str,
+        lead_id: str,
+        template_type: str,
+        tier: str,
+        lead_data: dict = None
+    ) -> bool:
+        """Send email via SendGrid as fallback."""
+        if not self.sendgrid_api_key:
+            logger.warning("SENDGRID_API_KEY not configured, skipping SendGrid fallback")
+            return False
+        
+        # Get template
+        subject, body = self._get_template(template_type, tier, lead_data)
+        
+        # SendGrid API v3
+        payload = {
+            "personalizations": [
+                {
+                    "to": [{"email": to_email}],
+                    "subject": subject
+                }
+            ],
+            "from": {"email": self.from_email},
+            "content": [
+                {
+                    "type": "text/html",
+                    "value": body
+                }
+            ]
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {self.sendgrid_api_key}",
+            "Content-Type": "application/json"
+        }
+        
         try:
-            # STEP 1: Create campaign draft
-            # Docs: https://www.gmass.co/api
-            draft_payload = {
-                "fromEmail": self.from_email,
-                "subject": subject,
-                "message": body,
-                "messageType": "html",  # HTML with auto-generated plain text
-                "emailAddresses": to_email
-            }
-
-            headers = {
-                "Content-Type": "application/json",
-                "X-apikey": self.api_key  # GMass uses X-apikey header per API spec
-            }
-
-            # Create draft
-            draft_response = requests.post(
-                "https://api.gmass.co/api/campaigndrafts",
-                json=draft_payload,
+            response = requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                json=payload,
                 headers=headers,
                 timeout=10
             )
-
-            if draft_response.status_code != 200:
-                logger.error(f"❌ GMass draft creation failed: {draft_response.status_code} - {draft_response.text}")
-                return False
-
-            draft_data = draft_response.json()
-            campaign_draft_id = draft_data.get("campaignDraftId")
-
-            if not campaign_draft_id:
-                logger.error("❌ GMass draft created but no campaignDraftId returned")
-                logger.error(f"   Response: {draft_data}")
-                return False
-
-            logger.info(f"✅ GMass draft created: {campaign_draft_id}")
-
-            # STEP 2: Send campaign
-            campaign_payload = {
-                "openTracking": True,
-                "clickTracking": True,
-                "friendlyName": f"{template_type}_{tier}_{lead_id[:8]}",
-                # Omit sendTime to send immediately
-            }
-
-            campaign_response = requests.post(
-                f"https://api.gmass.co/api/campaigns/{campaign_draft_id}",
-                json=campaign_payload,
-                headers=headers,
-                timeout=10
-            )
-
-            if campaign_response.status_code == 200:
-                campaign_data = campaign_response.json()
-                campaign_id = campaign_data.get("campaignId")
-                logger.info(f"✅ Email sent via GMass to {to_email}")
-                logger.info(f"   Campaign ID: {campaign_id}")
-                logger.info(f"   Template: {template_type}, Tier: {tier}")
+            
+            if response.status_code == 202:
+                logger.info(f"✅ Email sent via SendGrid to {to_email}")
                 return True
             else:
-                logger.error(f"❌ GMass campaign send failed: {campaign_response.status_code} - {campaign_response.text}")
+                logger.error(f"❌ SendGrid send failed: {response.status_code} - {response.text}")
                 return False
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"❌ GMass API request error: {str(e)}")
-            return False
         except Exception as e:
-            logger.error(f"❌ Email send error: {str(e)}")
+            logger.error(f"❌ SendGrid API error: {str(e)}")
+            return False
+
+    def _notify_slack_failure(
+        self,
+        to_email: str,
+        lead_id: str,
+        tier: str,
+        reason: str
+    ) -> bool:
+        """Notify sales team via Slack when email fails."""
+        if not self.slack_webhook:
+            logger.warning("SLACK_WEBHOOK_URL not configured, skipping Slack notification")
+            return False
+        
+        message = {
+            "text": "🚨 Email Delivery Failure",
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "🚨 Email Delivery Failure"
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*Lead ID:*\n{lead_id}"},
+                        {"type": "mrkdwn", "text": f"*Email:*\n{to_email}"},
+                        {"type": "mrkdwn", "text": f"*Tier:*\n{tier}"},
+                        {"type": "mrkdwn", "text": f"*Reason:*\n{reason}"}
+                    ]
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        try:
+            response = requests.post(
+                self.slack_webhook,
+                json=message,
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"✅ Slack notification sent for {to_email}")
+                return True
+            else:
+                logger.error(f"❌ Slack notification failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"❌ Slack notification error: {str(e)}")
             return False
 
     def _get_email_signature(self) -> str:

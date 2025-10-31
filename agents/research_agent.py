@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 import httpx
 import os
 import dspy
+from agents.base_agent import SelfOptimizingAgent, AgentRules
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ class ResearchResult(BaseModel):
 
 # ===== Research Agent =====
 
-class ResearchAgent(dspy.Module):
+class ResearchAgent(SelfOptimizingAgent):
     """Agent for conducting deep research on leads and companies.
     
     Refactored as dspy.Module for better architecture and DSPy optimization.
@@ -117,7 +118,21 @@ class ResearchAgent(dspy.Module):
     """
     
     def __init__(self):
-        super().__init__()  # Initialize dspy.Module
+        # Define agent rules for SelfOptimizingAgent
+        rules = AgentRules(
+            allowed_models=["llama-3.1-70b", "mixtral-8x7b"],
+            default_model="llama-3.1-70b",
+            allowed_tools=["research", "web_search", "supabase"],
+            requires_approval=False,  # Auto-approve (low cost)
+            max_cost_per_request=0.10,
+            optimizer="bootstrap",  # BootstrapFewShot (cheaper)
+            auto_optimize_threshold=0.80,
+            department="Research"
+        )
+        
+        # Initialize base class
+        super().__init__(agent_name="ResearchAgent", rules=rules)
+        
         
         # DSPy modules for research workflow
         self.plan_research = dspy.ChainOfThought(ResearchPlanning)
@@ -631,6 +646,82 @@ class ResearchAgent(dspy.Module):
         
         return " | ".join(parts) if parts else "Limited research data available"
 
+
+    async def respond(self, message: str) -> str:
+        """A2A endpoint - respond to inter-agent messages about lead research.
+        
+        Args:
+            message: JSON string with lead info or natural language query
+            
+        Returns:
+            String response with research results
+        """
+        import json
+        import asyncio
+        
+        try:
+            # Parse JSON request
+            try:
+                data = json.loads(message)
+                lead_id = data.get('lead_id')
+                name = data.get('name')
+                email = data.get('email')
+                company = data.get('company')
+                
+                if not lead_id:
+                    return "❌ Error: No lead_id provided in request"
+                    
+            except json.JSONDecodeError:
+                return "❌ Error: Please provide lead info in JSON format: {\"lead_id\": \"...\", \"name\": \"...\", \"email\": \"...\", \"company\": \"...\"}"
+                
+            # Conduct research
+            results = self.forward(
+                lead_id=lead_id,
+                name=name,
+                email=email,
+                company=company
+            )
+            
+            # Handle async result if needed
+            if asyncio.iscoroutine(results):
+                results = await results
+                
+            # Format response
+            response_parts = [
+                f"🔍 **Research Results: {name or 'Lead'}**",
+                f"",
+                f"**Lead ID:** {lead_id}",
+                f""
+            ]
+            
+            # Add key insights
+            if 'key_insights' in results:
+                response_parts.extend([
+                    f"**Key Insights:**",
+                    results['key_insights'],
+                    f""
+                ])
+                
+            # Add engagement strategy
+            if 'engagement_strategy' in results:
+                response_parts.extend([
+                    f"**Engagement Strategy:**",
+                    results['engagement_strategy'],
+                    f""
+                ])
+                
+            # Add talking points
+            if 'talking_points' in results:
+                response_parts.extend([
+                    f"**Talking Points:**",
+                    results['talking_points']
+                ])
+                
+            return "\n".join(response_parts)
+            
+        except Exception as e:
+            import traceback
+            return f"❌ Error conducting research: {str(e)}\n\n{traceback.format_exc()}"
 
 # ===== Export =====
 __all__ = ['ResearchAgent', 'PersonProfile', 'CompanyProfile', 'Contact', 'ResearchResult']
