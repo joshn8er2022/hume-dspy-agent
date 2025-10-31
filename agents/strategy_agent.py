@@ -1352,58 +1352,177 @@ class StrategyAgent(SelfOptimizingAgent):
         return await self.respond_optimized(message=message, user_id=user_id)
 
     async def analyze_pipeline(self, days: int = 7) -> PipelineAnalysis:
-        """Analyze the inbound pipeline.
-        
+        """Analyze the inbound pipeline with REAL data from Supabase.
+
         Args:
             days: Number of days to analyze
-        
+
         Returns:
-            PipelineAnalysis with insights
+            PipelineAnalysis with insights based on real data
         """
         logger.info(f"📊 Analyzing pipeline for last {days} days...")
-        
-        # Query via A2A
-        analysis_data = await self._a2a_command(
-            agent_type="strategy",
-            action="analyze_pipeline",
-            parameters={"days": days}
-        )
-        
-        # Query Supabase for REAL pipeline data
+
+        # Check if Supabase is configured
+        if not self.supabase:
+            logger.error("❌ Supabase not configured - cannot analyze pipeline")
+            return PipelineAnalysis(
+                period_days=days,
+                total_leads=0,
+                by_tier={},
+                by_source={},
+                conversion_rate=0.0,
+                avg_qualification_score=0.0,
+                top_industries=[],
+                insights=["❌ Supabase not configured - set SUPABASE_URL and SUPABASE_KEY environment variables"]
+            )
+
+        # Query Supabase for REAL pipeline data from the 'leads' table
         from datetime import datetime, timedelta
 
         try:
+            # Calculate start date for query
             start_date = (datetime.now() - timedelta(days=days)).isoformat()
 
-            result = self.supabase.table('raw_events') \
+            # Query the 'leads' table for all leads within the date range
+            logger.info(f"🔍 Querying 'leads' table from {start_date}")
+            result = self.supabase.table('leads') \
                 .select('*') \
                 .gte('created_at', start_date) \
                 .execute()
 
-            # Count by tier and source
-            tier_counts = {}
-            source_counts = {}
+            # Initialize tier counts with all possible tiers
+            tier_counts = {
+                'SCORCHING': 0,
+                'HOT': 0,
+                'WARM': 0,
+                'COOL': 0,
+                'COLD': 0,
+                'UNQUALIFIED': 0
+            }
 
-            for event in result.data:
-                tier = event.get('tier', 'UNKNOWN')
-                source = event.get('source', 'unknown')
+            source_counts = {}
+            industries = {}
+            total_score = 0
+            scored_leads_count = 0
+            qualified_leads = 0  # Leads that are not UNQUALIFIED
+            meetings_booked = 0
+
+            # Process each lead
+            for lead in result.data:
+                # Count by tier (check multiple possible field names)
+                tier = (
+                    lead.get('qualification_tier') or
+                    lead.get('tier') or
+                    lead.get('lead_tier') or
+                    'UNQUALIFIED'
+                ).upper()
+
+                # Ensure tier is valid, otherwise mark as UNQUALIFIED
+                if tier not in tier_counts:
+                    tier = 'UNQUALIFIED'
+
                 tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+                # Count qualified leads (not UNQUALIFIED)
+                if tier != 'UNQUALIFIED':
+                    qualified_leads += 1
+
+                # Count by source
+                source = lead.get('source') or lead.get('lead_source') or 'unknown'
                 source_counts[source] = source_counts.get(source, 0) + 1
 
+                # Track industries
+                industry = lead.get('industry') or lead.get('company_industry')
+                if industry:
+                    industries[industry] = industries.get(industry, 0) + 1
+
+                # Calculate average qualification score
+                score = lead.get('qualification_score') or lead.get('score')
+                if score is not None:
+                    try:
+                        total_score += float(score)
+                        scored_leads_count += 1
+                    except (ValueError, TypeError):
+                        pass
+
+                # Count meetings booked (check multiple possible indicators)
+                if (lead.get('meeting_booked') or
+                    lead.get('appointment_scheduled') or
+                    lead.get('demo_scheduled') or
+                    lead.get('status') == 'meeting_scheduled'):
+                    meetings_booked += 1
+
             total_leads = len(result.data)
-            hot_leads = tier_counts.get('HOT', 0) + tier_counts.get('SCORCHING', 0)
-            conversion_rate = hot_leads / total_leads if total_leads > 0 else 0
+
+            # Calculate conversion rate (meetings booked / qualified leads)
+            conversion_rate = 0.0
+            if qualified_leads > 0:
+                conversion_rate = meetings_booked / qualified_leads
+
+            # Calculate average qualification score
+            avg_score = 0.0
+            if scored_leads_count > 0:
+                avg_score = total_score / scored_leads_count
+
+            # Get top 3 industries
+            top_industries = sorted(industries.items(), key=lambda x: x[1], reverse=True)[:3]
+            top_industries_list = [industry for industry, count in top_industries]
 
             # Generate REAL insights based on actual data
             insights = []
-            if tier_counts.get('UNKNOWN', 0) == total_leads and total_leads > 0:
-                insights.append(f"⚠️ All {total_leads} leads are unclassified (tier: UNKNOWN) - qualification system may not be running")
-            if total_leads == 0:
-                insights.append(f"No leads in last {days} days - check data pipeline")
-            if hot_leads > 0:
-                insights.append(f"{hot_leads} HOT/SCORCHING leads require immediate follow-up")
 
-            logger.info(f"📊 Real pipeline data: {total_leads} total, {tier_counts}")
+            # No leads insight
+            if total_leads == 0:
+                insights.append(f"📭 No leads captured in last {days} days - check lead capture systems (Typeform, VAPI, etc.)")
+
+            # High-priority leads insight
+            scorching = tier_counts.get('SCORCHING', 0)
+            hot = tier_counts.get('HOT', 0)
+            if scorching > 0:
+                insights.append(f"🔥 {scorching} SCORCHING leads need IMMEDIATE attention - these are your hottest prospects!")
+            if hot > 0:
+                insights.append(f"⭐ {hot} HOT leads in pipeline - prioritize outreach within 24 hours")
+
+            # Qualification system check
+            if total_leads > 0 and tier_counts.get('UNQUALIFIED', 0) == total_leads:
+                insights.append(f"⚠️ All {total_leads} leads are UNQUALIFIED - qualification agent may not be running or needs tuning")
+
+            # Conversion rate insights
+            if qualified_leads > 0:
+                conversion_pct = conversion_rate * 100
+                if conversion_rate > 0.15:
+                    insights.append(f"✅ Strong conversion rate: {conversion_pct:.1f}% ({meetings_booked} meetings from {qualified_leads} qualified leads)")
+                elif conversion_rate > 0.05:
+                    insights.append(f"📊 Moderate conversion rate: {conversion_pct:.1f}% - room for improvement in follow-up")
+                else:
+                    insights.append(f"⚠️ Low conversion rate: {conversion_pct:.1f}% - review follow-up sequences and qualification criteria")
+
+            # Score-based insights
+            if avg_score > 0:
+                if avg_score >= 75:
+                    insights.append(f"💎 High-quality pipeline: Average score {avg_score:.0f}/100")
+                elif avg_score >= 50:
+                    insights.append(f"📈 Moderate-quality pipeline: Average score {avg_score:.0f}/100")
+                else:
+                    insights.append(f"⚠️ Lower-quality pipeline: Average score {avg_score:.0f}/100 - may need better lead sources")
+
+            # Warm/Cool leads insight
+            warm = tier_counts.get('WARM', 0)
+            cool = tier_counts.get('COOL', 0)
+            if warm + cool > 0:
+                insights.append(f"🎯 {warm + cool} WARM/COOL leads ({warm} WARM, {cool} COOL) - nurture these with targeted content")
+
+            # Industry concentration
+            if top_industries_list:
+                top_industry, top_count = top_industries[0]
+                industry_pct = (top_count / total_leads * 100) if total_leads > 0 else 0
+                if industry_pct > 40:
+                    insights.append(f"🏢 Strong concentration in {top_industry} ({industry_pct:.0f}%) - consider vertical specialization")
+
+            logger.info(f"✅ Real pipeline analysis complete: {total_leads} total leads")
+            logger.info(f"   Tier distribution: {tier_counts}")
+            logger.info(f"   Conversion rate: {conversion_rate*100:.1f}%")
+            logger.info(f"   Avg score: {avg_score:.0f}/100")
 
             return PipelineAnalysis(
                 period_days=days,
@@ -1411,22 +1530,24 @@ class StrategyAgent(SelfOptimizingAgent):
                 by_tier=tier_counts,
                 by_source=source_counts,
                 conversion_rate=conversion_rate,
-                avg_qualification_score=0,  # TODO: Calculate from actual scores
-                top_industries=[],  # TODO: Extract from lead data
+                avg_qualification_score=avg_score,
+                top_industries=top_industries_list,
                 insights=insights
             )
 
         except Exception as e:
-            logger.error(f"Error analyzing pipeline: {e}")
+            logger.error(f"❌ Error analyzing pipeline: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return PipelineAnalysis(
                 period_days=days,
                 total_leads=0,
                 by_tier={},
                 by_source={},
-                conversion_rate=0,
-                avg_qualification_score=0,
+                conversion_rate=0.0,
+                avg_qualification_score=0.0,
                 top_industries=[],
-                insights=[f"Error querying pipeline data: {str(e)}"]
+                insights=[f"❌ Error querying pipeline data: {str(e)}. Check Supabase connection and 'leads' table schema."]
             )
     
     async def recommend_outbound_targets(
@@ -1435,46 +1556,339 @@ class StrategyAgent(SelfOptimizingAgent):
         min_size: int = 50,
         limit: int = 10
     ) -> List[OutboundTarget]:
-        """Recommend companies for outbound outreach.
-        
+        """Recommend companies for outbound outreach based on REAL lead pattern analysis.
+
+        Analyzes successful leads from Supabase to identify:
+        - Common industries of high-quality leads
+        - Company size patterns (patient volume, revenue)
+        - Technology stack preferences
+        - Geographic patterns
+        - Success factors (what makes a lead convert)
+
         Args:
             segment: Target segment (e.g., "weight_loss_clinics", "all")
             min_size: Minimum patient volume
             limit: Max number of targets
-        
+
         Returns:
-            List of recommended targets
+            List of recommended targets based on real data patterns
         """
-        logger.info(f"🎯 Generating outbound targets: {segment}, min size: {min_size}")
-        
-        # Query via A2A
-        result = await self._a2a_command(
-            agent_type="strategy",
-            action="recommend_outbound_targets",
-            parameters={
-                "segment": segment,
-                "min_size": min_size,
-                "limit": limit
-            }
-        )
-        
-        # For now, return mock data (TODO: Implement real analysis)
-        return [
-            OutboundTarget(
-                company_name="West Coast Weight Loss Center",
-                reason="Similar to our top-performing HOT leads. 200+ patient volume, focuses on chronic disease management.",
-                fit_score=92,
-                estimated_patient_volume="200-300",
-                contact_info={"linkedin": "linkedin.com/company/wcwlc"}
-            ),
-            OutboundTarget(
-                company_name="Precision Health Clinic",
-                reason="Uses InBody (competitor) - perfect for competitive displacement. 150+ patients.",
-                fit_score=88,
-                estimated_patient_volume="150-200",
-                contact_info={"website": "precisionhealthclinic.com"}
+        logger.info(f"🎯 Generating outbound targets from REAL data: {segment}, min size: {min_size}")
+
+        try:
+            # Step 1: Query Supabase for successful leads (meeting_booked, deal_closed)
+            if not self.supabase:
+                logger.error("❌ Supabase not configured - cannot analyze lead patterns")
+                return []
+
+            # Query leads with high success rates
+            successful_statuses = ['meeting_booked', 'deal_closed', 'opportunity']
+            successful_tiers = ['HOT', 'SCORCHING']
+
+            # Get successful leads
+            logger.info("📊 Querying successful leads from Supabase...")
+            success_query = self.supabase.table('leads').select('*').or_(
+                f"status.in.({','.join(successful_statuses)}),qualification_tier.in.({','.join(successful_tiers)})"
+            ).limit(100).execute()
+
+            successful_leads = success_query.data
+            logger.info(f"   Found {len(successful_leads)} successful leads")
+
+            if not successful_leads:
+                logger.warning("⚠️ No successful leads found - cannot generate recommendations")
+                return []
+
+            # Step 2: Analyze patterns using DSPy reasoning
+            logger.info("🧠 Analyzing patterns with DSPy...")
+            patterns = await self._analyze_lead_patterns(successful_leads)
+            logger.info(f"   Identified patterns: {patterns}")
+
+            # Step 3: Use Wolfram Alpha for market intelligence (optional enhancement)
+            market_insights = None
+            if patterns.get('top_industry'):
+                try:
+                    logger.info(f"🔬 Querying Wolfram Alpha for {patterns['top_industry']} market data...")
+                    from tools.strategy_tools import wolfram_market_analysis
+                    market_insights = await wolfram_market_analysis(
+                        market=patterns['top_industry'],
+                        metric="market size and growth rate",
+                        comparison_regions=["United States"]
+                    )
+                    logger.info(f"   Market insights: {market_insights[:100]}...")
+                except Exception as e:
+                    logger.warning(f"⚠️ Wolfram Alpha query failed (non-critical): {e}")
+
+            # Step 4: Generate recommendations using DSPy with real patterns
+            logger.info("🎯 Generating recommendations with DSPy...")
+            recommendations = await self._generate_target_recommendations(
+                patterns=patterns,
+                market_insights=market_insights,
+                segment=segment,
+                min_size=min_size,
+                limit=limit
             )
+
+            logger.info(f"✅ Generated {len(recommendations)} recommendations from REAL data")
+            return recommendations
+
+        except Exception as e:
+            logger.error(f"❌ Error generating outbound targets: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+
+    async def _analyze_lead_patterns(self, leads: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze patterns in successful leads using DSPy reasoning.
+
+        Args:
+            leads: List of successful lead records from Supabase
+
+        Returns:
+            Dictionary of identified patterns
+        """
+        try:
+            # Extract key attributes
+            industries = []
+            company_sizes = []
+            tech_stacks = []
+            revenues = []
+            locations = []
+
+            for lead in leads:
+                # Extract from metadata or direct fields
+                metadata = lead.get('metadata', {})
+
+                if lead.get('company'):
+                    industries.append(metadata.get('industry', 'unknown'))
+
+                if metadata.get('company_size'):
+                    company_sizes.append(metadata.get('company_size'))
+
+                if metadata.get('tech_stack'):
+                    tech_stacks.extend(metadata.get('tech_stack', []))
+
+                if metadata.get('revenue'):
+                    revenues.append(metadata.get('revenue'))
+
+                if metadata.get('location'):
+                    locations.append(metadata.get('location'))
+
+            # Calculate frequencies
+            from collections import Counter
+            industry_counts = Counter(industries)
+            size_counts = Counter(company_sizes)
+            tech_counts = Counter(tech_stacks)
+            location_counts = Counter(locations)
+
+            # Calculate average qualification score
+            scores = [lead.get('qualification_score', 0) for lead in leads if lead.get('qualification_score')]
+            avg_score = sum(scores) / len(scores) if scores else 0
+
+            patterns = {
+                'total_analyzed': len(leads),
+                'avg_score': avg_score,
+                'top_industry': industry_counts.most_common(1)[0][0] if industry_counts else 'healthcare',
+                'common_industries': [ind for ind, count in industry_counts.most_common(3)],
+                'common_sizes': [size for size, count in size_counts.most_common(3)],
+                'common_tech': [tech for tech, count in tech_counts.most_common(5)],
+                'top_locations': [loc for loc, count in location_counts.most_common(5)],
+                'success_factors': self._identify_success_factors(leads)
+            }
+
+            logger.info(f"📊 Pattern analysis: {patterns}")
+            return patterns
+
+        except Exception as e:
+            logger.error(f"❌ Error analyzing patterns: {e}")
+            # Return safe defaults
+            return {
+                'total_analyzed': len(leads),
+                'avg_score': 0,
+                'top_industry': 'healthcare',
+                'common_industries': ['healthcare', 'wellness', 'medical'],
+                'common_sizes': ['medium', 'large'],
+                'common_tech': [],
+                'top_locations': [],
+                'success_factors': ['Active engagement', 'Clear need identified']
+            }
+
+    def _identify_success_factors(self, leads: List[Dict[str, Any]]) -> List[str]:
+        """Identify common success factors from lead data.
+
+        Args:
+            leads: List of successful leads
+
+        Returns:
+            List of success factors
+        """
+        factors = []
+
+        # Analyze metadata for common patterns
+        for lead in leads:
+            metadata = lead.get('metadata', {})
+
+            # Check for specific indicators
+            if metadata.get('has_budget'):
+                factors.append('Budget confirmed')
+
+            if metadata.get('decision_maker'):
+                factors.append('Direct decision maker contact')
+
+            if metadata.get('pain_points'):
+                factors.append('Clear pain points identified')
+
+            if lead.get('engagement_score', 0) > 40:
+                factors.append('High engagement score')
+
+            if lead.get('business_fit_score', 0) > 40:
+                factors.append('Strong business fit')
+
+        # Return unique factors
+        from collections import Counter
+        factor_counts = Counter(factors)
+        return [factor for factor, count in factor_counts.most_common(5)]
+
+    async def _generate_target_recommendations(
+        self,
+        patterns: Dict[str, Any],
+        market_insights: Optional[str],
+        segment: str,
+        min_size: int,
+        limit: int
+    ) -> List[OutboundTarget]:
+        """Generate target recommendations using DSPy reasoning over real patterns.
+
+        Args:
+            patterns: Identified patterns from successful leads
+            market_insights: Optional Wolfram Alpha market data
+            segment: Target segment filter
+            min_size: Minimum company size
+            limit: Max recommendations
+
+        Returns:
+            List of OutboundTarget recommendations
+        """
+        try:
+            # Create DSPy signature for recommendation generation
+            class OutboundTargetRecommendation(dspy.Signature):
+                """Generate outbound target recommendations based on successful lead patterns.
+
+                Analyze patterns from high-performing leads and recommend similar companies
+                that would be good outbound targets.
+                """
+                patterns = dspy.InputField(desc="Patterns from successful leads (industries, sizes, tech, etc.)")
+                market_insights = dspy.InputField(desc="Market intelligence from Wolfram Alpha (optional)")
+                segment = dspy.InputField(desc="Target segment filter")
+                min_size = dspy.InputField(desc="Minimum company size")
+
+                recommendations = dspy.OutputField(desc="JSON list of recommended targets with company_name, reason, fit_score, estimated_patient_volume")
+
+            # Use ChainOfThought for reasoning
+            recommender = dspy.ChainOfThought(OutboundTargetRecommendation)
+
+            # Format inputs
+            patterns_str = json.dumps(patterns, indent=2)
+            market_str = market_insights if market_insights else "No market insights available"
+
+            # Generate recommendations
+            with dspy.context(lm=self.sonnet_lm):
+                result = recommender(
+                    patterns=patterns_str,
+                    market_insights=market_str,
+                    segment=segment,
+                    min_size=str(min_size)
+                )
+
+            # Parse recommendations from output
+            try:
+                # Try to parse JSON from the recommendations field
+                recommendations_text = result.recommendations
+
+                # Extract JSON array if embedded in text
+                import re
+                json_match = re.search(r'\[.*\]', recommendations_text, re.DOTALL)
+                if json_match:
+                    recommendations_data = json.loads(json_match.group(0))
+                else:
+                    # Fallback: create from patterns
+                    logger.warning("⚠️ Could not parse DSPy recommendations, using pattern-based fallback")
+                    recommendations_data = self._create_pattern_based_recommendations(patterns, limit)
+
+                # Convert to OutboundTarget objects
+                targets = []
+                for rec in recommendations_data[:limit]:
+                    targets.append(OutboundTarget(
+                        company_name=rec.get('company_name', 'Unknown Company'),
+                        reason=rec.get('reason', 'Based on successful lead patterns'),
+                        fit_score=int(rec.get('fit_score', 75)),
+                        estimated_patient_volume=rec.get('estimated_patient_volume'),
+                        contact_info=rec.get('contact_info')
+                    ))
+
+                return targets
+
+            except Exception as e:
+                logger.error(f"❌ Error parsing DSPy recommendations: {e}")
+                # Fallback to pattern-based recommendations
+                return self._create_pattern_based_recommendations(patterns, limit)
+
+        except Exception as e:
+            logger.error(f"❌ Error generating recommendations: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+
+    def _create_pattern_based_recommendations(
+        self,
+        patterns: Dict[str, Any],
+        limit: int
+    ) -> List[OutboundTarget]:
+        """Create recommendations directly from patterns (fallback method).
+
+        Args:
+            patterns: Identified patterns
+            limit: Max recommendations
+
+        Returns:
+            List of OutboundTarget recommendations
+        """
+        targets = []
+
+        # Get top industry and success factors
+        top_industry = patterns.get('top_industry', 'healthcare')
+        success_factors = patterns.get('success_factors', [])
+        avg_score = patterns.get('avg_score', 0)
+
+        # Create generic but data-driven recommendations
+        recommendation_templates = [
+            {
+                'name_template': f"{top_industry.title()} leader with similar profile",
+                'reason': f"Matches successful lead patterns: {', '.join(success_factors[:2])}. Average qualification score of successful leads: {avg_score:.0f}/100",
+                'fit_score': min(95, int(avg_score * 1.1))
+            },
+            {
+                'name_template': f"Mid-market {top_industry} provider",
+                'reason': f"Fits common size profile ({', '.join(patterns.get('common_sizes', []))[:2]}). Success factors: {', '.join(success_factors[:2])}",
+                'fit_score': min(90, int(avg_score * 1.05))
+            },
+            {
+                'name_template': f"Growing {top_industry} practice",
+                'reason': f"Industry alignment with {len(patterns.get('common_industries', []))} successful verticals. High-engagement profile match",
+                'fit_score': min(85, int(avg_score))
+            }
         ]
+
+        for i, template in enumerate(recommendation_templates[:limit]):
+            targets.append(OutboundTarget(
+                company_name=f"[Pattern Match {i+1}] {template['name_template']}",
+                reason=template['reason'],
+                fit_score=template['fit_score'],
+                estimated_patient_volume="Based on successful lead pattern analysis",
+                contact_info={"note": "Use research tools to identify specific companies matching this profile"}
+            ))
+
+        logger.info(f"✅ Created {len(targets)} pattern-based recommendations")
+        return targets
     
     async def generate_recommendations(self) -> List[StrategyRecommendation]:
         """Generate strategic recommendations based on current state.
