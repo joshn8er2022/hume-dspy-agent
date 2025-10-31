@@ -752,30 +752,83 @@ class StrategyAgent(dspy.Module):
                 logger.error(f"❌ Spreadsheet query failed: {e}")
                 return json.dumps({"error": str(e), "tool": "query_spreadsheet_data"})
         
-        def wolfram_market_insight(query: str) -> str:
+        def wolfram_strategic_query(query: str, category: str = None) -> str:
             """
-            Get strategic market intelligence from Wolfram Alpha.
+            Execute strategic intelligence query using Wolfram Alpha.
             
             Use for market analysis, economic indicators, demographics, etc.
+            Provides computational knowledge and cross-domain data synthesis.
             
             Args:
-                query: Strategic question
+                query: Strategic question (e.g., "healthcare spending US vs Europe")
+                category: Optional category hint (healthcare, economics, demographics)
                 
             Returns:
                 Computational analysis from Wolfram Alpha
                 
             Example:
-                wolfram_market_insight("healthcare spending US vs Europe")
+                wolfram_strategic_query("median household income by state United States")
             """
             try:
-                from tools.strategy_tools import wolfram_market_insight as _wolfram
-                logger.info(f"🔬 Wolfram query: {query}")
-                result = run_async_in_thread(_wolfram(query))
+                from tools.strategy_tools import wolfram_strategic_query as _wolfram
+                logger.info(f"🔬 Wolfram strategic query: {query}")
+                result = run_async_in_thread(_wolfram(query, category))
                 logger.info("✅ Wolfram query complete")
                 return result
             except Exception as e:
                 logger.error(f"❌ Wolfram query failed: {e}")
-                return json.dumps({"error": str(e), "tool": "wolfram_market_insight"})
+                return json.dumps({"error": str(e), "tool": "wolfram_strategic_query"})
+        
+        def wolfram_market_analysis(market: str, metric: str, comparison_regions: list = None) -> str:
+            """
+            Analyze market metrics using Wolfram Alpha computational data.
+            
+            Specialized tool for structured market analysis with regional comparisons.
+            
+            Args:
+                market: Market/industry (e.g., "healthcare", "supplements")
+                metric: What to analyze (e.g., "spending per capita", "market size")
+                comparison_regions: Optional regions to compare (e.g., ["US", "Europe"])
+                
+            Returns:
+                Comparative market analysis
+                
+            Example:
+                wolfram_market_analysis("healthcare", "spending per capita", ["United States", "Europe"])
+            """
+            try:
+                from tools.strategy_tools import wolfram_market_analysis as _market
+                logger.info(f"🔬 Wolfram market analysis: {market} - {metric}")
+                result = run_async_in_thread(_market(market, metric, comparison_regions))
+                logger.info("✅ Market analysis complete")
+                return result
+            except Exception as e:
+                logger.error(f"❌ Market analysis failed: {e}")
+                return json.dumps({"error": str(e), "tool": "wolfram_market_analysis"})
+        
+        def wolfram_demographic_insight(region: str, demographic_query: str) -> str:
+            """
+            Get demographic insights for strategic planning.
+            
+            Args:
+                region: Geographic region (country, state, city)
+                demographic_query: What demographic data to retrieve
+                
+            Returns:
+                Demographic analysis from Wolfram Alpha
+                
+            Example:
+                wolfram_demographic_insight("California", "population over 65 aging trends")
+            """
+            try:
+                from tools.strategy_tools import wolfram_demographic_insight as _demo
+                logger.info(f"🔬 Wolfram demographic query: {region} - {demographic_query}")
+                result = run_async_in_thread(_demo(region, demographic_query))
+                logger.info("✅ Demographic analysis complete")
+                return result
+            except Exception as e:
+                logger.error(f"❌ Demographic analysis failed: {e}")
+                return json.dumps({"error": str(e), "tool": "wolfram_demographic_insight"})
         
         # Return list of tools (existing + MCP + delegation + communication + refinement + RAG + Wolfram)
         tools = [
@@ -792,17 +845,23 @@ class StrategyAgent(dspy.Module):
             delegate_to_subordinate,  # Spawn specialized subordinates
             ask_other_agent,  # Ask other agents for help
             refine_subordinate_work,  # Iterative refinement
-            # NEW: Phase 2.0 - RAG Knowledge Base + Strategic Intelligence
-            search_knowledge_base,  # Search 87 indexed docs (11,325 chunks)
+            # NEW: Phase 2.0 - RAG Knowledge Base (87 docs, 11,325 chunks)
+            search_knowledge_base,  # Semantic search across all indexed docs
             list_indexed_documents,  # List all indexed files
             query_spreadsheet_data,  # Query KPI trackers, logs, etc.
-            wolfram_market_insight  # Strategic market intelligence
+            # NEW: Phase 2.0 - Wolfram Alpha Strategic Intelligence
+            wolfram_strategic_query,  # General strategic intelligence queries
+            wolfram_market_analysis,  # Structured market analysis with comparisons
+            wolfram_demographic_insight  # Demographic data for strategic planning
         ]
-        logger.info(f"   Initialized {len(tools)} ReAct tools (RAG + Wolfram Alpha enabled!)")
+        logger.info(f"   Initialized {len(tools)} ReAct tools (RAG + Wolfram Alpha fully integrated!)")
         logger.info(f"   - 3 core tools (audit, query, stats)")
         logger.info(f"   - 4 MCP tools (Close CRM, Perplexity, Apify, List)")
         logger.info(f"   - 3 Phase 1.5 tools (delegate, ask_agent, refine)")
-        logger.info(f"   - 4 Phase 2.0 tools (RAG search, list docs, query sheets, Wolfram)")
+        logger.info(f"   - 3 RAG tools (search KB, list docs, query sheets)")
+        logger.info(f"   - 3 Wolfram tools (strategic query, market analysis, demographics)")
+        logger.info(f"   📚 Knowledge Base: 87 indexed docs, 11,325 chunks")
+        logger.info(f"   🔬 Strategic Intelligence: Wolfram Alpha computational knowledge")
         return tools
     
     def _register_instruments(self):
@@ -1635,11 +1694,14 @@ _Reply with "details" for full analysis_
                                 "audit_lead_flow", "query_supabase", "get_pipeline_stats",
                                 "create_close_lead", "research_with_perplexity", "scrape_website",
                                 "list_mcp_tools", "delegate_to_subordinate", "ask_other_agent",
-                                "refine_subordinate_work"
+                                "refine_subordinate_work", "search_knowledge_base", 
+                                "list_indexed_documents", "query_spreadsheet_data",
+                                "wolfram_strategic_query", "wolfram_market_analysis", 
+                                "wolfram_demographic_insight"
                             ],
                             "strategic_guidance": "You are Josh's AI business partner, NOT just a pipeline analyst. Pipeline analysis is ~10% of your role. Focus on strategic execution, competitive intelligence, market research, and growth strategies. Use your tools and subordinates proactively.",
                             "status": "active",
-                            "version": "Phase 1.5 Enhanced - Agent Zero Integration"
+                            "version": "Phase 2.0 - RAG + Wolfram Alpha Intelligence Layer"
                         }
                     },
                     "data_layer": {
@@ -1654,7 +1716,9 @@ _Reply with "details" for full analysis_
                         "openrouter": "LLM inference (Claude 3.5 Sonnet)",
                         "mcp_zapier": f"{'✅ 200+ integrations via MCP (use list_mcp_tools to see all)' if self.mcp_client and self.mcp_client.client else '❌ Not configured'}",
                         "mcp_perplexity": "AI research via MCP",
-                        "mcp_apify": "Web scraping via MCP"
+                        "mcp_apify": "Web scraping via MCP",
+                        "knowledge_base": "✅ 87 indexed Google Drive docs, 11,325 chunks (RAG via Supabase)",
+                        "wolfram_alpha": "✅ Strategic intelligence & computational knowledge"
                     },
                     "deployment": {
                         "platform": "Railway",

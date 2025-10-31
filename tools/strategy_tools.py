@@ -202,31 +202,100 @@ async def query_spreadsheet_data(file_name: str, query_description: str) -> str:
 # WOLFRAM ALPHA STRATEGIC INTELLIGENCE
 # ============================================================================
 
-async def wolfram_market_insight(query: str) -> str:
+async def wolfram_strategic_query(query: str, category: Optional[str] = None) -> str:
     """
-    Get strategic market intelligence from Wolfram Alpha.
+    Execute a strategic intelligence query using Wolfram Alpha.
     
-    Use for:
-    - Market size comparisons
-    - Economic indicators
-    - Demographic data
+    This tool provides computational knowledge and cross-domain data synthesis
+    for strategic planning, market analysis, and competitive intelligence.
+    
+    Use this for:
+    - Market size and demographic analysis
+    - Economic indicators and trends
     - Healthcare spending patterns
-    - Income statistics
+    - Competitive benchmarking
+    - Statistical comparisons across regions/markets
+    - Scientific/medical data for product development
     
     Args:
-        query: Strategic question (e.g., "healthcare spending US vs Europe")
+        query: Natural language query
+        category: Optional category hint (healthcare, economics, demographics, etc.)
         
     Returns:
-        Computational analysis from Wolfram Alpha
+        Formatted strategic insights from Wolfram Alpha
         
-    Example:
-        data = await wolfram_market_insight("median income California vs Texas")
+    Example Queries:
+        - "healthcare spending per capita United States vs Europe"
+        - "aging population demographics over 65 in California"
+        - "median household income by state United States"
     """
     try:
-        from tools.wolfram_alpha import wolfram_strategic_query
-        return await wolfram_strategic_query(query)
+        from tools.wolfram_alpha import wolfram_strategic_query as _wolfram_query
+        return await _wolfram_query(query, category)
     except ImportError:
-        return "❌ Wolfram Alpha not installed (pip install tools/wolfram_alpha.py)"
+        return "❌ Wolfram Alpha module not found"
+    except Exception as e:
+        logger.error(f"Wolfram error: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+async def wolfram_market_analysis(
+    market: str,
+    metric: str,
+    comparison_regions: Optional[List[str]] = None
+) -> str:
+    """
+    Analyze market metrics using Wolfram Alpha computational data.
+    
+    Specialized tool for market analysis queries with structured inputs.
+    
+    Args:
+        market: Market or industry (e.g., "healthcare", "supplements", "telemedicine")
+        metric: What to analyze (e.g., "spending per capita", "market size", "growth rate")
+        comparison_regions: Optional list of regions to compare
+        
+    Returns:
+        Comparative market analysis
+        
+    Example:
+        result = await wolfram_market_analysis(
+            market="healthcare",
+            metric="spending per capita",
+            comparison_regions=["United States", "Europe", "Asia"]
+        )
+    """
+    try:
+        from tools.wolfram_alpha import wolfram_market_analysis as _market_analysis
+        return await _market_analysis(market, metric, comparison_regions)
+    except ImportError:
+        return "❌ Wolfram Alpha module not found"
+    except Exception as e:
+        logger.error(f"Wolfram error: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+async def wolfram_demographic_insight(region: str, demographic_query: str) -> str:
+    """
+    Get demographic insights for strategic planning.
+    
+    Args:
+        region: Geographic region (country, state, city)
+        demographic_query: What demographic data to retrieve
+        
+    Returns:
+        Demographic analysis from Wolfram Alpha
+        
+    Example:
+        result = await wolfram_demographic_insight(
+            region="California",
+            demographic_query="population over 65 aging trends"
+        )
+    """
+    try:
+        from tools.wolfram_alpha import wolfram_demographic_insight as _demographic
+        return await _demographic(region, demographic_query)
+    except ImportError:
+        return "❌ Wolfram Alpha module not found"
     except Exception as e:
         logger.error(f"Wolfram error: {e}")
         return f"❌ Error: {str(e)}"
@@ -242,16 +311,27 @@ STRATEGY_TOOLS = {
     "list_indexed_documents": list_indexed_documents,
     "query_spreadsheet_data": query_spreadsheet_data,
     
-    # Strategic Intelligence (NEW!)
-    "wolfram_market_insight": wolfram_market_insight,
+    # Wolfram Alpha Strategic Intelligence (NEW!)
+    "wolfram_strategic_query": wolfram_strategic_query,
+    "wolfram_market_analysis": wolfram_market_analysis,
+    "wolfram_demographic_insight": wolfram_demographic_insight,
 }
 
 
 # Export all tools for easy import
 __all__ = [
+    # RAG Tools
     "search_knowledge_base",
     "list_indexed_documents",
     "query_spreadsheet_data",
-    "wolfram_market_insight",
-    "STRATEGY_TOOLS"
+    
+    # Wolfram Tools
+    "wolfram_strategic_query",
+    "wolfram_market_analysis",
+    "wolfram_demographic_insight",
+    
+    # Registry
+    "STRATEGY_TOOLS",
+    "get_supabase",
+    "get_openai"
 ]
