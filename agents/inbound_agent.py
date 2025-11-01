@@ -301,7 +301,7 @@ class InboundAgent(SelfOptimizingAgent):
         return {
             "score": result.fit_score,
             "reasoning": result.reasoning,
-            "use_case_context": use_case[:200],  # Pass context for debugging
+            "use_case_context": str(use_case)[:200] if use_case else "",  # Convert to string first
         }
 
     def _analyze_engagement(self, lead: Lead) -> Dict[str, Any]:

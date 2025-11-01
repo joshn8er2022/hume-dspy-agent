@@ -8,7 +8,7 @@ import os
 import logging
 from typing import Optional
 from supabase import create_client, Client
-from supabase._async.client import AsyncClient, create_async_client
+from supabase._async.client import AsyncClient, create_client as create_async_client
 
 logger = logging.getLogger(__name__)
 
