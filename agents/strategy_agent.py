@@ -2697,9 +2697,9 @@ I've received approval to implement this fix.
     async def _save_lead_to_db(self, lead):
         """Persist lead to leads table in Supabase."""
         try:
-            from core.async_supabase_client import get_async_client
+            from core.async_supabase_client import get_async_supabase_client
 
-            supabase = get_async_client()
+            supabase = await get_async_supabase_client()
 
             # Prepare lead data for database
             lead_record = {

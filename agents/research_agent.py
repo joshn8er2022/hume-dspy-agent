@@ -300,7 +300,6 @@ class ResearchAgent(SelfOptimizingAgent):
 
         # Save agent state to database (async, non-blocking)
         try:
-            import asyncio
             from core.async_supabase_client import save_agent_state
 
             # Check if we're in an async context

@@ -579,8 +579,8 @@ async def inbound_agent_qualify(request: Request):
 
         # Update lead record in database with qualification results
         try:
-            from core.async_supabase_client import get_async_client
-            supabase = get_async_client()
+            from core.async_supabase_client import get_async_supabase_client
+            supabase = await get_async_supabase_client()
 
             await supabase.table('leads').update({
                 "qualification_score": result.score,
