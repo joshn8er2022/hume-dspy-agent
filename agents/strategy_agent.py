@@ -2629,9 +2629,18 @@ I've received approval to implement this fix.
     async def _delegate_to_research(self, lead):
         """Delegate to ResearchAgent."""
         import httpx
+        import json
         try:
-            # A2A endpoints expect {"message": ...} format
-            message = f"Research lead: {lead.email} from {lead.company}. Lead ID: {lead.id}"
+            # ResearchAgent.respond() expects JSON-encoded lead data
+            lead_data = {
+                "lead_id": str(lead.id),
+                "name": f"{lead.first_name} {lead.last_name}".strip() or "Unknown",
+                "email": lead.email,
+                "company": lead.company or "Unknown",
+                "phone": lead.phone
+            }
+            message = json.dumps(lead_data)
+
             async with httpx.AsyncClient() as client:
                 r = await client.post(
                     f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/research/a2a",
@@ -2646,11 +2655,20 @@ I've received approval to implement this fix.
     async def _delegate_to_followup(self, lead, strategy, research_data=None):
         """Delegate to FollowUpAgent."""
         import httpx
+        import json
         try:
-            # A2A endpoints expect {"message": ...} format
-            message = f"Start follow-up sequence for lead: {lead.email} from {lead.company}. Lead ID: {lead.id}"
+            # FollowUpAgent.respond() expects JSON-encoded lead data with action
+            lead_data = {
+                "lead_id": str(lead.id),
+                "name": f"{lead.first_name} {lead.last_name}".strip() or "Unknown",
+                "email": lead.email,
+                "company": lead.company or "Unknown",
+                "action": "start"  # start|continue|status
+            }
             if research_data:
-                message += f"\nResearch insights: {str(research_data)[:200]}"
+                lead_data["research_insights"] = str(research_data)[:500]
+
+            message = json.dumps(lead_data)
 
             async with httpx.AsyncClient() as client:
                 r = await client.post(
