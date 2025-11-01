@@ -2539,7 +2539,7 @@ I've received approval to implement this fix.
             return {
                 "status": "success",
                 "lead_id": str(lead.id),
-                "strategy": strategy.model_dump(),
+                "strategy": strategy.model_dump(mode='json'),
                 "result": result
             }
 
@@ -2584,11 +2584,11 @@ I've received approval to implement this fix.
             # Use the correct base URL (localhost:8080 for Railway)
             base_url = self.communication.base_url if self.communication else "http://localhost:8080"
             url = f"{base_url}/agents/inbound/qualify"
-            
+
             logger.info(f"🔗 Delegating to InboundAgent: {url}")
-            
+
             async with httpx.AsyncClient(timeout=30.0) as client:
-                r = await client.post(url, json={"lead": lead.model_dump()})
+                r = await client.post(url, json={"lead": lead.model_dump(mode='json')})
                 
                 if r.status_code == 200:
                     result = r.json()
@@ -2644,7 +2644,7 @@ I've received approval to implement this fix.
             await supabase.table('agent_state').insert({
                 'agent_name': 'StrategyAgent',
                 'lead_id': str(lead.id),
-                'state_data': {'strategy': strategy.model_dump() if hasattr(strategy, 'dict') else {}, 'result': result},
+                'state_data': {'strategy': strategy.model_dump(mode='json') if hasattr(strategy, 'model_dump') else {}, 'result': result},
                 'status': 'completed'
             }).execute()
         except Exception as e:
