@@ -676,16 +676,15 @@ class ResearchAgent(SelfOptimizingAgent):
 
     async def respond(self, message: str) -> str:
         """A2A endpoint - respond to inter-agent messages about lead research.
-        
+
         Args:
             message: JSON string with lead info or natural language query
-            
+
         Returns:
             String response with research results
         """
         import json
-        import asyncio
-        
+
         try:
             # Parse JSON request
             try:
