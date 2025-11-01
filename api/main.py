@@ -48,6 +48,8 @@ if tracer_provider:
 else:
     logger.info("⚠️ Phoenix tracing disabled - set PHOENIX_API_KEY to enable")
 
+logger.info("🚀 Deployment: Phase 1 + 1.3 - Async agent_state + FastAPI BackgroundTasks")
+
 # ============================================================================
 # DSPY GLOBAL CONFIGURATION (CRITICAL!)
 # ============================================================================
