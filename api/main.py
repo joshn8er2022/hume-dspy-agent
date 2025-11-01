@@ -739,6 +739,69 @@ async def trigger_performance_monitoring(request: Request):
             content={"status": "error", "error": str(e)}
         )
 
+async def _send_error_to_slack(processor: str, error_msg: str, traceback_str: str, payload: dict):
+    """Send webhook processing error to Slack for visibility.
+
+    Args:
+        processor: Name of the processor that failed (StrategyAgent, InboundAgent)
+        error_msg: Short error message
+        traceback_str: Full traceback string
+        payload: The webhook payload that failed (for debugging)
+    """
+    try:
+        from utils.slack_client import SlackClient
+        slack = SlackClient()
+
+        # Extract lead info if available
+        lead_info = ""
+        try:
+            if 'form_response' in payload:
+                answers = payload.get('form_response', {}).get('answers', [])
+                for answer in answers:
+                    if answer.get('type') == 'email':
+                        lead_info = f"\n**Lead Email:** {answer.get('email', 'N/A')}"
+                        break
+        except:
+            pass
+
+        # Create error message
+        error_notification = f"""
+🚨 **Webhook Processing Error**
+
+**Processor:** {processor}
+**Error:** {error_msg[:500]}
+{lead_info}
+
+**Traceback:**
+```
+{traceback_str[:1500]}
+```
+
+**Payload Preview:**
+```
+{str(payload)[:500]}...
+```
+
+_Check Railway logs for full details_
+"""
+
+        # Send to Slack
+        if slack.client:
+            channel = os.getenv("SLACK_ERROR_CHANNEL", "agent-errors")
+            slack.client.chat_postMessage(
+                channel=channel,
+                text=error_notification,
+                mrkdwn=True
+            )
+            logger.info(f"✅ Error notification sent to Slack #{channel}")
+        else:
+            logger.warning("⚠️ Slack client not configured - cannot send error notification")
+
+    except Exception as e:
+        # Don't fail if Slack notification fails
+        logger.error(f"❌ Failed to send error to Slack: {e}")
+
+
 async def _process_webhook_background(raw_payload: dict, processor: str):
     """Background task to process webhook asynchronously.
 
@@ -762,7 +825,12 @@ async def _process_webhook_background(raw_payload: dict, processor: str):
     except Exception as e:
         logger.error(f"❌ Background processing failed: {e}")
         import traceback
-        logger.error(traceback.format_exc())
+        error_traceback = traceback.format_exc()
+        logger.error(error_traceback)
+
+        # Send error notification to Slack
+        await _send_error_to_slack(processor, str(e), error_traceback, raw_payload)
+
         raise
 
 
@@ -927,8 +995,18 @@ async def process_event_async(event_id: str, source: str):
         logger.error(f"❌ Event processing failed: {event_id}")
         logger.error(f"   Error: {str(e)}")
         import traceback
-        logger.error(traceback.format_exc())
-        
+        error_traceback = traceback.format_exc()
+        logger.error(error_traceback)
+
+        # Send error notification to Slack
+        if event:
+            await _send_error_to_slack(
+                processor=f"{source.upper()} processor",
+                error_msg=str(e),
+                traceback_str=error_traceback,
+                payload=event.get('payload', {})
+            )
+
         # Update status to 'failed'
         if supabase and event:
             retry_count = event.get('retry_count', 0) + 1 if event else 0
@@ -937,7 +1015,7 @@ async def process_event_async(event_id: str, source: str):
                 'processing_error': str(e),
                 'retry_count': retry_count
             }).eq('id', event_id).execute()
-            
+
             # Retry logic
             if retry_count < 3:
                 logger.info(f"🔄 Retrying: {event_id} (attempt {retry_count + 1}/3)")
