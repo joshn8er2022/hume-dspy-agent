@@ -316,8 +316,8 @@ class InboundAgent(SelfOptimizingAgent):
             company_context=get_company_context_for_qualification(),
             response_type=lead.response_type,
             has_calendly_booking=has_calendly,
-            body_comp_response=lead.get_field('body_comp_tracking') or semantic.get('use_case', '')[:100] or "No response provided",
-            ai_summary=lead.get_field('ai_summary') or semantic.get('use_case', '')[:200] or "No summary available",
+            body_comp_response=lead.get_field('body_comp_tracking') or str(semantic.get('use_case', ''))[:100] or "No response provided",
+            ai_summary=lead.get_field('ai_summary') or str(semantic.get('use_case', ''))[:200] or "No summary available",
         )
         return {
             "score": result.engagement_score,
