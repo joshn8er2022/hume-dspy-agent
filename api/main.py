@@ -737,122 +737,77 @@ async def trigger_performance_monitoring(request: Request):
             content={"status": "error", "error": str(e)}
         )
 
+async def _process_webhook_background(raw_payload: dict, processor: str):
+    """Background task to process webhook asynchronously.
+
+    This runs AFTER the webhook has responded to Typeform, preventing timeouts.
+    """
+    try:
+        if processor == "StrategyAgent":
+            from agents.strategy_agent import StrategyAgent
+            logger.info("🔄 Background: StrategyAgent processing started")
+            strategy_agent = StrategyAgent()
+            result = await strategy_agent.process_lead_webhook(raw_payload)
+            logger.info(f"✅ Background: StrategyAgent complete - {result.get('status')}")
+            return result
+        else:
+            # InboundAgent processing
+            logger.info("🔄 Background: InboundAgent processing started")
+            from api.processors import process_typeform_submission
+            result = await process_typeform_submission(raw_payload)
+            logger.info(f"✅ Background: InboundAgent complete - {result.get('lead_id')}")
+            return result
+    except Exception as e:
+        logger.error(f"❌ Background processing failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
+
+
 @app.post("/webhooks/typeform")
 async def typeform_webhook_receiver(
     request: Request,
     background_tasks: BackgroundTasks
 ):
-    """Typeform webhook receiver - SINGLE ROUTE to prevent duplicates."""
+    """Typeform webhook receiver - Returns IMMEDIATELY, processes in background.
+
+    CRITICAL: This endpoint responds in <50ms to prevent Typeform timeouts.
+    All processing happens asynchronously in background tasks.
+    """
     source = "typeform"
     start_time = datetime.utcnow()
-    
+
+    # Get raw payload
+    raw_body = await request.body()
+    raw_payload = json.loads(raw_body.decode('utf-8'))
+
     # Feature flag routing: StrategyAgent vs. InboundAgent
     USE_STRATEGY_AGENT_ENTRY = os.getenv("USE_STRATEGY_AGENT_ENTRY", "false").lower() == "true"
 
     if USE_STRATEGY_AGENT_ENTRY:
-        # NEW: Route to StrategyAgent for strategic processing
-        logger.info("🎯 Routing to StrategyAgent (strategic processing)")
-        try:
-            from agents.strategy_agent import StrategyAgent
-            strategy_agent = StrategyAgent()
+        # Route to StrategyAgent - Process in BACKGROUND
+        logger.info("🎯 Webhook accepted - Routing to StrategyAgent (background)")
+        background_tasks.add_task(_process_webhook_background, raw_payload, "StrategyAgent")
 
-            # Get raw payload
-            raw_body = await request.body()
-            raw_payload = json.loads(raw_body.decode('utf-8'))
-
-            # Process via StrategyAgent
-            result = await strategy_agent.process_lead_webhook(raw_payload)
-            logger.info(f"✅ StrategyAgent processing complete: {result.get('status')}")
-
-            return {"status": "success", "processor": "StrategyAgent", "result": result}
-        except Exception as e:
-            logger.error(f"❌ StrategyAgent processing failed: {e}")
-            logger.info("   Falling back to InboundAgent processing")
-            # Fall through to existing InboundAgent processing below
-
-    # EXISTING: InboundAgent processing (default when flag OFF or StrategyAgent fails)
-    logger.info("📥 Using InboundAgent processing (default)")
-
-    try:
-        logger.info("="*80)
-        logger.info(f"📥 WEBHOOK RECEIVED: {source}")
-        logger.info(f"   Path: {request.url.path}")
-        
-        # Get raw body
-        raw_body = await request.body()
-        headers = dict(request.headers)
-        logger.info(f"   Body size: {len(raw_body)} bytes")
-        
-        # Parse JSON
-        try:
-            payload = await request.json()
-        except Exception as e:
-            logger.error(f"❌ Invalid JSON: {str(e)}")
-            return JSONResponse(
-                status_code=400,
-                content={"ok": False, "error": "Invalid JSON"}
-            )
-        
-        # ============================================================================
-        # DEDUPLICATION: Check if this Typeform event was already processed
-        # ============================================================================
-        typeform_event_id = payload.get('event_id')
-        
-        if typeform_event_id and supabase:
-            try:
-                # Check if this event_id already exists in raw_events
-                existing = supabase.table('raw_events').select('id, received_at, status').eq('source', source).filter('raw_payload->>event_id', 'eq', typeform_event_id).execute()
-                
-                if existing.data:
-                    # This is a duplicate webhook delivery from Typeform
-                    first_event = existing.data[0]
-                    logger.warning(f"⚠️  DUPLICATE WEBHOOK DETECTED")
-                    logger.warning(f"   Typeform event_id: {typeform_event_id}")
-                    logger.warning(f"   First received: {first_event['received_at']}")
-                    logger.warning(f"   Status: {first_event['status']}")
-                    logger.warning(f"   Returning 200 OK (idempotent)")
-                    
-                    return {
-                        "ok": True,
-                        "duplicate": True,
-                        "event_id": first_event['id'],
-                        "message": "Duplicate webhook ignored (already processed)",
-                        "first_received_at": first_event['received_at']
-                    }
-            except Exception as e:
-                # If deduplication check fails, log but continue processing
-                # Better to process twice than lose an event
-                logger.error(f"⚠️  Deduplication check failed: {str(e)}")
-                logger.error(f"   Continuing with processing...")
-        
-        # Store raw event
-        event_id = await store_raw_event(source, payload, headers)
-        
-        # Queue for async processing
-        background_tasks.add_task(process_event_async, event_id, source)
-        
-        # Calculate response time
-        response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-        
-        logger.info(f"✅ Webhook acknowledged in {response_time:.0f}ms")
-        logger.info(f"   Event ID: {event_id}")
-        logger.info("="*80)
-        
+        # Return IMMEDIATELY (Typeform gets instant 200 OK)
         return {
-            "ok": True,
-            "event_id": event_id,
-            "message": "Webhook received, processing in background",
-            "response_time_ms": response_time
+            "status": "accepted",
+            "processor": "StrategyAgent",
+            "processing": "background",
+            "message": "Webhook received, processing asynchronously"
         }
-        
-    except Exception as e:
-        logger.error(f"❌ Webhook reception failed: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return JSONResponse(
-            status_code=500,
-            content={"ok": False, "error": str(e)}
-        )
+
+    # Route to InboundAgent - Process in BACKGROUND
+    logger.info("📥 Webhook accepted - Routing to InboundAgent (background)")
+    background_tasks.add_task(_process_webhook_background, raw_payload, "InboundAgent")
+
+    # Return IMMEDIATELY (Typeform gets instant 200 OK)
+    return {
+        "status": "accepted",
+        "processor": "InboundAgent",
+        "processing": "background",
+        "message": "Webhook received, processing asynchronously"
+    }
 
 
 @app.post("/webhooks/vapi")
