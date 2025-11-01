@@ -2630,20 +2630,37 @@ I've received approval to implement this fix.
         """Delegate to ResearchAgent."""
         import httpx
         try:
+            # A2A endpoints expect {"message": ...} format
+            message = f"Research lead: {lead.email} from {lead.company}. Lead ID: {lead.id}"
             async with httpx.AsyncClient() as client:
-                r = await client.post(f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/research/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
-                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
+                r = await client.post(
+                    f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/research/a2a",
+                    json={"message": message},
+                    timeout=30.0
+                )
+                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error", "http_status": r.status_code}
         except Exception as e:
+            logger.error(f"❌ ResearchAgent delegation failed: {e}")
             return {"status": "error", "error": str(e)}
-    
+
     async def _delegate_to_followup(self, lead, strategy, research_data=None):
         """Delegate to FollowUpAgent."""
         import httpx
         try:
+            # A2A endpoints expect {"message": ...} format
+            message = f"Start follow-up sequence for lead: {lead.email} from {lead.company}. Lead ID: {lead.id}"
+            if research_data:
+                message += f"\nResearch insights: {str(research_data)[:200]}"
+
             async with httpx.AsyncClient() as client:
-                r = await client.post(f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/followup/a2a", json={"lead_id": str(lead.id)}, timeout=30.0)
-                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error"}
+                r = await client.post(
+                    f"{self.communication.base_url if self.communication else 'http://localhost:8080'}/agents/followup/a2a",
+                    json={"message": message},
+                    timeout=30.0
+                )
+                return {"status": "success", "data": r.json()} if r.status_code == 200 else {"status": "error", "http_status": r.status_code}
         except Exception as e:
+            logger.error(f"❌ FollowUpAgent delegation failed: {e}")
             return {"status": "error", "error": str(e)}
     
     async def _fallback_to_inbound(self, lead_data):
