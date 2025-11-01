@@ -243,6 +243,38 @@ class InboundAgent(SelfOptimizingAgent):
             result.campaign_id = campaign_id
 
         logger.info(f"✅ Qualification complete - Tier: {result.tier if 'result' in locals() else 'unknown'}, Score: {result.score if 'result' in locals() else 0}")
+
+        # Save agent state to database (async, non-blocking)
+        try:
+            import asyncio
+            from core.async_supabase_client import save_agent_state
+
+            # Check if we're in an async context (event loop running)
+            try:
+                loop = asyncio.get_running_loop()
+                # Create task to save state without blocking
+                loop.create_task(
+                    save_agent_state(
+                        agent_name='InboundAgent',
+                        lead_id=str(lead.id),
+                        state_data={
+                            'qualification_tier': tier.value,
+                            'qualification_score': total_score,
+                            'reasoning': reasoning[:500] if reasoning else None,
+                            'next_actions': [action.action_type for action in actions_result.next_actions] if actions_result.next_actions else [],
+                            'processing_time_ms': processing_time,
+                            'model_used': settings.PRIMARY_MODEL
+                        },
+                        status='completed'
+                    )
+                )
+            except RuntimeError:
+                # No event loop - we're in sync context, skip state saving
+                logger.warning("⚠️ InboundAgent running in sync context, skipping state save")
+        except Exception as e:
+            # Non-critical - log but don't fail qualification
+            logger.warning(f"⚠️ Failed to save InboundAgent state (non-critical): {e}")
+
         return result
 
     def _analyze_business_fit(self, lead: Lead) -> Dict[str, Any]:

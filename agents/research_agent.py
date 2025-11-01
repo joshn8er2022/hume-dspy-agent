@@ -297,7 +297,34 @@ class ResearchAgent(SelfOptimizingAgent):
         logger.info(f"✅ Research complete for lead: {lead_id}")
         logger.info(f"   Score: {research_score}/100")
         logger.info(f"   Insights: {len(insights)}")
-        
+
+        # Save agent state to database (async, non-blocking)
+        try:
+            import asyncio
+            from core.async_supabase_client import save_agent_state
+
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    save_agent_state(
+                        agent_name='ResearchAgent',
+                        lead_id=lead_id,
+                        state_data={
+                            'research_score': research_score,
+                            'insights_count': len(insights),
+                            'recommendations': [rec.recommendation for rec in result.recommendations] if result.recommendations else [],
+                            'technologies_used': technologies,
+                            'customer_segments': result.customer_segments
+                        },
+                        status='completed'
+                    )
+                )
+            except RuntimeError:
+                logger.warning("⚠️ ResearchAgent running in sync context, skipping state save")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to save ResearchAgent state (non-critical): {e}")
+
         return result
     
     async def research_person(

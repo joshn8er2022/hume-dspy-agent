@@ -624,10 +624,31 @@ class StrategyAgent(SelfOptimizingAgent):
                 by_source = {}
                 
                 for lead in result.data:
-                    tier = lead.get('tier', 'UNKNOWN')
+                    # Use qualification_tier (primary field) with fallbacks
+                    tier = (
+                        lead.get('qualification_tier') or
+                        lead.get('tier') or
+                        lead.get('lead_tier') or
+                        'UNQUALIFIED'
+                    ).upper()
+
+                    # Normalize tier to known values
+                    if tier not in ['SCORCHING', 'HOT', 'WARM', 'COOL', 'COLD', 'UNQUALIFIED']:
+                        tier = 'UNQUALIFIED'
+
                     by_tier[tier] = by_tier.get(tier, 0) + 1
-                    
-                    source = lead.get('source', 'UNKNOWN')
+
+                    # Extract source from raw_metadata or form_id
+                    source = 'UNKNOWN'
+                    if lead.get('raw_metadata'):
+                        metadata = lead['raw_metadata']
+                        if isinstance(metadata, dict):
+                            source = metadata.get('source', 'typeform')
+                        else:
+                            source = 'typeform'  # Default for Typeform webhooks
+                    elif lead.get('form_id'):
+                        source = 'typeform'
+
                     by_source[source] = by_source.get(source, 0) + 1
                 
                 return json.dumps({
@@ -2636,19 +2657,23 @@ I've received approval to implement this fix.
             return {"status": "error", "error": str(e)}
     
     async def _save_lead_state(self, lead, strategy, result):
-        """Save state to database."""
+        """Save state to database using async Supabase client."""
         try:
-            from config.settings import settings
-            from supabase import create_client
-            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-            await supabase.table('agent_state').insert({
-                'agent_name': 'StrategyAgent',
-                'lead_id': str(lead.id),
-                'state_data': {'strategy': strategy.model_dump(mode='json') if hasattr(strategy, 'model_dump') else {}, 'result': result},
-                'status': 'completed'
-            }).execute()
+            from core.async_supabase_client import save_agent_state
+
+            await save_agent_state(
+                agent_name='StrategyAgent',
+                lead_id=str(lead.id),
+                state_data={
+                    'strategy': strategy.model_dump(mode='json') if hasattr(strategy, 'model_dump') else {},
+                    'result': result
+                },
+                status='completed'
+            )
         except Exception as e:
-            logger.error(f"Failed to save state: {e}")
+            logger.error(f"Failed to save StrategyAgent state: {e}")
+            # Re-raise to ensure calling code knows save failed
+            raise
 
 # ===== Export =====
 __all__ = ['StrategyAgent', 'PipelineAnalysis', 'OutboundTarget', 'StrategyRecommendation']
