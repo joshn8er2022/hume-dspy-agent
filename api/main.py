@@ -572,11 +572,29 @@ async def inbound_agent_qualify(request: Request):
         
         # Qualify the lead using forward()
         result = inbound_agent.forward(lead)
-        
+
         logger.info(f"✅ InboundAgent Qualification Complete")
         logger.info(f"   Score: {result.score}")
         logger.info(f"   Tier: {result.tier}")
-        
+
+        # Update lead record in database with qualification results
+        try:
+            from core.async_supabase_client import get_async_client
+            supabase = get_async_client()
+
+            await supabase.table('leads').update({
+                "qualification_score": result.score,
+                "qualification_tier": result.tier.value if hasattr(result.tier, 'value') else str(result.tier),
+                "qualification_reasoning": result.reasoning[:1000] if result.reasoning else "",
+                "recommended_actions": result.recommended_actions[:500] if result.recommended_actions else "",
+                "status": "qualified"
+            }).eq("id", str(lead.id)).execute()
+
+            logger.info(f"✅ Lead qualification saved to database")
+        except Exception as db_error:
+            logger.error(f"⚠️ Failed to update lead in database: {db_error}")
+            # Continue - this is non-critical
+
         # Return QualificationResult as JSON
         return JSONResponse(content={
             "status": "success",

@@ -2546,15 +2546,18 @@ I've received approval to implement this fix.
             lead = transform_typeform_webhook(lead_data)
             logger.info(f"   Lead: {lead.email} ({lead.company})")
 
-            # Step 2: Strategic reasoning - determine engagement strategy
+            # Step 2: Persist lead to database BEFORE delegation
+            await self._save_lead_to_db(lead)
+
+            # Step 3: Strategic reasoning - determine engagement strategy
             strategy = await self._strategize_engagement(lead)
             logger.info(f"   Strategy: {strategy.approach}")
 
-            # Step 3: Execute strategy via delegation
+            # Step 4: Execute strategy via delegation
             result = await self._execute_strategy(lead, strategy)
             logger.info(f"   Result: {result.get('status')}")
 
-            # Step 4: Save state
+            # Step 5: Save state
             await self._save_lead_state(lead, strategy, result)
 
             return {
@@ -2691,6 +2694,39 @@ I've received approval to implement this fix.
         except Exception as e:
             return {"status": "error", "error": str(e)}
     
+    async def _save_lead_to_db(self, lead):
+        """Persist lead to leads table in Supabase."""
+        try:
+            from core.async_supabase_client import get_async_client
+
+            supabase = get_async_client()
+
+            # Prepare lead data for database
+            lead_record = {
+                "id": str(lead.id),
+                "typeform_id": lead.typeform_id or "",
+                "form_id": lead.form_id or "",
+                "first_name": lead.first_name or "",
+                "last_name": lead.last_name or "",
+                "email": lead.email,
+                "phone": lead.phone or "",
+                "company": lead.company or "",
+                "status": "new",  # Will be updated by InboundAgent/FollowUpAgent
+                "follow_up_count": 0,
+                "response_received": False,
+                "escalated": False,
+                "raw_answers": lead.raw_answers or {},
+                "raw_metadata": lead.raw_metadata or {}
+            }
+
+            # Upsert to handle duplicate lead IDs gracefully
+            await supabase.table('leads').upsert(lead_record).execute()
+            logger.info(f"✅ Lead {lead.email} saved to database (ID: {lead.id})")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to save lead to database: {e}")
+            # Don't re-raise - this is non-critical, processing can continue
+
     async def _save_lead_state(self, lead, strategy, result):
         """Save state to database using async Supabase client."""
         try:
