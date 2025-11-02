@@ -436,7 +436,7 @@ Moving to nurture campaign.
         lead: Lead = None,
         tier: LeadTier = None,
         slack_thread_ts: str = None,
-        slack_channel: str = "inbound-leads",
+        slack_channel: str = "ai-test",
         # Alternative parameter names for direct invocation
         lead_id: str = None,
         email: str = None,
@@ -519,6 +519,8 @@ Moving to nurture campaign.
         import json
         from supabase import create_client
         import os
+        # Ensure asyncio is available in this scope
+        import asyncio
         
         try:
             # Parse JSON request
@@ -578,7 +580,7 @@ Moving to nurture campaign.
                     company=data.get('company') or lead_data.get('company', 'your company'),
                     tier=data.get('tier') or lead_data.get('tier', 'UNQUALIFIED'),
                     slack_thread_ts=slack_thread_ts,
-                    slack_channel=slack_channel or "inbound-leads"
+                    slack_channel=slack_channel or "ai-test"
                 )
                 
                 response_parts = [

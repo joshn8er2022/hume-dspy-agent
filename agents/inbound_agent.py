@@ -264,12 +264,15 @@ class InboundAgent(SelfOptimizingAgent):
             # Save to memory (async)
             # Check if we're in an async context
             try:
+                # Ensure asyncio is available - import at function level to avoid scope issues
+                import asyncio
                 loop = asyncio.get_running_loop()
                 # We're in async context - create task
                 loop.create_task(self.memory.save_lead_memory(lead_memory))
                 print(f"💾 Queued lead save to memory: {lead.email}")
             except RuntimeError:
                 # No event loop - we're in sync context
+                import asyncio
                 memory_id = asyncio.run(self.memory.save_lead_memory(lead_memory))
                 print(f"💾 Saved lead to memory: {lead.email} (ID: {memory_id})")
         except Exception as e:
@@ -295,6 +298,8 @@ class InboundAgent(SelfOptimizingAgent):
                 }
                 # Check if we're in an async context
                 try:
+                    # Ensure asyncio is available - import at function level to avoid scope issues
+                    import asyncio
                     loop = asyncio.get_running_loop()
                     # We're in async context - create task
                     task = loop.create_task(self.orchestrator.process_new_lead(campaign_data))
@@ -304,6 +309,7 @@ class InboundAgent(SelfOptimizingAgent):
                     campaign_id = None  # Will be None since we're not awaiting
                 except RuntimeError:
                     # No event loop - we're in sync context
+                    import asyncio
                     campaign_result = asyncio.run(self.orchestrator.process_new_lead(campaign_data))
                     campaign_id = campaign_result.get('campaign_id')
                     print(f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})")
