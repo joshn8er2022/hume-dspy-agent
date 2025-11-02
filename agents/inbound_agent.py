@@ -205,7 +205,7 @@ class InboundAgent(SelfOptimizingAgent):
                 practice_size=lead.get_field('business_size'),
                 patient_volume=lead.get_field('patient_volume'),
                 industry=lead.get_field('industry') or 'Healthcare',
-                strategy_used=actions_result.primary_action.action_type if actions_result.primary_action else None,
+                strategy_used=str(actions_result.primary_action.value) if (actions_result.primary_action and hasattr(actions_result.primary_action, 'value')) else (str(actions_result.primary_action) if actions_result.primary_action else None),
                 converted=None,  # Will be updated later when we know conversion
                 key_insights=reasoning[:500] if reasoning else None,
             )
@@ -261,7 +261,7 @@ class InboundAgent(SelfOptimizingAgent):
                             'qualification_tier': tier.value,
                             'qualification_score': total_score,
                             'reasoning': reasoning[:500] if reasoning else None,
-                            'next_actions': [action.action_type for action in actions_result.next_actions] if actions_result.next_actions else [],
+                            'next_actions': [str(action.value) if hasattr(action, 'value') else str(action) for action in actions_result.next_actions] if actions_result.next_actions else [],
                             'processing_time_ms': processing_time,
                             'model_used': settings.PRIMARY_MODEL
                         },

@@ -312,9 +312,9 @@ class ResearchAgent(SelfOptimizingAgent):
                         state_data={
                             'research_score': research_score,
                             'insights_count': len(insights),
-                            'recommendations': [rec.recommendation for rec in result.recommendations] if result.recommendations else [],
-                            'technologies_used': technologies,
-                            'customer_segments': result.customer_segments
+                            'recommendations': getattr(result, 'recommendations', []),
+                            'technologies_used': getattr(result, 'technologies_used', []),
+                            'customer_segments': getattr(result, 'customer_segments', [])
                         },
                         status='completed'
                     )
@@ -707,8 +707,8 @@ class ResearchAgent(SelfOptimizingAgent):
                 company=company
             )
             
-            # Handle async result if needed
-            if asyncio.iscoroutine(results):
+            # Handle async result if needed (Task or coroutine)
+            if asyncio.iscoroutine(results) or isinstance(results, asyncio.Task):
                 results = await results
                 
             # Format response

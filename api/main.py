@@ -586,7 +586,7 @@ async def inbound_agent_qualify(request: Request):
                 "qualification_score": result.score,
                 "qualification_tier": result.tier.value if hasattr(result.tier, 'value') else str(result.tier),
                 "qualification_reasoning": result.reasoning[:1000] if result.reasoning else "",
-                "recommended_actions": result.recommended_actions[:500] if result.recommended_actions else "",
+                "recommended_actions": [str(action.value) if hasattr(action, 'value') else str(action) for action in result.next_actions][:10] if result.next_actions else [],
                 "status": "qualified"
             }).eq("id", str(lead.id)).execute()
 
