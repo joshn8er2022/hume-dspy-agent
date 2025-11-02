@@ -133,8 +133,25 @@ class ResearchAgent(SelfOptimizingAgent):
         # Initialize base class
         super().__init__(agent_name="ResearchAgent", rules=rules)
         
+        # Create LM object for use with dspy.context() (don't use dspy.configure() in async tasks)
+        try:
+            import dspy
+            openrouter_key = os.getenv("OPENROUTER_API_KEY")
+            if openrouter_key:
+                self.research_lm = dspy.LM(
+                    model="openrouter/anthropic/claude-haiku-4.5",
+                    api_key=openrouter_key,
+                    max_tokens=4000,
+                    temperature=0.7
+                )
+            else:
+                self.research_lm = None
+        except Exception as e:
+            logger.warning(f"   ⚠️ Failed to create ResearchAgent LM: {e}")
+            self.research_lm = None
         
         # DSPy modules for research workflow
+        # These will use context() when called (modules can be initialized without context)
         self.plan_research = dspy.ChainOfThought(ResearchPlanning)
         self.synthesize_findings = dspy.ChainOfThought(ResearchSynthesis)
         self.clearbit_api_key = os.getenv("CLEARBIT_API_KEY")
@@ -232,6 +249,30 @@ class ResearchAgent(SelfOptimizingAgent):
         """
         logger.info(f"🔍 Starting deep research for lead: {lead_id}")
         
+        # STEP 1: Plan research strategy using DSPy (generates Phoenix spans!)
+        research_plan = None
+        priority_targets = None
+        if self.plan_research and self.research_lm:
+            try:
+                lead_info = f"Lead: {name} ({email}) at {company or 'Unknown company'}"
+                research_goals = "Find professional background, company intelligence, engagement opportunities, and actionable insights for B2B sales"
+                
+                logger.info("🧠 Planning research strategy with DSPy...")
+                with dspy.context(lm=self.research_lm):
+                    # Explicitly call .forward() for better Phoenix tracing
+                    plan_result = self.plan_research.forward(
+                        lead_info=lead_info,
+                        research_goals=research_goals
+                    )
+                    research_plan = plan_result.research_plan
+                    priority_targets = plan_result.priority_targets
+                    logger.info(f"   ✅ Research plan: {plan_result.priority_targets[:150]}...")
+            except Exception as e:
+                logger.warning(f"   ⚠️ Research planning failed: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
+                research_plan = None
+        
         tasks = []
         
         # Research the person
@@ -274,12 +315,68 @@ class ResearchAgent(SelfOptimizingAgent):
             additional_contacts
         )
         
-        # Generate insights
-        insights = self._generate_insights(
-            person_profile,
-            company_profile,
-            additional_contacts
-        )
+        # STEP 2: Use DSPy to synthesize findings into actionable insights (generates Phoenix spans!)
+        insights = []
+        if self.synthesize_findings and self.research_lm and (person_profile or company_profile):
+            try:
+                # Prepare findings summary
+                findings_summary = self._create_summary(person_profile, company_profile)
+                person_data = person_profile.model_dump() if person_profile else {}
+                company_data = company_profile.model_dump() if company_profile else {}
+                
+                # Format findings for DSPy (separate person and company data)
+                person_text = f"""
+Name: {person_data.get('name', 'Unknown')}
+Title: {person_data.get('title', 'Unknown')}
+Company: {person_data.get('company', 'Unknown')}
+LinkedIn: {person_data.get('linkedin_url', 'Not found')}
+Bio: {person_data.get('bio', 'Not available')[:200]}
+Location: {person_data.get('location', 'Unknown')}
+Recent Activity: {len(person_data.get('recent_activity', []))} items found
+                """.strip() if person_profile else "No person data available"
+                
+                company_text = f"""
+Name: {company_data.get('name', 'Unknown')}
+Employees: {company_data.get('employee_count', 'Unknown')}
+Industry: {company_data.get('industry', 'Unknown')}
+Tech Stack: {', '.join(company_data.get('tech_stack', []))[:200]}
+Recent News: {len(company_data.get('recent_news', []))} items
+Funding: {company_data.get('funding_stage', 'Unknown')} - {company_data.get('total_funding', 'Unknown')}
+Additional Contacts: {len(additional_contacts)} found
+                """.strip() if company_profile else "No company data available"
+                
+                logger.info("🧠 Synthesizing research findings with DSPy...")
+                with dspy.context(lm=self.research_lm):
+                    # Explicitly call .forward() for better Phoenix tracing
+                    synthesis_result = self.synthesize_findings.forward(
+                        person_data=person_text,
+                        company_data=company_text
+                    )
+                    insights = []
+                    if hasattr(synthesis_result, 'key_insights') and synthesis_result.key_insights:
+                        insights.append(synthesis_result.key_insights)
+                    if hasattr(synthesis_result, 'engagement_strategy') and synthesis_result.engagement_strategy:
+                        insights.append(synthesis_result.engagement_strategy)
+                    if hasattr(synthesis_result, 'talking_points') and synthesis_result.talking_points:
+                        insights.append(synthesis_result.talking_points)
+                    logger.info(f"   ✅ Generated {len(insights)} insights from research")
+            except Exception as e:
+                logger.warning(f"   ⚠️ Research synthesis failed: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
+                # Fallback to simple insights
+                insights = self._generate_insights(
+                    person_profile,
+                    company_profile,
+                    additional_contacts
+                )
+        else:
+            # Fallback: use simple insights if DSPy not available
+            insights = self._generate_insights(
+                person_profile,
+                company_profile,
+                additional_contacts
+            )
         
         # Create summary
         summary = self._create_summary(person_profile, company_profile)

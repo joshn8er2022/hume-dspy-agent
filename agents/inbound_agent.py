@@ -1,5 +1,6 @@
 """DSPy-based Inbound Lead Qualification Agent."""
 import dspy
+import os
 from agents.base_agent import SelfOptimizingAgent, AgentRules
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -60,7 +61,24 @@ class InboundAgent(SelfOptimizingAgent):
         # Initialize base class
         super().__init__(agent_name="InboundAgent", rules=rules)
 
+        # Create LM object for use with dspy.context() (don't use dspy.configure() in async tasks)
+        try:
+            openrouter_key = os.getenv("OPENROUTER_API_KEY")
+            if openrouter_key:
+                self.inbound_lm = dspy.LM(
+                    model="openrouter/anthropic/claude-haiku-4.5",
+                    api_key=openrouter_key,
+                    max_tokens=4000,
+                    temperature=0.7
+                )
+            else:
+                self.inbound_lm = None
+        except Exception as e:
+            logger.warning(f"   ⚠️ Failed to create InboundAgent LM: {e}")
+            self.inbound_lm = None
+
         # Initialize DSPy modules
+        # These will use context() when called (modules can be initialized without context)
         self.analyze_business = dspy.ChainOfThought(AnalyzeBusinessFit)
         self.analyze_engagement = dspy.ChainOfThought(AnalyzeEngagement)
         self.determine_actions = dspy.ChainOfThought(DetermineNextActions)
@@ -119,39 +137,72 @@ class InboundAgent(SelfOptimizingAgent):
         tier = self._determine_tier(total_score, lead, engagement)
         is_qualified = total_score >= self.COLD_THRESHOLD
 
-        # Step 5: Determine next actions
-        actions_result = self.determine_actions(
-            company_context=get_company_context_for_qualification(),
-            qualification_score=total_score,
-            tier=tier.value,
-            has_booking=lead.has_field('calendly_url'),
-            response_complete=lead.is_complete(),
-        )
+        # Step 5: Determine next actions (use dspy.context() for async-safe calls)
+        if self.inbound_lm:
+            with dspy.context(lm=self.inbound_lm):
+                # Explicitly call .forward() for better Phoenix tracing
+                actions_result = self.determine_actions.forward(
+                    company_context=get_company_context_for_qualification(),
+                    qualification_score=total_score,
+                    tier=tier.value,
+                    has_booking=lead.has_field('calendly_url'),
+                    response_complete=lead.is_complete(),
+                )
+        else:
+            # Fallback: use global config if LM not available
+            actions_result = self.determine_actions(
+                company_context=get_company_context_for_qualification(),
+                qualification_score=total_score,
+                tier=tier.value,
+                has_booking=lead.has_field('calendly_url'),
+                response_complete=lead.is_complete(),
+            )
 
         # Step 6: Generate personalized templates if qualified
         email_template = None
         sms_template = None
 
         if is_qualified and lead.is_complete():
-            email_result = self.generate_email(
-                company_context=get_company_context_for_qualification(),
-                lead_name=(lead.get_field('first_name', '') + ' ' + lead.get_field('last_name', '')).strip() or 'there',
-                company=lead.get_field('company') or "your practice",
-                business_size=lead.get_field('business_size') if lead.get_field('business_size') else "small business",
-                patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "1-50 patients",
-                needs_summary=lead.get_field('ai_summary') or "body composition tracking",
-                tier=tier.value,
-            )
+            # Use dspy.context() for async-safe DSPy module calls (generates Phoenix spans!)
+            if self.inbound_lm:
+                with dspy.context(lm=self.inbound_lm):
+                    # Explicitly call .forward() for better Phoenix tracing
+                    email_result = self.generate_email.forward(
+                        company_context=get_company_context_for_qualification(),
+                        lead_name=(lead.get_field('first_name', '') + ' ' + lead.get_field('last_name', '')).strip() or 'there',
+                        company=lead.get_field('company') or "your practice",
+                        business_size=lead.get_field('business_size') if lead.get_field('business_size') else "small business",
+                        patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "1-50 patients",
+                        needs_summary=lead.get_field('ai_summary') or "body composition tracking",
+                        tier=tier.value,
+                    )
+                    sms_result = self.generate_sms.forward(
+                        company_context=get_company_context_for_qualification(),
+                        lead_name=lead.get_field('first_name'),
+                        tier=tier.value,
+                        has_booking=lead.has_field('calendly_url'),
+                    )
+            else:
+                # Fallback: use global config if LM not available
+                email_result = self.generate_email(
+                    company_context=get_company_context_for_qualification(),
+                    lead_name=(lead.get_field('first_name', '') + ' ' + lead.get_field('last_name', '')).strip() or 'there',
+                    company=lead.get_field('company') or "your practice",
+                    business_size=lead.get_field('business_size') if lead.get_field('business_size') else "small business",
+                    patient_volume=lead.get_field('patient_volume') if lead.get_field('patient_volume') else "1-50 patients",
+                    needs_summary=lead.get_field('ai_summary') or "body composition tracking",
+                    tier=tier.value,
+                )
+                sms_result = self.generate_sms(
+                    company_context=get_company_context_for_qualification(),
+                    lead_name=lead.get_field('first_name'),
+                    tier=tier.value,
+                    has_booking=lead.has_field('calendly_url'),
+                )
+            
             email_template = f"""Subject: {email_result.email_subject}
 
 {email_result.email_body}"""
-
-            sms_result = self.generate_sms(
-                company_context=get_company_context_for_qualification(),
-                lead_name=lead.get_field('first_name'),
-                tier=tier.value,
-                has_booking=lead.has_field('calendly_url'),
-            )
             sms_template = sms_result.sms_message
 
         # Step 7: Compile reasoning
@@ -291,13 +342,26 @@ class InboundAgent(SelfOptimizingAgent):
         else:
             patient_volume = lead.get_field('patient_volume') or "Unknown"
 
-        result = self.analyze_business(
-            company_context=get_company_context_for_qualification(),
-            business_size=lead.get_field('business_size') or semantic.get('business_size') or "Unknown - see use case",
-            patient_volume=patient_volume,
-            company=semantic.get('company') or lead.get_field('company') or "Unknown",
-            industry="Healthcare",
-        )
+        # Use dspy.context() for async-safe DSPy module calls (generates Phoenix spans!)
+        if self.inbound_lm:
+            with dspy.context(lm=self.inbound_lm):
+                # Explicitly call .forward() for better Phoenix tracing
+                result = self.analyze_business.forward(
+                    company_context=get_company_context_for_qualification(),
+                    business_size=lead.get_field('business_size') or semantic.get('business_size') or "Unknown - see use case",
+                    patient_volume=patient_volume,
+                    company=semantic.get('company') or lead.get_field('company') or "Unknown",
+                    industry="Healthcare",
+                )
+        else:
+            # Fallback: use global config if LM not available
+            result = self.analyze_business(
+                company_context=get_company_context_for_qualification(),
+                business_size=lead.get_field('business_size') or semantic.get('business_size') or "Unknown - see use case",
+                patient_volume=patient_volume,
+                company=semantic.get('company') or lead.get_field('company') or "Unknown",
+                industry="Healthcare",
+            )
         return {
             "score": result.fit_score,
             "reasoning": result.reasoning,
@@ -312,13 +376,26 @@ class InboundAgent(SelfOptimizingAgent):
         # Check for Calendly in semantic data or regular fields
         has_calendly = semantic.get('has_calendly', False) or lead.has_field('calendly_url')
 
-        result = self.analyze_engagement(
-            company_context=get_company_context_for_qualification(),
-            response_type=lead.response_type,
-            has_calendly_booking=has_calendly,
-            body_comp_response=lead.get_field('body_comp_tracking') or str(semantic.get('use_case', ''))[:100] or "No response provided",
-            ai_summary=lead.get_field('ai_summary') or str(semantic.get('use_case', ''))[:200] or "No summary available",
-        )
+        # Use dspy.context() for async-safe DSPy module calls (generates Phoenix spans!)
+        if self.inbound_lm:
+            with dspy.context(lm=self.inbound_lm):
+                # Explicitly call .forward() for better Phoenix tracing
+                result = self.analyze_engagement.forward(
+                    company_context=get_company_context_for_qualification(),
+                    response_type=lead.response_type,
+                    has_calendly_booking=has_calendly,
+                    body_comp_response=lead.get_field('body_comp_tracking') or str(semantic.get('use_case', ''))[:100] or "No response provided",
+                    ai_summary=lead.get_field('ai_summary') or str(semantic.get('use_case', ''))[:200] or "No summary available",
+                )
+        else:
+            # Fallback: use global config if LM not available
+            result = self.analyze_engagement(
+                company_context=get_company_context_for_qualification(),
+                response_type=lead.response_type,
+                has_calendly_booking=has_calendly,
+                body_comp_response=lead.get_field('body_comp_tracking') or str(semantic.get('use_case', ''))[:100] or "No response provided",
+                ai_summary=lead.get_field('ai_summary') or str(semantic.get('use_case', ''))[:200] or "No summary available",
+            )
         return {
             "score": result.engagement_score,
             "intent_level": result.intent_level,

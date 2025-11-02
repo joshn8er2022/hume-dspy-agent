@@ -224,6 +224,19 @@ class StrategyAgent(SelfOptimizingAgent):
         self.research_agent = ResearchAgent()
         self.follow_up_agent = FollowUpAgent()
         
+        # Initialize development introspection (Phoenix MCP integration)
+        self.dev_introspection = None
+        try:
+            from agents.development_agent_extension import DevelopmentAgentExtension
+            self.dev_introspection = DevelopmentAgentExtension(agent=self)
+            # Register for error and after_execute hooks
+            self.register_extension('on_error', self.dev_introspection)
+            self.register_extension('after_execute', self.dev_introspection)
+            logger.info("   Development Introspection: ✅ Enabled (Phoenix MCP)")
+        except Exception as e:
+            logger.warning(f"   Development Introspection: ⚠️ Failed to enable: {e}")
+            self.dev_introspection = None
+        
         # Initialize audit agent for real data retrieval
         from agents.audit_agent import get_audit_agent
         self.audit_agent = get_audit_agent()
@@ -266,13 +279,15 @@ class StrategyAgent(SelfOptimizingAgent):
                     max_tokens=8000,  # More tokens for complex reasoning
                     temperature=0.7
                 )
-                dspy.configure(lm=haiku_lm)
+                # CRITICAL: Don't call dspy.configure() here - it fails in background async tasks!
+                # Store LMs and use dspy.context() when calling modules instead
                 self.haiku_lm = haiku_lm
                 self.sonnet_lm = sonnet_lm
                 logger.info("   Strategy Agent: ✅ Using Sonnet 4.5 for high-level reasoning")
             
-            # Initialize DSPy modules with Sonnet 4.5
+            # Initialize DSPy modules
             # IMPORTANT: Use Predict for simple queries (fast), ChainOfThought for complex (reasoning)
+            # Modules will use context() when called, so initialization without configure() is OK
             self.simple_conversation = dspy.Predict(StrategyConversation)  # No reasoning
             self.complex_conversation = dspy.ChainOfThought(StrategyConversation)  # With reasoning
             self.pipeline_analyzer = dspy.ChainOfThought(PipelineAnalysisSignature)
@@ -282,7 +297,12 @@ class StrategyAgent(SelfOptimizingAgent):
             # Initialize ReAct for tool calling (action queries)
             self.tools = self._init_tools()
             
-            with dspy.context(lm=sonnet_lm):
+            # ReAct needs a context for initialization
+            if self.sonnet_lm:
+                with dspy.context(lm=self.sonnet_lm):
+                    self.action_agent = dspy.ReAct(StrategyConversation, tools=self.tools)
+            else:
+                # Fallback: initialize without explicit context (will use default if configured)
                 self.action_agent = dspy.ReAct(StrategyConversation, tools=self.tools)
             
             logger.info("   DSPy Modules: ✅ Triple-mode conversation")
@@ -292,6 +312,8 @@ class StrategyAgent(SelfOptimizingAgent):
             logger.info(f"   ReAct Tools: {len(self.tools)} available ({', '.join([t.__name__ for t in self.tools][:3])}...)")
         except Exception as e:
             logger.error(f"   DSPy Modules: ❌ Failed to initialize: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             self.simple_conversation = None
             self.complex_conversation = None
             self.action_agent = None
@@ -472,7 +494,8 @@ class StrategyAgent(SelfOptimizingAgent):
                 history_str = self._format_conversation_history(self.conversation_history.get(user_id, []))
 
                 with dspy.context(lm=self.sonnet_lm):  # ReAct needs powerful model
-                    result = self.action_agent(
+                    # Explicitly call .forward() for better Phoenix tracing
+                    result = self.action_agent.forward(
                         context=context,
                         user_message=message,
                         conversation_history=history_str
@@ -487,11 +510,13 @@ class StrategyAgent(SelfOptimizingAgent):
 
                 if complexity == "simple":
                     with dspy.context(lm=self.haiku_lm):
-                        result = self.simple_conversation(context=context, user_message=message, conversation_history=history_str)
+                        # Explicitly call .forward() for better Phoenix tracing
+                        result = self.simple_conversation.forward(context=context, user_message=message, conversation_history=history_str)
                     model, cost = "Haiku", 0.0006
                 else:
                     with dspy.context(lm=self.sonnet_lm):
-                        result = self.complex_conversation(context=context, user_message=message, conversation_history=history_str)
+                        # Explicitly call .forward() for better Phoenix tracing
+                        result = self.complex_conversation.forward(context=context, user_message=message, conversation_history=history_str)
                     model, cost = "Sonnet", 0.0072
                 response = result.response
             if user_id not in self.conversation_history:
@@ -1369,6 +1394,23 @@ class StrategyAgent(SelfOptimizingAgent):
         Returns:
             DSPy-generated response text
         """
+        # Check if message contains development/debugging keywords
+        dev_keywords = ["debug", "analyze", "investigate", "phoenix", "traces", "spans", "development", "issue"]
+        if any(keyword in message.lower() for keyword in dev_keywords):
+            # Trigger development introspection if available
+            if self.dev_introspection:
+                try:
+                    analysis_result = await self.dev_introspection.on_error(
+                        task=message,
+                        error=None,  # No error, just development request
+                        user_message=message
+                    )
+                    if analysis_result and analysis_result.get("development_insight"):
+                        # Include Phoenix analysis in response
+                        return f"{await self.respond_optimized(message=message, user_id=user_id)}\n\n{analysis_result.get('formatted_message', '')}"
+                except Exception as e:
+                    logger.warning(f"⚠️ Development introspection failed: {e}")
+        
         # Phoenix optimization: use respond_optimized
         return await self.respond_optimized(message=message, user_id=user_id)
 
