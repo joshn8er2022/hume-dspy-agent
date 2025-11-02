@@ -325,22 +325,34 @@ class ResearchAgent(SelfOptimizingAgent):
                 company_data = company_profile.model_dump() if company_profile else {}
                 
                 # Format findings for DSPy (separate person and company data)
+                # Safe attribute access - handle None values
+                person_bio = person_data.get('bio') or 'Not available'
+                person_bio = person_bio[:200] if isinstance(person_bio, str) else 'Not available'
+                person_activity = person_data.get('recent_activity') or []
+                
                 person_text = f"""
 Name: {person_data.get('name', 'Unknown')}
 Title: {person_data.get('title', 'Unknown')}
 Company: {person_data.get('company', 'Unknown')}
 LinkedIn: {person_data.get('linkedin_url', 'Not found')}
-Bio: {person_data.get('bio', 'Not available')[:200]}
+Bio: {person_bio}
 Location: {person_data.get('location', 'Unknown')}
-Recent Activity: {len(person_data.get('recent_activity', []))} items found
+Recent Activity: {len(person_activity) if isinstance(person_activity, list) else 0} items found
                 """.strip() if person_profile else "No person data available"
+                
+                # Safe attribute access for company data
+                company_tech_stack = company_data.get('tech_stack') or []
+                company_tech_stack = company_tech_stack if isinstance(company_tech_stack, list) else []
+                company_tech_str = ', '.join(str(t) for t in company_tech_stack[:10])[:200] if company_tech_stack else 'None'
+                company_news = company_data.get('recent_news') or []
+                company_news = company_news if isinstance(company_news, list) else []
                 
                 company_text = f"""
 Name: {company_data.get('name', 'Unknown')}
 Employees: {company_data.get('employee_count', 'Unknown')}
 Industry: {company_data.get('industry', 'Unknown')}
-Tech Stack: {', '.join(company_data.get('tech_stack', []))[:200]}
-Recent News: {len(company_data.get('recent_news', []))} items
+Tech Stack: {company_tech_str}
+Recent News: {len(company_news)} items
 Funding: {company_data.get('funding_stage', 'Unknown')} - {company_data.get('total_funding', 'Unknown')}
 Additional Contacts: {len(additional_contacts)} found
                 """.strip() if company_profile else "No company data available"

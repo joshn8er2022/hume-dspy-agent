@@ -256,7 +256,7 @@ class InboundAgent(SelfOptimizingAgent):
                 practice_size=lead.get_field('business_size'),
                 patient_volume=lead.get_field('patient_volume'),
                 industry=lead.get_field('industry') or 'Healthcare',
-                strategy_used=str(actions_result.primary_action.value) if (actions_result.primary_action and hasattr(actions_result.primary_action, 'value')) else (str(actions_result.primary_action) if actions_result.primary_action else None),
+                strategy_used=str(actions_result.next_actions[0].value) if (actions_result.next_actions and len(actions_result.next_actions) > 0 and hasattr(actions_result.next_actions[0], 'value')) else (str(actions_result.next_actions[0]) if (actions_result.next_actions and len(actions_result.next_actions) > 0) else None),
                 converted=None,  # Will be updated later when we know conversion
                 key_insights=reasoning[:500] if reasoning else None,
             )
