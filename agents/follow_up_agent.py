@@ -5,7 +5,6 @@ This agent manages the entire lead journey autonomously:
 - Monitors for responses
 - Schedules and sends follow-ups
 - Updates Slack thread with progress
-import asyncio
 - Escalates hot leads
 """
 
@@ -13,6 +12,7 @@ from typing import Literal, TypedDict
 from datetime import datetime
 import os
 import logging
+import asyncio
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver

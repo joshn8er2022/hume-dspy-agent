@@ -1271,6 +1271,19 @@ class StrategyAgent(SelfOptimizingAgent):
         
         target_channel = channel or self.josh_slack_dm_channel
         
+        # Resolve channel name to ID if needed (channel IDs start with C/U/D)
+        if target_channel and not target_channel.startswith(('C', 'U', 'D')):
+            try:
+                from utils.slack_helpers import get_channel_id
+                resolved = await get_channel_id(target_channel, self.slack_bot_token)
+                if resolved:
+                    target_channel = resolved
+                    logger.debug(f"✅ Resolved channel name '{channel}' to ID '{target_channel}'")
+                else:
+                    logger.warning(f"⚠️ Could not resolve channel '{target_channel}' to ID, trying anyway")
+            except Exception as e:
+                logger.warning(f"⚠️ Error resolving channel '{target_channel}': {e}, trying anyway")
+        
         # Chunk long messages to avoid Slack API timeouts
         chunks = self._chunk_message(message)
         
@@ -2631,13 +2644,28 @@ I've received approval to implement this fix.
 _Processed via StrategyAgent orchestration_"""
 
                     # Send to Slack and get thread_ts
+                    # Use settings for channel (defaults to channel ID)
+                    from config.settings import settings
+                    inbound_channel = os.getenv('SLACK_CHANNEL_INBOUND') or settings.SLACK_CHANNEL_INBOUND
+                    
+                    # Resolve channel name to ID if needed (before sending)
+                    # We need the resolved ID for database storage
+                    resolved_channel = inbound_channel
+                    if inbound_channel and not inbound_channel.startswith(('C', 'U', 'D')):
+                        from utils.slack_helpers import get_channel_id
+                        resolved = await get_channel_id(inbound_channel, self.slack_bot_token)
+                        if resolved:
+                            resolved_channel = resolved
+                            logger.debug(f"   ✅ Resolved channel '{inbound_channel}' to ID '{resolved_channel}'")
+                    
+                    # send_slack_message will also handle channel resolution as fallback
                     slack_thread_ts = await self.send_slack_message(
                         message=message,
-                        channel=os.getenv('SLACK_CHANNEL_INBOUND', 'inbound-leads')
+                        channel=resolved_channel
                     )
                     
                     if slack_thread_ts:
-                        slack_channel = os.getenv('SLACK_CHANNEL_INBOUND', 'inbound-leads')
+                        slack_channel = resolved_channel  # Use resolved ID for storage
                         logger.info(f"   ✅ Slack notification created: {slack_thread_ts}")
                         
                         # Update lead record with Slack thread info

@@ -17,9 +17,12 @@ async def get_channel_id(channel_name_or_id: str, slack_token: str) -> Optional[
     Returns:
         Channel ID or None if not found
     """
-    # If it starts with C and is alphanumeric, it's already an ID
-    if channel_name_or_id.startswith('C') and len(channel_name_or_id) == 11:
-        return channel_name_or_id
+    # If it starts with C, U, or D (channel, user, or DM IDs), it's already an ID
+    # Slack IDs are typically 9-11 characters, but can vary
+    if channel_name_or_id and channel_name_or_id.startswith(('C', 'U', 'D')):
+        # Additional check: IDs are alphanumeric and typically 9-15 characters
+        if len(channel_name_or_id) >= 9 and channel_name_or_id.replace('_', '').replace('-', '').isalnum():
+            return channel_name_or_id
 
     # Otherwise, look up the channel by name
     try:

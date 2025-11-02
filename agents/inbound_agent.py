@@ -262,8 +262,16 @@ class InboundAgent(SelfOptimizingAgent):
             )
 
             # Save to memory (async)
-            memory_id = asyncio.run(self.memory.save_lead_memory(lead_memory))
-            print(f"💾 Saved lead to memory: {lead.email} (ID: {memory_id})")
+            # Check if we're in an async context
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in async context - create task
+                loop.create_task(self.memory.save_lead_memory(lead_memory))
+                print(f"💾 Queued lead save to memory: {lead.email}")
+            except RuntimeError:
+                # No event loop - we're in sync context
+                memory_id = asyncio.run(self.memory.save_lead_memory(lead_memory))
+                print(f"💾 Saved lead to memory: {lead.email} (ID: {memory_id})")
         except Exception as e:
             # Graceful degradation - continue even if memory save fails
             print(f"⚠️ Memory save failed (non-critical): {e}")
@@ -285,11 +293,23 @@ class InboundAgent(SelfOptimizingAgent):
                     'business_size': lead.get_field('business_size'),
                     'patient_volume': lead.get_field('patient_volume'),
                 }
-                campaign_result = asyncio.run(self.orchestrator.process_new_lead(campaign_data))
-                campaign_id = campaign_result.get('campaign_id')
-                print(f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})")
+                # Check if we're in an async context
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in async context - create task
+                    task = loop.create_task(self.orchestrator.process_new_lead(campaign_data))
+                    # Don't await - run in background
+                    print(f"🎯 ABM Campaign queued for {lead.email} (tier: {tier.value})")
+                    # Optionally store task for later retrieval
+                    campaign_id = None  # Will be None since we're not awaiting
+                except RuntimeError:
+                    # No event loop - we're in sync context
+                    campaign_result = asyncio.run(self.orchestrator.process_new_lead(campaign_data))
+                    campaign_id = campaign_result.get('campaign_id')
+                    print(f"🎯 ABM Campaign initiated: {campaign_id} for {lead.email} (tier: {tier.value})")
             except Exception as e:
                 print(f"⚠️ ABM campaign initiation failed (non-critical): {e}")
+                campaign_id = None
         if campaign_id:
             result.campaign_id = campaign_id
 
