@@ -2595,18 +2595,78 @@ I've received approval to implement this fix.
             strategy = await self._strategize_engagement(lead)
             logger.info(f"   Strategy: {strategy.approach}")
 
-            # Step 4: Execute strategy via delegation
-            result = await self._execute_strategy(lead, strategy)
+            # Step 4: Execute qualification first to get results for Slack
+            qualification_result = {}
+            if strategy.qualification_needed:
+                qualification_result = await self._delegate_to_inbound(lead)
+                logger.info(f"   Qualification: {qualification_result.get('status')}")
+            
+            # Step 4.5: Create Slack notification with qualification results (if available)
+            slack_channel = None
+            slack_thread_ts = None
+            
+            if qualification_result.get('status') == 'success':
+                try:
+                    # Build Slack message with qualification results
+                    tier = qualification_result.get('tier', 'unknown')
+                    score = qualification_result.get('score', 0)
+                    
+                    message = f"""📥 *New Lead Qualified* (StrategyAgent)
+
+*Contact Information:*
+• Name: {lead.first_name or 'N/A'} {lead.last_name or ''}
+• Company: {lead.company or 'N/A'}
+• Email: {lead.email or 'N/A'}
+• Phone: {lead.phone or 'N/A'}
+
+*AI Qualification Results:*
+• Score: {score}/100
+• Tier: {tier.upper()}
+
+*Strategy:*
+• Approach: {strategy.approach.value}
+• Research: {'✅ Yes' if strategy.research_needed else '❌ No'}
+• Personalization: {strategy.personalization_level.value}
+
+_Processed via StrategyAgent orchestration_"""
+
+                    # Send to Slack and get thread_ts
+                    slack_thread_ts = await self.send_slack_message(
+                        message=message,
+                        channel=os.getenv('SLACK_CHANNEL_INBOUND', 'inbound-leads')
+                    )
+                    
+                    if slack_thread_ts:
+                        slack_channel = os.getenv('SLACK_CHANNEL_INBOUND', 'inbound-leads')
+                        logger.info(f"   ✅ Slack notification created: {slack_thread_ts}")
+                        
+                        # Update lead record with Slack thread info
+                        await self._update_lead_slack_info(lead.id, slack_channel, slack_thread_ts)
+                    else:
+                        logger.warning("   ⚠️ Slack notification failed (no thread_ts)")
+                        
+                except Exception as e:
+                    logger.error(f"   ⚠️ Slack notification error: {e}")
+                    # Don't fail the whole process if Slack fails
+
+            # Step 5: Execute remaining strategy (research, followup) with Slack info
+            result = await self._execute_strategy(lead, strategy, slack_thread_ts, slack_channel)
+            
+            # Add qualification result to result dict
+            result['delegations']['qualification'] = qualification_result
+            
             logger.info(f"   Result: {result.get('status')}")
 
-            # Step 5: Save state
+            # Step 6: Save state
             await self._save_lead_state(lead, strategy, result)
 
             return {
                 "status": "success",
                 "lead_id": str(lead.id),
                 "strategy": strategy.model_dump(mode='json'),
-                "result": result
+                "result": result,
+                "slack_thread_ts": slack_thread_ts,
+                "slack_channel": slack_channel
             }
 
         except Exception as e:
@@ -2633,14 +2693,17 @@ I've received approval to implement this fix.
             personalization_level=PersonalizationLevel.CUSTOM if research_needed else PersonalizationLevel.TARGETED
         )
     
-    async def _execute_strategy(self, lead, strategy):
+    async def _execute_strategy(self, lead, strategy, slack_thread_ts=None, slack_channel=None):
         """Execute strategy by delegating to specialists."""
         results = {}
-        if strategy.qualification_needed:
-            results['qualification'] = await self._delegate_to_inbound(lead)
+        # Qualification already done before Slack notification
+        # if strategy.qualification_needed:
+        #     results['qualification'] = await self._delegate_to_inbound(lead)
         if strategy.research_needed:
             results['research'] = await self._delegate_to_research(lead)
-        results['engagement'] = await self._delegate_to_followup(lead, strategy, results.get('research'))
+        results['engagement'] = await self._delegate_to_followup(
+            lead, strategy, results.get('research'), slack_thread_ts, slack_channel
+        )
         return {"status": "success", "delegations": results}
     
     async def _delegate_to_inbound(self, lead):
@@ -2697,7 +2760,7 @@ I've received approval to implement this fix.
             logger.error(f"❌ ResearchAgent delegation failed: {e}")
             return {"status": "error", "error": str(e)}
 
-    async def _delegate_to_followup(self, lead, strategy, research_data=None):
+    async def _delegate_to_followup(self, lead, strategy, research_data=None, slack_thread_ts=None, slack_channel=None):
         """Delegate to FollowUpAgent."""
         import httpx
         import json
@@ -2712,6 +2775,10 @@ I've received approval to implement this fix.
             }
             if research_data:
                 lead_data["research_insights"] = str(research_data)[:500]
+            if slack_thread_ts:
+                lead_data["slack_thread_ts"] = slack_thread_ts
+            if slack_channel:
+                lead_data["slack_channel"] = slack_channel
 
             message = json.dumps(lead_data)
 

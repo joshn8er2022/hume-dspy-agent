@@ -433,18 +433,46 @@ Moving to nurture campaign.
 
     def start_lead_journey(
         self,
-        lead: Lead,
-        tier: LeadTier,
-        slack_thread_ts: str,
-        slack_channel: str = "inbound-leads"
+        lead: Lead = None,
+        tier: LeadTier = None,
+        slack_thread_ts: str = None,
+        slack_channel: str = "inbound-leads",
+        # Alternative parameter names for direct invocation
+        lead_id: str = None,
+        email: str = None,
+        first_name: str = None,
+        company: str = None,
+        tier_value: str = None
     ) -> dict:
-        """Start the autonomous journey for a new lead."""
+        """Start the autonomous journey for a new lead.
+        
+        Can be called with either:
+        - lead object: start_lead_journey(lead=lead, tier=tier, ...)
+        - individual params: start_lead_journey(lead_id=..., email=..., ...)
+        """
+
+        # Handle both calling conventions
+        if lead:
+            # Original signature (Lead object)
+            actual_lead_id = lead.id
+            actual_email = lead.email
+            actual_first_name = lead.first_name or "there"
+            actual_tier = tier.value if tier else "UNQUALIFIED"
+            actual_company = lead.company or "your company"
+        else:
+            # New signature (individual parameters)
+            actual_lead_id = lead_id
+            actual_email = email
+            actual_first_name = first_name or "there"
+            actual_tier = tier_value or (tier.value if tier else "UNQUALIFIED")
+            actual_company = company or "your company"
 
         initial_state: LeadJourneyState = {
-            "lead_id": lead.id,
-            "email": lead.email,
-            "first_name": lead.first_name or "there",
-            "tier": tier.value,
+            "lead_id": actual_lead_id,
+            "email": actual_email,
+            "first_name": actual_first_name,
+            "company": actual_company,
+            "tier": actual_tier,
             "status": LeadStatus.NEW.value,
             "slack_thread_ts": slack_thread_ts,
             "slack_channel": slack_channel,
@@ -458,7 +486,7 @@ Moving to nurture campaign.
             "error": None,
         }
 
-        config = {"configurable": {"thread_id": lead.id}}
+        config = {"configurable": {"thread_id": actual_lead_id}}
         result = self.graph.invoke(initial_state, config)
 
         return result
@@ -505,30 +533,52 @@ Moving to nurture campaign.
             except json.JSONDecodeError:
                 return "❌ Error: Please provide lead info in JSON format: {\"lead_id\": \"...\", \"action\": \"start|continue|status\"}"
                 
-            # Fetch lead from Supabase
+            # Fetch lead from Supabase with retry (in case of async commit timing)
+            import time
             supabase = create_client(
                 os.getenv('SUPABASE_URL'),
                 os.getenv('SUPABASE_KEY')
             )
             
-            result = supabase.table('leads').select('*').eq('id', lead_id).execute()
-            
-            if not result.data:
-                return f"❌ Error: Lead {lead_id} not found"
+            # Try to find lead with retry (max 3 attempts, 1 second delay)
+            lead_data = None
+            for attempt in range(3):
+                result = supabase.table('leads').select('*').eq('id', lead_id).execute()
                 
-            lead_data = result.data[0]
+                if result.data:
+                    lead_data = result.data[0]
+                    break
+                elif attempt < 2:
+                    logger.warning(f"   ⚠️ Lead {lead_id} not found (attempt {attempt + 1}/3), retrying...")
+                    await asyncio.sleep(1.0)  # Wait 1 second for async commit
+                else:
+                    # Last attempt failed - try by email as fallback
+                    if data.get('email'):
+                        logger.info(f"   🔄 Lead not found by ID, trying email lookup: {data.get('email')}")
+                        email_result = supabase.table('leads').select('*').eq('email', data.get('email')).limit(1).execute()
+                        if email_result.data:
+                            lead_data = email_result.data[0]
+                            logger.info(f"   ✅ Found lead by email instead")
+                            break
+            
+            if not lead_data:
+                return f"❌ Error: Lead {lead_id} not found (tried by ID and email)"
+            
+            # Use slack_thread_ts from message data first (passed by StrategyAgent), fallback to DB
+            slack_thread_ts = data.get('slack_thread_ts') or lead_data.get('slack_thread_ts')
+            slack_channel = data.get('slack_channel') or lead_data.get('slack_channel_id') or lead_data.get('slack_channel')
             
             # Execute action
             if action == 'start':
                 # Start new follow-up journey
                 journey_result = self.start_lead_journey(
                     lead_id=lead_id,
-                    email=lead_data.get('email'),
-                    first_name=lead_data.get('name', '').split()[0] if lead_data.get('name') else 'there',
-                    company=lead_data.get('company', 'your company'),
-                    tier=lead_data.get('tier', 'UNQUALIFIED'),
-                    slack_thread_ts=lead_data.get('slack_thread_ts'),
-                    slack_channel=lead_data.get('slack_channel_id')
+                    email=lead_data.get('email') or data.get('email'),
+                    first_name=data.get('name', lead_data.get('first_name', 'there')).split()[0] if data.get('name') or lead_data.get('first_name') else 'there',
+                    company=data.get('company') or lead_data.get('company', 'your company'),
+                    tier=data.get('tier') or lead_data.get('tier', 'UNQUALIFIED'),
+                    slack_thread_ts=slack_thread_ts,
+                    slack_channel=slack_channel or "inbound-leads"
                 )
                 
                 response_parts = [
