@@ -19,7 +19,7 @@ class Settings:
         os.getenv("SLACK_MCP_XOXP_TOKEN")
     )
     SLACK_CHANNEL_INBOUND = os.getenv("SLACK_CHANNEL", "C09FZT6T1A5")
-    SLACK_CHANNEL_AI_TEST = os.getenv("SLACK_CHANNEL_AI_TEST", "ai-test")
+    SLACK_CHANNEL_AI_TEST = os.getenv("SLACK_CHANNEL_AI_TEST", "C09FZT6T1A5")  # ai-test channel ID
     
     # ============================================================================
     # SUPABASE CONFIGURATION

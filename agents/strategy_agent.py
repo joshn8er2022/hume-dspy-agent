@@ -2644,9 +2644,9 @@ I've received approval to implement this fix.
 _Processed via StrategyAgent orchestration_"""
 
                     # Send to Slack and get thread_ts
-                    # Use ai-test channel as specified
+                    # Use ai-test channel ID: C09FZT6T1A5
                     from config.settings import settings
-                    inbound_channel = os.getenv('SLACK_CHANNEL_INBOUND') or settings.SLACK_CHANNEL_AI_TEST or "ai-test"
+                    inbound_channel = os.getenv('SLACK_CHANNEL_INBOUND') or settings.SLACK_CHANNEL_AI_TEST or "C09FZT6T1A5"
                     
                     # Resolve channel name to ID if needed (before sending)
                     # We need the resolved ID for database storage

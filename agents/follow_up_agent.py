@@ -436,7 +436,7 @@ Moving to nurture campaign.
         lead: Lead = None,
         tier: LeadTier = None,
         slack_thread_ts: str = None,
-        slack_channel: str = "ai-test",
+        slack_channel: str = "C09FZT6T1A5",  # ai-test channel ID
         # Alternative parameter names for direct invocation
         lead_id: str = None,
         email: str = None,
@@ -580,7 +580,7 @@ Moving to nurture campaign.
                     company=data.get('company') or lead_data.get('company', 'your company'),
                     tier=data.get('tier') or lead_data.get('tier', 'UNQUALIFIED'),
                     slack_thread_ts=slack_thread_ts,
-                    slack_channel=slack_channel or "ai-test"
+                    slack_channel=slack_channel or "C09FZT6T1A5"  # ai-test channel ID
                 )
                 
                 response_parts = [
